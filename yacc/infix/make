@@ -1,0 +1,3 @@
+#! /bin/sh
+
+yacc $1 && gcc y.tab.c -lm -o ${1%%.c}
