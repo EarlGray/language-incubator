@@ -2,14 +2,11 @@ CC := gcc
 LD := gcc
 CFLAGS := -g
 
-kld: main.o lexer.o
+kld: main.o ast.o
 	$(LD) $^ -o $@
 
 .c.o :
 	$(CC) -g -c $< -o $@
-
-#main.o: main.c
-#lexer.o: lexer.c
 
 .PHONY: clean
 clean:
