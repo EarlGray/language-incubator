@@ -1,0 +1,7 @@
+# Compute the n'th Fibonacci number
+def fib(n)
+  if x < 3 then 1
+  else fib(n - 1) + fib(n - 2)
+
+# do it!
+fib(40)
