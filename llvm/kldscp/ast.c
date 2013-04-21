@@ -62,6 +62,10 @@ void * list_data(list_node_t *n) {
     return n->data;
 }
 
+size_t list_length(list_t *l) {
+    return l->length;
+}
+
 void free_list(list_t *l, void (*free_node)(void *)) {
     list_node_t *n = l->head;
     while (n) {

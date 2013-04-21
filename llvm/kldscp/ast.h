@@ -3,6 +3,10 @@
 
 #define STRTOKEN_MAX_SIZE   256
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * List 
  */
@@ -10,6 +14,7 @@
 typedef  struct list_node  list_node_t;
 typedef  struct list       list_t;
 
+size_t        list_length(list_t *);
 list_node_t * list_head(list_t *l);
 list_node_t * list_next(list_node_t *);
 void *        list_data(list_node_t *);
@@ -115,5 +120,9 @@ ast_t *parse_toplevel(parser_t *p);
 void print_ast(int indent, ast_t *ast);
 
 void free_ast(ast_t *ast);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //__KLDSCP_PARSER__H_
