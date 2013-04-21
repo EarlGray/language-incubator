@@ -394,11 +394,14 @@ ast_t *parse_binop(parser_t *p, ast_t *lhs) {
     ast_t *expr = parse_expr(p);
     assertf(expr, "parse_binop: parse_expr() failed\n");
 
-    if (expr->type != TOK_BINOP)
+    if (expr->type != AST_BINOP)
         return new_binop(op1, lhs, expr);
 
     int op2 = expr->as_binop.op;
-    if (precedence(op1) < precedence(op2))
+
+    int p1 = precedence(op1);
+    int p2 = precedence(op2);
+    if (p1 < p2)
         return new_binop(op1, lhs, expr);
 
     // rebalance
