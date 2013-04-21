@@ -78,6 +78,8 @@ void free_list(list_t *l, void (*free_node)(void *)) {
  * Binary operations
  */
 
+#define PAREN_PRECEDENCE   100
+
 const struct {
    char name;
    int preced;
@@ -251,12 +253,13 @@ ast_t *new_funcall(const char *name, list_t *args) {
     return funcall;
 }
 
-ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs) {
+ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
     ast_t *bop = malloc(sizeof(ast_t));
     bop->type = AST_BINOP;
     bop->as_binop.op = op;
     bop->as_binop.lhs = lhs;
     bop->as_binop.rhs = rhs;
+    bop->as_binop.preced = prec;
     return bop;
 }
 
@@ -320,6 +323,8 @@ ast_t *parse_paren_expr(parser_t *p) {
 
     ast_t *expr = parse_expr(p);
     if (!expr) return NULL;
+    if (expr->type == AST_BINOP)
+        expr->as_binop.preced = PAREN_PRECEDENCE;
 
     assertf(p->token == ')', "parse_paren_expr(): expected ')'\n");
     next_token(p);
@@ -389,25 +394,26 @@ ast_t *parse_if(parser_t *p) {
 
 ast_t *parse_binop(parser_t *p, ast_t *lhs) {
     int op1 = p->lex->op;
+    int p1 = precedence(op1);
 
     next_token(p);
     ast_t *expr = parse_expr(p);
     assertf(expr, "parse_binop: parse_expr() failed\n");
 
     if (expr->type != AST_BINOP)
-        return new_binop(op1, lhs, expr);
+        return new_binop(op1, lhs, expr, p1);
 
     int op2 = expr->as_binop.op;
+    int p2 = expr->as_binop.preced;
 
-    int p1 = precedence(op1);
-    int p2 = precedence(op2);
+    //printf("parse_binop(): '%c'[%d], '%c'[%d]\n", op1, p1, op2, p2);
     if (p1 < p2)
-        return new_binop(op1, lhs, expr);
+        return new_binop(op1, lhs, expr, p1);
 
     // rebalance
     return new_binop(op2,
-            new_binop(op1, lhs, expr->as_binop.lhs),
-            expr->as_binop.rhs);
+            new_binop(op1, lhs, expr->as_binop.lhs, p1),
+            expr->as_binop.rhs, p2);
 }
 
 ast_t *parse_primary(parser_t *p) {

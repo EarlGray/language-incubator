@@ -80,6 +80,7 @@ struct ast_node {
         struct {
             char op;
             ast_t *rhs, *lhs;
+            int preced;
         } as_binop;
 
         // AST_IF
