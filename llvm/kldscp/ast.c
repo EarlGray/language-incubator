@@ -205,25 +205,6 @@ int lextoken(lexer_t *lex) {
 }
 
 
-void test_lexer(void) {
-    lexer_t lex = { 0 };
-    int c;
-    lexinit(&lex, (nextchar_func_t)getchar);
-
-    for (;;) { 
-        switch (c = lextoken(&lex)) {
-          case TOK_EOF: printf("TOK_EOF\n"); return;
-          case TOK_EXT: printf("TOK_EXT\n"); break;
-          case TOK_NUM: printf("TOK_NUM(%f)\n", lex.numtoken); break;
-          case TOK_BINOP: printf("TOK_BINOP(%c)\n", lex.op); break;
-          case TOK_DEF: printf("TOK_DEF\n"); break;
-          case TOK_IF: printf("TOK_IF\n"); break;
-          case TOK_ID: printf("TOK_ID(%s)\n", lex.strtoken); break;
-          default: printf("%c\n", c);
-        }
-    }
-}
-
 /*
  *  Parser
  */

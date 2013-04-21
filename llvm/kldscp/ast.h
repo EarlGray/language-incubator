@@ -23,7 +23,6 @@ typedef  struct lexstate  lexer_t;
 typedef int (*nextchar_func_t)();
 
 lexer_t *new_lexer(nextchar_func_t next);
-void test_lexer(void);
 
 
 /*
