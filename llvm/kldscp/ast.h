@@ -3,6 +3,10 @@
 
 #define STRTOKEN_MAX_SIZE   256
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * List 
  */
@@ -114,5 +118,9 @@ ast_t *parse_toplevel(parser_t *p);
 void print_ast(int indent, ast_t *ast);
 
 void free_ast(ast_t *ast);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //__KLDSCP_PARSER__H_

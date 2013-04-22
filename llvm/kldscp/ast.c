@@ -142,6 +142,10 @@ lexer_t *new_lexer(nextchar_func_t nextchar) {
     return lex;
 }
 
+inline static int lexcmp(lexer_t *lex, const char *s) {
+    return !strncmp(s, lex->strtoken, STRTOKEN_MAX_SIZE);
+}
+
 int lextoken(lexer_t *lex) {
     while (isspace(lex->lastchar))
         lex->lastchar = lex->nextchar(lex);
@@ -154,11 +158,11 @@ int lextoken(lexer_t *lex) {
             *idstr++ = lex->lastchar;
 
         *idstr = 0;
-        if (!strncmp(lex->strtoken, "if", STRTOKEN_MAX_SIZE))
+        if (lexcmp(lex, "if"))
             return (lex->token = TOK_IF);
-        if (!strncmp(lex->strtoken, "def", STRTOKEN_MAX_SIZE)) 
+        if (lexcmp(lex, "def"))
             return (lex->token = TOK_DEF);
-        if (!strncmp(lex->strtoken, "extern", STRTOKEN_MAX_SIZE)) 
+        if (lexcmp(lex, "extern")) 
             return (lex->token = TOK_EXT);
         return (lex->token = TOK_ID);
     }
@@ -350,21 +354,19 @@ ast_t *parse_idexpr(parser_t *p) {
 }
 
 ast_t *parse_if(parser_t *p) {
-    assertf(p->token, "parse_if: 'if'  expected\n");
+    assertf(p->token == TOK_IF, "parse_if: 'if'  expected\n");
 
     next_token(p);
     ast_t *cond = parse_expr(p);
     assertf(cond, "parse_if: parse_expr(condition) failed\n");
 
-    assertf(!strncmp("then", p->lex->strtoken, STRTOKEN_MAX_SIZE), 
-            "parse_if: 'then' expected\n");
+    assertf(lexcmp(p->lex, "then"), "parse_if: 'then' expected\n");
 
     next_token(p);
     ast_t *thenb = parse_expr(p);
     assertf(thenb, "parse_if: parse_expr(thenb) failed\n");
 
-    assertf(!strncmp("else", p->lex->strtoken, STRTOKEN_MAX_SIZE),
-            "parse_if: 'else' expected\n");
+    assertf(lexcmp(p->lex, "else"), "parse_if: 'else' expected\n");
 
     next_token(p);
     ast_t *elseb = parse_expr(p);
