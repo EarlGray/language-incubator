@@ -52,18 +52,22 @@ list_t *list_append(list_t *l, void *data) {
 }
 
 list_node_t *list_head(list_t *l) {
+    assertf(l, "list_head(NULL)\n");
     return l->head;
 }
 
 list_node_t *list_next(list_node_t *n) {
+    assertf(n, "list_next(NULL)\n");
     return n->next;
 }
 
 void * list_data(list_node_t *n) {
+    assertf(n, "list_data(NULL)\n");
     return n->data;
 }
 
 size_t list_length(list_t *l) {
+    if (! l) return 0;
     return l->length;
 }
 

@@ -62,7 +62,53 @@ Value *codegenVar(ast_t *ast) {
 
 Value *codegenIf(ast_t *ast) {
     assert(ast->type == AST_IF);
-    return (Value *)errorVal("codegenIf: TODO\n");
+    Value *condval = codegen(ast->as_if.cond);
+    if (!condval)
+        return (Value *)errorVal("codegenIf: codegen(cond) failed\n");
+
+    condval = theBuilder.CreateFCmpONE(condval,
+            ConstantFP::get(getGlobalContext(), APFloat(0.0)),
+            "ifcond");
+
+    Function *func = theBuilder.GetInsertBlock()->getParent();
+    if (!func)
+        return (Value*)errorVal("codegenIf: getParent() -> NULL\n");
+
+    BasicBlock *bbThen = BasicBlock::Create(getGlobalContext(), "then", func);
+    // these block are not inserted into 'func' now:
+    BasicBlock *bbElse = BasicBlock::Create(getGlobalContext(), "else");
+    BasicBlock *bbEnd =  BasicBlock::Create(getGlobalContext(), "ifcont");
+
+    theBuilder.CreateCondBr(condval, bbThen, bbElse);
+
+    // insert 'then' branch
+    theBuilder.SetInsertPoint(bbThen);
+    Value *thenval = codegen(ast->as_if.thenb);
+    if (!thenval)
+        return (Value *)errorVal("codegenIf: codegen(then) failed\n");
+
+    theBuilder.CreateBr(bbEnd);
+    bbThen = theBuilder.GetInsertBlock(); // update the block
+
+    // insert 'else' branch
+    func->getBasicBlockList().push_back(bbElse);
+    theBuilder.SetInsertPoint(bbElse);
+    Value *elseval = codegen(ast->as_if.elseb);
+    if (!elseval)
+        return (Value *)errorVal("codegenIf: codegen(else) failed\n");
+
+    theBuilder.CreateBr(bbEnd);
+    bbElse = theBuilder.GetInsertBlock();
+
+    // end block:
+    func->getBasicBlockList().push_back(bbEnd);
+    theBuilder.SetInsertPoint(bbEnd);
+
+    PHINode *phi = theBuilder.CreatePHI(Type::getDoubleTy(getGlobalContext()), 2, "iftmp");
+    phi->addIncoming(thenval, bbThen);
+    phi->addIncoming(elseval, bbElse);
+
+    return phi;
 }
 
 Value *codegenFunCall(ast_t *ast) {
@@ -111,7 +157,7 @@ Function *codegenProto(ast_t *ast) {
             return (Function *)errorVal("codegenProto: redefinition with different argument count\n");
     }
 
-    list_node_t *arg = list_head(ast->as_fundef.args);
+    list_node_t *arg = ast->as_fundef.args ? list_head(ast->as_fundef.args) : nullptr;
     for (Function::arg_iterator ai = func->arg_begin();
          ai != func->arg_end(); ++ai, arg = list_next(arg))
     {
@@ -171,6 +217,9 @@ Value *codegen(ast_t *ast) {
 extern "C" {
 
 void test_codegen() {
+    LLVMContext &llvm_ctx = getGlobalContext();
+    theModule = new Module("kld", llvm_ctx);
+
     parser_t p;
     parseinit(&p, new_lexer(getchar));
 
@@ -207,6 +256,11 @@ void test_codegen() {
 
         free_ast(ast);
     }
+
+    fprintf(stderr, "=======================================\n");
+    theModule->dump();
+    fprintf(stderr, "=======================================\n");
+    fprintf(stderr, "Bye.\n");
 }
 
 }
