@@ -29,5 +29,6 @@ void test_parser(void) {
 
 int main(int argc, char *argv[]) {
     //test_lexer();
-    test_parser();
+    //test_parser();
+    test_codegen();
 }

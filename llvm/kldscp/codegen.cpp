@@ -168,6 +168,8 @@ Value *codegen(ast_t *ast) {
     return (Value *)errorVal("codegen(): unknown ast->type %d\n", ast->type);
 }
 
+extern "C" {
+
 void test_codegen() {
     parser_t p;
     parseinit(&p, new_lexer(getchar));
@@ -205,4 +207,6 @@ void test_codegen() {
 
         free_ast(ast);
     }
+}
+
 }
