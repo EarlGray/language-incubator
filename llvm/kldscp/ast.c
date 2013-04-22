@@ -349,7 +349,9 @@ ast_t *parse_idexpr(parser_t *p) {
     // is it a function call
     list_t *args = NULL;
     next_token(p);
-    if (p->token != ')') {
+    if (p->token == ')') 
+        next_token(p);
+    else {
         args = new_list();
         while (1) {
             ast_t *expr = parse_expr(p);
@@ -550,11 +552,13 @@ void print_ast(int indent, ast_t *ast) {
         break;
       case AST_CALL:
         print_indent(indent); printf("CALL(%s)\n", ast->as_funcall.name);
-        list_node_t *arg = list_head(ast->as_funcall.args);
-        while (arg) {
-            print_indent(indent); printf("ARG:\n");
-            print_ast(indent + 1, (ast_t *)list_data(arg));
-            arg = list_next(arg);
+        if (ast->as_funcall.args) {
+            list_node_t *arg = list_head(ast->as_funcall.args);
+            while (arg) {
+                print_indent(indent); printf("ARG:\n");
+                print_ast(indent + 1, (ast_t *)list_data(arg));
+                arg = list_next(arg);
+            }
         }
         break;
       case AST_FUNDEF:
@@ -617,7 +621,8 @@ void free_ast(ast_t *ast) {
         free((void *)ast->as_fundef.name);
         } break;
       case AST_CALL:
-        free_list(ast->as_funcall.args, (void (*)(void *))free_ast);
+        if (ast->as_funcall.args)
+            free_list(ast->as_funcall.args, (void (*)(void *))free_ast);
         free((void *)ast->as_funcall.name);
         break;
     }

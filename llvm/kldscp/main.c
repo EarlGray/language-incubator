@@ -9,6 +9,7 @@ void test_parser(void) {
     p.lex = new_lexer(getchar);
 
     while (1) {
+        printf("### ");
         ast_t *ast = parse_toplevel(&p);
 
         if (NULL == ast) {
@@ -20,7 +21,6 @@ void test_parser(void) {
         }
 
         print_ast(0, ast);
-        printf("### ");
 
         free_ast(ast);
     }
