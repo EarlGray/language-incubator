@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include "ast.h"
 
@@ -88,12 +89,12 @@ const struct {
    char name;
    int preced;
 } binops[] = {
-    [BINOP_LESS] = { '<', 5 },
     [BINOP_PLUS] = { '+', 10},
     [BINOP_MINUS] = {'-', 20},
     [BINOP_MUL] =  { '*', 40},
     [BINOP_DIV] =  { '/', 50},
-    { '\0', 0 }
+    [BINOP_LESS] = { '<', 5 },
+    [BINOP_LESS+1] = { '\0', 0 }
 };
 
 int binop_to_code(char op) {
@@ -232,6 +233,24 @@ void test_lexer(void) {
  *  Parser
  */
 
+parser_t *new_parser(lexer_t *lex) {
+    parser_t *p = malloc(sizeof(parser_t));
+    parseinit(p, lex);
+    return p;
+}
+
+void parseinit(parser_t *p, lexer_t *lex) {
+    p->lex = lex;
+    p->token = TOK_START;
+}
+
+int parse_eof(parser_t *p) {
+    return p->token == TOK_EOF;
+}
+
+int parsed_semicolon(parser_t *p) {
+    return p->prev_token == ';';
+}
 
 ast_t *new_num(double val) { 
     ast_t *num = malloc(sizeof(ast_t));

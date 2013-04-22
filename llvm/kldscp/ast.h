@@ -115,7 +115,13 @@ typedef enum {
     BINOP_LESS,
 } binop_e;
 
+parser_t *new_parser(lexer_t *lex);
+void parseinit(parser_t *p, lexer_t *lex);
+
 ast_t *parse_toplevel(parser_t *p);
+
+int parsed_semicolon(parser_t *p);
+int parse_eof(parser_t *p);
 
 void print_ast(int indent, ast_t *ast);
 
