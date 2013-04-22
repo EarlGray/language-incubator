@@ -14,6 +14,7 @@ extern "C" {
 typedef  struct list_node  list_node_t;
 typedef  struct list       list_t;
 
+size_t        list_length(list_t *);
 list_node_t * list_head(list_t *l);
 list_node_t * list_next(list_node_t *);
 void *        list_data(list_node_t *);
