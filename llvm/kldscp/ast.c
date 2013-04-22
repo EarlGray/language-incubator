@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include "ast.h"
 
@@ -88,12 +89,12 @@ const struct {
    char name;
    int preced;
 } binops[] = {
-    [BINOP_LESS] = { '<', 5 },
     [BINOP_PLUS] = { '+', 10},
     [BINOP_MINUS] = {'-', 20},
     [BINOP_MUL] =  { '*', 40},
     [BINOP_DIV] =  { '/', 50},
-    { '\0', 0 }
+    [BINOP_LESS] = { '<', 5 },
+    [BINOP_LESS+1] = { '\0', 0 }
 };
 
 int binop_to_code(char op) {
@@ -217,6 +218,24 @@ int lextoken(lexer_t *lex) {
  *  Parser
  */
 
+parser_t *new_parser(lexer_t *lex) {
+    parser_t *p = malloc(sizeof(parser_t));
+    parseinit(p, lex);
+    return p;
+}
+
+void parseinit(parser_t *p, lexer_t *lex) {
+    p->lex = lex;
+    p->token = TOK_START;
+}
+
+int parse_eof(parser_t *p) {
+    return p->token == TOK_EOF;
+}
+
+int parsed_semicolon(parser_t *p) {
+    return p->prev_token == ';';
+}
 
 ast_t *new_num(double val) { 
     ast_t *num = malloc(sizeof(ast_t));
@@ -334,7 +353,9 @@ ast_t *parse_idexpr(parser_t *p) {
     // is it a function call
     list_t *args = NULL;
     next_token(p);
-    if (p->token != ')') {
+    if (p->token == ')') 
+        next_token(p);
+    else {
         args = new_list();
         while (1) {
             ast_t *expr = parse_expr(p);
@@ -533,11 +554,13 @@ void print_ast(int indent, ast_t *ast) {
         break;
       case AST_CALL:
         print_indent(indent); printf("CALL(%s)\n", ast->as_funcall.name);
-        list_node_t *arg = list_head(ast->as_funcall.args);
-        while (arg) {
-            print_indent(indent); printf("ARG:\n");
-            print_ast(indent + 1, (ast_t *)list_data(arg));
-            arg = list_next(arg);
+        if (ast->as_funcall.args) {
+            list_node_t *arg = list_head(ast->as_funcall.args);
+            while (arg) {
+                print_indent(indent); printf("ARG:\n");
+                print_ast(indent + 1, (ast_t *)list_data(arg));
+                arg = list_next(arg);
+            }
         }
         break;
       case AST_FUNDEF:
@@ -600,7 +623,8 @@ void free_ast(ast_t *ast) {
         free((void *)ast->as_fundef.name);
         } break;
       case AST_CALL:
-        free_list(ast->as_funcall.args, (void (*)(void *))free_ast);
+        if (ast->as_funcall.args)
+            free_list(ast->as_funcall.args, (void (*)(void *))free_ast);
         free((void *)ast->as_funcall.name);
         break;
     }
