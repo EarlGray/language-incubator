@@ -1,11 +1,13 @@
 #include <iostream>
+#include <map>
+#include <vector>
 #include <stdarg.h>
 
-#include <llvm/Core.h>
 #include <llvm/Function.h>
 #include <llvm/Module.h>
 #include <llvm/Type.h>
 #include <llvm/LLVMContext.h>
+#include <llvm/Support/IRBuilder.h>
 
 #include "ast.h"
 
@@ -28,11 +30,12 @@ Value *errorVal(const char *msg, ...) {
 Value *codegen(ast_t *ast) {
     switch (ast->type) {
       case AST_NUM:
-        return ConstantFP::get(getGlobalContext(), APFloat(ast->as_num);
-      case AST_VAR:
+        return ConstantFP::get(getGlobalContext(), APFloat(ast->as_num));
+      case AST_VAR: {
         Value *val = theVarStore[ast->as_var];
         return val ? val : errorVal("Unknown variable: %s\n", ast->as_var);
-      case AST_BINOP:
+      }
+      case AST_BINOP: {
         Value *lval = codegen(ast->as_binop.lhs);
         Value *rval = codegen(ast->as_binop.rhs);
         if (!rval || !lval) 
@@ -49,10 +52,10 @@ Value *codegen(ast_t *ast) {
                                 "booltmp");
           default: return errorVal("codegen: unknown binop %c\n", ast->as_binop.op);
         }
-        break;
+      }
       case AST_IF:
         break;
-      case AST_CALL:
+      case AST_CALL: {
         const char *funname = ast->as_funcall.name;
         Function *callee = theModule->getFunction(funname);
         if (!callee)
@@ -72,15 +75,16 @@ Value *codegen(ast_t *ast) {
             arg = list_next(arg);
         }
         return theBuilder.CreateCall(callee, argvals, "calltmp");
+      }
 
-      case AST_FUNDEF:
+      case AST_FUNDEF: {
         // create its prototype
         std::string funname(ast->as_fundef.name);
         std::vector<Type *> doubles(list_length(ast->as_fundef.args),
                                     Type::getDoubleTy(getGlobalContext()));
         FunctionType *functype = FunctionType::get(Type::getDoubleTy(getGlobalContext()), doubles, false);
         Function *func = Function::Create(functype, Function::ExternalLinkage, funname, theModule);
-        break;
-      default:
-
+        } break;
+    }
+    return errorVal("no val\n");
 }
