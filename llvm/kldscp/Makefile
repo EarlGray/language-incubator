@@ -4,9 +4,9 @@ LD 			:= clang++
 LLVMCONF	:= llvm-config-3.1
 CFLAGS 		:= -g $(shell $(LLVMCONF) --cflags)
 CXXFLAGS	:= -g $(shell $(LLVMCONF) --cppflags)
-LDFLAGS 	:= $(shell $(LLVMCONF) --libs core analysis codegen) $(shell $(LLVMCONF) --ldflags)
+LDFLAGS 	:= $(shell $(LLVMCONF) --libs core native jit) $(shell $(LLVMCONF) --ldflags)
 
-kld: main.o ast.o codegen.o
+kld: ast.o codegen.o main.o
 	$(LD) $^ $(LDFLAGS) -o $@
 
 .c.o :

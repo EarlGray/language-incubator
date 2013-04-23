@@ -2,6 +2,7 @@
 
 #include "ast.h"
 #include "codegen.h"
+//#include "interp.h"
 
 void test_parser(void) {
     parser_t p;
@@ -30,5 +31,6 @@ void test_parser(void) {
 int main(int argc, char *argv[]) {
     //test_lexer();
     //test_parser();
-    test_codegen();
+    //test_codegen();
+    test_interp();
 }

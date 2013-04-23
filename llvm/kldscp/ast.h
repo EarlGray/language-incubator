@@ -5,6 +5,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#include <glob.h>
 #endif
 
 /*
