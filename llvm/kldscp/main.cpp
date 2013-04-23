@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string>
 
 #include "ast.h"
 #include "codegen.h"
@@ -9,8 +10,8 @@ void test_parser(void) {
 
     parseinit(&p, new_lexer(getchar));
 
+    printf("#AST# ");
     while (1) {
-        printf("#AST# ");
         ast_t *ast = parse_toplevel(&p);
 
         if (NULL == ast) {
@@ -24,13 +25,40 @@ void test_parser(void) {
         print_ast(0, ast);
 
         free_ast(ast);
+        printf("#AST# ");
     }
     printf("Bye.\n");
 }
 
+void usage(const char *arg0) {
+    printf("USAGE: \n");
+    printf("    %s                     -- run interpreter\n", arg0);
+    printf("    %s [--codegen|-c] [-i] -- test codegenerator (interactively)\n", arg0);
+    printf("    %s [--parser|-p]       -- test parser\n", arg0);
+}
+
 int main(int argc, char *argv[]) {
-    //test_lexer();
-    //test_parser();
-    //test_codegen();
-    test_interp();
+    if (argc < 2) {
+        test_interp();
+        return 0;
+    }
+
+    std::string arg1(argv[1]);
+
+    if (arg1 == "--parser" || arg1 == "-p") {
+        test_parser();
+        return 0;
+    }
+
+    if (arg1 == "--codegen" || arg1 == "-c") {
+        bool interactive = false;
+        if (argc == 3 && std::string(argv[2]) == "-i")
+            interactive = true;
+
+        test_codegen(interactive);
+        return 0;
+    }
+
+    usage(argv[0]);
+    return 1;
 }

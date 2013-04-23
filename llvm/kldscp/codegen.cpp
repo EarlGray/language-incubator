@@ -1,4 +1,3 @@
-#define __KLD_OPT
 #include "codegen.h"
 
 #include <cassert>
@@ -14,6 +13,12 @@
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/Analysis/Verifier.h>
 
+#include <llvm/ExecutionEngine/JIT.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/PassManager.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Analysis/Passes.h>
+
 #include "ast.h"
 
 using namespace llvm;
@@ -23,9 +28,12 @@ typedef std::map<std::string, Value * > varmap;
 struct codegen_t {
     Module *module;
     IRBuilder<> ir_builder;
+    FunctionPassManager *fpm;
     varmap variables;
 
-    codegen_t(): ir_builder(getGlobalContext()) {}
+    codegen_t(): 
+        ir_builder(getGlobalContext()), fpm(nullptr) 
+    {}
 };
 
 void *errorVal(const char *msg, ...) {
@@ -175,7 +183,7 @@ Function *codegenProto(codegen_t &cg, ast_t *ast) {
     return func;
 }
 
-Function *codegenFunDef(codegen_t &cg, ast_t *ast, Optimizer *optimize = 0) {
+Function *codegenFunDef(codegen_t &cg, ast_t *ast) {
     assert(ast->type == AST_FUNDEF);
     cg.variables.clear();
 
@@ -199,8 +207,8 @@ Function *codegenFunDef(codegen_t &cg, ast_t *ast, Optimizer *optimize = 0) {
     cg.ir_builder.CreateRet(bodyval);
     verifyFunction(*func);
 
-    if (optimize)
-        (*optimize)(func);
+    if (cg.fpm) 
+        cg.fpm->run(*func);
 
     return func;
 }
@@ -224,15 +232,9 @@ Value *codegen(codegen_t &cg, ast_t *ast) {
     return (Value *)errorVal("codegen(): unknown ast->type %d\n", ast->type);
 }
 
-#include <llvm/ExecutionEngine/JIT.h>
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/PassManager.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Analysis/Passes.h>
-
 extern "C" {
 
-void test_codegen() {
+void test_codegen(bool interactive) {
     codegen_t cg;
     LLVMContext &llvm_ctx = getGlobalContext();
     cg.module = new Module("kld", llvm_ctx);
@@ -240,8 +242,9 @@ void test_codegen() {
     parser_t p;
     parseinit(&p, new_lexer(getchar));
 
+    if (interactive) printf("#IR# ");
+
     while(1) {
-        printf("#IR# ");
         ast_t *ast = parse_toplevel(&p);
 
         if (! ast) {
@@ -255,7 +258,8 @@ void test_codegen() {
           case AST_FUNDEF: {
             Function *irfunc = codegenFunDef(cg, ast);
             if (irfunc) {
-                irfunc->dump();
+                if (interactive) 
+                    irfunc->dump();
             }
             else fprintf(stderr, "test_codegen: codegenFunDef failed\n");
           } break;
@@ -272,12 +276,16 @@ void test_codegen() {
         }
 
         free_ast(ast);
+
+        if (interactive) printf("#IR# ");
     }
 
-    fprintf(stderr, "=======================================\n");
+    if (interactive) fprintf(stderr, "=======================================\n");
     cg.module->dump();
-    fprintf(stderr, "=======================================\n");
-    fprintf(stderr, "Bye.\n");
+    if (interactive) {
+        fprintf(stderr, "=======================================\n");
+        fprintf(stderr, "Bye.\n");
+    }
 }
 
 typedef double (*doublefunc_t)();
@@ -312,8 +320,8 @@ void test_interp() {
     funcpass.doInitialization();
     */
 
+    printf("#KLD# ");
     while (1) {
-        printf("#KLD# ");
         ast_t *ast = parse_toplevel(&p);
 
         if (! ast) {
@@ -328,7 +336,7 @@ void test_interp() {
           case AST_FUNDEF: {
             Function *func = codegenFunDef(cg, ast);
             if (func) {
-                printf("ok\n");
+                printf("OK\n");
             }
             else fprintf(stderr, "test_interp: codegenFunDef() failed\n");
           } break;
@@ -343,13 +351,14 @@ void test_interp() {
                 void *funcptr = theEngine->getPointerToFunction(func);
                 doublefunc_t fp = (doublefunc_t) funcptr;
                 double result = fp();
-                fprintf(stderr, "==== RESULT: %f\n", result);
+                fprintf(stderr, "OK: %f\n", result);
             } else 
                 fprintf(stderr, "test_interp: codegen() failed\n");
           } 
         }
 
         free_ast(ast);
+        printf("#KLD# ");
     }
 }
 
