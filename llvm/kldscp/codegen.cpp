@@ -59,6 +59,7 @@ Value *codegenBinop(codegen_t &cg, ast_t *ast) {
       case '+': return IR.CreateFAdd(lval, rval, "addtmp");
       case '-': return IR.CreateFSub(lval, rval, "subtmp");
       case '*': return IR.CreateFMul(lval, rval, "multmp");
+      case '/': return IR.CreateFDiv(lval, rval, "divtmp");
       case '<':
         lval = IR.CreateFCmpULT(lval, rval, "cmptmp");
         return IR.CreateUIToFP(lval,
