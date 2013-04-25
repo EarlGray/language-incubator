@@ -11,13 +11,17 @@
 #include <llvm/Module.h>
 #include <llvm/LLVMContext.h>
 #include <llvm/Support/IRBuilder.h>
-#include <llvm/Analysis/Verifier.h>
 
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/PassManager.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Analysis/Passes.h>
+#include <llvm/Analysis/Verifier.h>
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/InstructionSimplify.h>
+#include <llvm/Target/TargetData.h>
+#include <llvm/Transforms/Scalar.h>
 
 #include "ast.h"
 
@@ -308,9 +312,8 @@ void test_interp() {
         return;
     }
     
-    /*
     FunctionPassManager funcpass(cg.module);
-    funcpass.add(new DataLayout(*theEngine->getDataLayout()));
+    funcpass.add(new TargetData(*theEngine->getTargetData()));
 
     funcpass.add(createBasicAliasAnalysisPass());
     funcpass.add(createInstructionCombiningPass());
@@ -319,7 +322,7 @@ void test_interp() {
     funcpass.add(createCFGSimplificationPass());
 
     funcpass.doInitialization();
-    */
+    cg.fpm = &funcpass;
 
     printf("#KLD# ");
     while (1) {
