@@ -1,131 +1,197 @@
 #ifndef __KLDSCP_PARSER__H_
 #define __KLDSCP_PARSER__H_
 
-#define STRTOKEN_MAX_SIZE   256
-
 #ifdef __cplusplus
 extern "C" {
 #include <glob.h>
 #endif
 
-/*
- * List 
- */
-
-typedef  struct list_node  list_node_t;
-typedef  struct list       list_t;
-
-size_t        list_length(list_t *);
-list_node_t * list_head(list_t *l);
-list_node_t * list_next(list_node_t *);
-void *        list_data(list_node_t *);
-
+#include <istream>
+#include <string>
+#include <vector>
 
 /*
  *  Lexer
  */
-typedef  struct lexstate  lexer_t;
 
-typedef int (*nextchar_func_t)();
+typedef int Token;
 
-lexer_t *new_lexer(nextchar_func_t next);
+class Lexer {
+public:
+    enum Token {
+        EOF = -1, 
+        DEF = -2,
+        EXT = -3,
+        ID = -4,
+        BINOP = -5,
+        NUM = -6,
+        IF = -7,
+        THEN = -8,
+        ELSE = -9,
 
+        START = 0xffff
+    };
+
+private:
+    int last;
+    int prev;
+    std::istream *inp;
+
+    int tok;
+    int prevtok;
+
+    std::string strtok;
+    double numtok;
+    char chrtok;
+
+    int nextchar();
+    Lexer& nexttok(int tok);
+
+public:
+    Lexer(std::istream *inp): 
+        inp(inp), last(' '), tok(Token::START) 
+    {}
+
+    int token() const;
+
+    std::string strval() const;
+    double numval() const;
+    char chrval() const;
+
+    Lexer & next();
+
+    int precedence(char op);
+};
+
+int Lexer::token() const {
+    return this->last;
+}
+
+std::string Lexer::strval() const {
+    return this->strtok;
+}
+
+double Lexer::numval() const {
+    return this->numtok;
+}
+
+char Lexer::chrval() const {
+    return this->chrtok;
+}
+
+/*
+ *  Abstract syntax tree
+ */
+struct ASTNode {
+    virtual void print(int indent) = 0;
+};
+
+struct ASTNumber : public ASTNode {
+    double val;
+
+    ASTNumber(double val): 
+        val(val)
+    {}
+}; 
+
+struct ASTIdentifier : public ASTNode {
+    std::string name;
+
+    ASTIdentifier(const std::string &name):
+        name(name)
+    {}
+
+    void print(int indent);
+};
+
+struct ASTBinop : public ASTNode {
+    char op;
+    int prec;
+    ASTNode *lhs, *rhs;
+
+    ASTBinop(char op, ASTNode *left, ASTNode *right, int prec):
+        op(op), lhs(left), rhs(right), prec(prec)
+    {}
+
+    ~ASTBinop();
+
+    void print(int indent);
+};
+
+struct ASTIfThenElse : public ASTNode {
+    ASTNode *condb;
+    ASTNode *thenb, *elseb;
+
+    ASTIfThenElse(const ASTNode &&condb, const ASTNode &&thenb, const ASTNode &&elseb):
+        condb(*condb), thenb(*thenb), elseb(*elseb)
+    {}
+    ~ASTIfThenElse(); 
+
+    void print(int indent);
+};
+
+struct ASTFunCall : public ASTNode {
+    std::vector<ASTNode *> args;
+    std::string name;
+
+    ASTFunCall(const std::string &&name, const std::vector<ASTNode *> args):
+        name(name), args(args)
+    {}
+    ~ASTFunCall();
+
+    void print(int indent);
+};
+
+struct ASTFunDef : public ASTNode {
+    std::string name;
+    std::vector< std::string > args;
+    ASTNode *body;
+
+    ASTFunDef(const std::string &&name, const std::vector< std::string > args, ASTNode *body):
+        name(name), args(args), body(body)
+    {}
+    ~ASTFunDef();
+
+    void print(int indent);
+};
 
 /*
  * Parser
  */
 
-typedef  struct parser  parser_t;
-typedef void (*nexttoken_func_t)(struct parser*);
+class Parser {
+private:
+    Lexer *lex;
 
-struct parser {
-    int token;
-    int prev_token;
+    int tok;
+    int prevtok;
 
-    lexer_t *lex;
+    int nexttok();
+
+    ASTNode *expr();
+    ASTNumber *number();
+    ASTNode *parenExpr();
+    ASTNode *identExpr();
+    ASTNode *cond();
+    ASTNode *binop(ASTNode *lhs);
+    ASTNode *primary();
+    ASTNode *proto();
+    ASTFunDef *funcDef();
+    ASTFunDef *externDef();
+
+    ASTNode *error(const char *msg, ...);
+public:
+    Parser(Lexer *lex): 
+        lex(lex)
+    {}
+
+    ASTNode *toplevel();
+
+    bool eof();
+    bool parsed_semicolon();
+
+    ~Parser();
 };
-
-enum node_type {
-    AST_NUM, 
-    AST_VAR, 
-    AST_BINOP,
-    AST_CALL, 
-    AST_FUNDEF,
-    AST_IF,
-};
-
-typedef  struct ast_node  ast_t;
-
-struct ast_node {
-    enum node_type type;
-    union {
-        // AST_FUNDEF:
-        struct {
-            // prototype:
-            const char *name;
-            // may be NULL
-            list_t/* char * */ *args;
-            // may be NULL (it is an extern function)
-            struct ast_node *body;
-        } as_fundef;
-
-        // AST_CALL:
-        struct {
-            const char *name;
-            list_t/*ast_t*/ *args;
-        } as_funcall;
-
-        // AST_NUM:
-        double as_num;
-
-        // AST_VAR:
-        const char *as_var;
-
-        // AST_BINOP:
-        struct {
-            char op;
-            ast_t *rhs, *lhs;
-            int preced;
-        } as_binop;
-
-        // AST_IF
-        struct {
-            ast_t *cond;
-            ast_t *thenb, *elseb;
-        } as_if;
-    };
-};
-
-typedef enum {
-    TOK_EOF = -1,
-    TOK_DEF = -2,
-    TOK_EXT = -3,
-    TOK_ID = -4,
-    TOK_BINOP = -5,
-    TOK_NUM = -6,
-    TOK_IF = -7,
-    TOK_START = 0xffff,
-} token_e ;
-
-typedef enum {
-    BINOP_PLUS = 0,
-    BINOP_MINUS,
-    BINOP_MUL,
-    BINOP_DIV,
-    BINOP_LESS,
-} binop_e;
-
-parser_t *new_parser(lexer_t *lex);
-void parseinit(parser_t *p, lexer_t *lex);
-
-ast_t *parse_toplevel(parser_t *p);
-
-int parsed_semicolon(parser_t *p);
-int parse_eof(parser_t *p);
-
-void print_ast(int indent, ast_t *ast);
-
-void free_ast(ast_t *ast);
 
 #ifdef __cplusplus
 }

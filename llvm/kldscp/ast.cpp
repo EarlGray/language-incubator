@@ -1,8 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <ctype.h>
+#include <cctype>
+#include <cstdlib>
+#include <map>
 
 #include "ast.h"
 
@@ -13,208 +11,110 @@
     } while (0)
 
 /*
- * Small in-place list implementation
- */
-struct list_node {
-    void *data;
-    struct list_node *next;
-};
-
-struct list {
-    list_node_t *head, *last;
-    size_t length;
-};
-
-list_t *new_list(void) {
-    list_t *l = malloc(sizeof(list_t));
-    l->head = NULL;
-    l->last = NULL;
-    l->length = 0;
-    return l;
-}
-
-list_t *list_append(list_t *l, void *data) {
-    assertf(l, "list_append(NULL)\n");
-
-    list_node_t *n = malloc(sizeof(list_node_t));
-    n->data = data;
-    n->next = NULL;
-
-    if (!l->head) 
-        l->head = n;
-
-    if (l->last) 
-        l->last->next = n;
-    l->last = n;
-    ++ l->length;
-
-    return l;
-}
-
-list_node_t *list_head(list_t *l) {
-    assertf(l, "list_head(NULL)\n");
-    return l->head;
-}
-
-list_node_t *list_next(list_node_t *n) {
-    assertf(n, "list_next(NULL)\n");
-    return n->next;
-}
-
-void * list_data(list_node_t *n) {
-    assertf(n, "list_data(NULL)\n");
-    return n->data;
-}
-
-size_t list_length(list_t *l) {
-    if (! l) return 0;
-    return l->length;
-}
-
-void free_list(list_t *l, void (*free_node)(void *)) {
-    list_node_t *n = l->head;
-    while (n) {
-        if (free_node) 
-            free_node(n->data);
-        else
-            free(n->data);
-        n = n->next;
-    }
-    free(l);
-}
-
-/*
  * Binary operations
  */
 
+#define DUMMY_PRECEDENCE   (-1)
 #define PAREN_PRECEDENCE   100
 
-const struct {
-   char name;
-   int preced;
-} binops[] = {
-    [BINOP_PLUS] = { '+', 10},
-    [BINOP_MINUS] = {'-', 20},
-    [BINOP_MUL] =  { '*', 40},
-    [BINOP_DIV] =  { '/', 50},
-    [BINOP_LESS] = { '<', 5 },
-    [BINOP_LESS+1] = { '\0', 0 }
+typedef std::map< char, int > precedmap_t;
+
+const precedmap_t initial_precedence = {
+    { '+', 10},
+    { '-', 20},
+    { '*', 40},
+    { '/', 50},
+    { '<', 5 },
 };
 
-int binop_to_code(char op) {
-    int i;
-    for (i = 0; binops[i].name; ++i)
-        if (binops[i].name == op)
-            return i;
-    return -1;
-}
-
-int precedence(char op) {
-    int i;
-    for (i = 0; binops[i].name; ++i)
-        if (binops[i].name == op) 
-            return binops[i].preced;
-    return 0;
-}
 
 /*
  *  Lexer
  */
 
-struct lexstate {
-    /* interface part */
-    int token;
-
-    double numtoken;
-    char strtoken[STRTOKEN_MAX_SIZE];
-    char op;
-
-    /* private part */
-    int lastchar;
-    nextchar_func_t nextchar;
+const std::map< std::string, Lexer::Token > keywords = {
+    { "if",     Lexer::IF },
+    { "then",   Lexer::THEN },
+    { "else",   Lexer::ELSE },
 };
 
-void lexinit(lexer_t *, nextchar_func_t next);
-int lextoken(lexer_t *);
-
-
-void lexinit(lexer_t *lex, nextchar_func_t next) {
-    lex->lastchar = ' ';
-    memset(lex->strtoken, 0, STRTOKEN_MAX_SIZE);
-    lex->token = 0;
-    lex->nextchar = next;
+int Lexer::nextchar() {
+    this->prev = this->last;
+    return (this->last = this->inp->get());
 }
 
-lexer_t *new_lexer(nextchar_func_t nextchar) {
-    lexer_t *lex = malloc(sizeof(lexer_t));
-    lexinit(lex, nextchar);
-    return lex;
+Lexer& Lexer::nexttok(int tok) {
+    this->prevtok = this->tok;
+    this->tok = tok;
+    return *this;
 }
 
-inline static int lexcmp(lexer_t *lex, const char *s) {
-    return !strncmp(s, lex->strtoken, STRTOKEN_MAX_SIZE);
+int Lexer::precedence(char op) {
+    auto itprec = initial_precedence.find(op);
+    if (itprec == std::map::end)
+        return DUMMY_PRECEDENCE;
+    return *itprec;
 }
 
-int lextoken(lexer_t *lex) {
-    while (isspace(lex->lastchar))
-        lex->lastchar = lex->nextchar(lex);
+Lexer& Lexer::next() {
+    while (isspace(this->last))
+        nextchar();
 
-    if (isalpha(lex->lastchar)) {
-        char *idstr = lex->strtoken;
-        *idstr++ = lex->lastchar;
+    // parse identifiers|keywords
+    if (isalpha(this->last)) {
+        this->strtok.clear();
 
-        while (isalnum(lex->lastchar = lex->nextchar(lex)))
-            *idstr++ = lex->lastchar;
+        do this->strtok += this->last;
+        while (isalnum(nextchar()));
 
-        *idstr = 0;
-        if (lexcmp(lex, "if"))
-            return (lex->token = TOK_IF);
-        if (lexcmp(lex, "def"))
-            return (lex->token = TOK_DEF);
-        if (lexcmp(lex, "extern")) 
-            return (lex->token = TOK_EXT);
-        return (lex->token = TOK_ID);
+        auto it = keywords.find(this->strtok);
+        if (it == std::map::end)
+            return nexttok(*it);
+
+        return nexttok(Token::ID);
     }
 
-    if (isdigit(lex->lastchar) || (lex->lastchar == '.')) {
-        char *numstr = lex->strtoken;
+    // parse numbers
+    if (isdigit(this->last) || (this->last == '.')) {
+        this->strtok.clear();
 
         do {
-            *numstr++ = lex->lastchar;
-            lex->lastchar = lex->nextchar(lex);
-        } while (isdigit(lex->lastchar) || lex->lastchar == '.');
-        *numstr = 0;
-
-        if (!strcmp(lex->strtoken, ".")) {
-            return (lex->token = '.');
-        };
-
-        char *end = 0;
-        lex->numtoken = strtod(lex->strtoken, &end);
-        //printf("strtod: read %ld\n", (end - lex->strtoken));
-        return (lex->token = TOK_NUM);
-    }
-
-    if (lex->lastchar == '#') {
-        do lex->lastchar = lex->nextchar(lex);
-        while (lex->lastchar != EOF && lex->lastchar != '\n');
+            this->strtok += this->last;
+            nextchar();
+        } while (isdigit(this->last) || this->last == '.');
         
-        if (lex->lastchar != EOF)
-            return lextoken(lex);
-    }
+        if (this->strtok == ".")
+            return nexttok('.');
+
+        size_t read = 0;
+        this->numtok = std::stod(this->strtok, &read);
     
-    if (lex->lastchar == EOF)
-        return (lex->token = TOK_EOF);
-
-    if (strchr("+-*/<", lex->lastchar)) {
-        lex->op = lex->lastchar;
-        lex->lastchar = lex->nextchar(lex);
-        return (lex->token = TOK_BINOP);
+        return nexttok(Token::NUM);
     }
 
-    int thischar = lex->lastchar;
-    lex->lastchar = lex->nextchar(lex);
-    return (lex->token = thischar);
+    // comments
+    if (this->last == '#') {
+        do nextchar();
+        while (this->last != EOF && this->last != '\n');
+
+        if (this->last != EOF)
+            return this->next();  // yes, recursion
+    }
+
+    if (this->last == EOF)
+        return nexttok(Token::EOF);
+
+    // maybe binary operation
+    if (precedence(this->last) != DUMMY_PRECEDENCE) {
+        this->chrtok = this->last;
+        nextchar();
+        return nexttok(Token::BINOP);
+    }
+
+    // a symbol
+    int c = this->last;
+    nextchar();
+    return c;
 }
 
 
@@ -222,82 +122,13 @@ int lextoken(lexer_t *lex) {
  *  Parser
  */
 
-parser_t *new_parser(lexer_t *lex) {
-    parser_t *p = malloc(sizeof(parser_t));
-    parseinit(p, lex);
-    return p;
-}
-
-void parseinit(parser_t *p, lexer_t *lex) {
-    p->lex = lex;
-    p->token = TOK_START;
-}
-
-int parse_eof(parser_t *p) {
-    return p->token == TOK_EOF;
-}
-
-int parsed_semicolon(parser_t *p) {
-    return p->prev_token == ';';
-}
-
-ast_t *new_num(double val) { 
-    ast_t *num = malloc(sizeof(ast_t));
-    num->type = AST_NUM;
-    num->as_num = val;
-    return num;
-}
-
-ast_t *new_fundef(const char *name, list_t *args, ast_t *body) {
-    ast_t *fundef = malloc(sizeof(ast_t));
-    fundef->type = AST_FUNDEF;
-    fundef->as_fundef.name = name;
-    fundef->as_fundef.args = args;
-    fundef->as_fundef.body = body;
-    return fundef;
-}
-
-ast_t *new_funcall(const char *name, list_t *args) {
-    ast_t *funcall = malloc(sizeof(ast_t));
-    funcall->type = AST_CALL;
-    funcall->as_funcall.name = name;
-    funcall->as_funcall.args = args;
-    return funcall;
-}
-
-ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
-    ast_t *bop = malloc(sizeof(ast_t));
-    bop->type = AST_BINOP;
-    bop->as_binop.op = op;
-    bop->as_binop.lhs = lhs;
-    bop->as_binop.rhs = rhs;
-    bop->as_binop.preced = prec;
-    return bop;
-}
-
-ast_t *new_var(const char *varname) {
-    ast_t *var = malloc(sizeof(ast_t));
-    var->type = AST_VAR;
-    var->as_var = varname;
-    return var;
-}
-
-ast_t *new_if(ast_t *cond, ast_t *thenb, ast_t *elseb) {
-    ast_t *ifexpr = malloc(sizeof(ast_t));
-    ifexpr->type = AST_IF;
-    ifexpr->as_if.cond = cond;
-    ifexpr->as_if.thenb = thenb;
-    ifexpr->as_if.elseb = elseb;
-    return ifexpr;
-}
-
-void next_token(parser_t *p) {
-    p->prev_token = p->token;
-    p->token = lextoken(p->lex);
+int Parser::nexttok() {
+    this->prevtok = this->tok;
+    this->tok = this->lex->next().token();
 #if DEBUG
     printf("next_token: ");
-    switch (p->token) {
-      case TOK_EOF: printf("TOK_EOF\n"); return;
+    switch (this->tok) {
+      case Lexer::Token::EOF: printf("TOK_EOF\n"); return;
       case TOK_NUM: printf("TOK_NUM(%f)\n", p->lex->numtoken); return;
       case TOK_ID: printf("TOK_ID(%s)\n", p->lex->strtoken); return;
       case TOK_BINOP: printf("TOK_BINOP(%c)\n", p->lex->op); return;
@@ -307,184 +138,188 @@ void next_token(parser_t *p) {
       default: printf("TOKEN<%c>\n", p->token); 
     }
 #endif
+    return this->tok;
 }
 
 
-ast_t *parse_error(parser_t *p, const char *msg, ...) {
+ASTNode * Parser::error(const char *msg, ...) {
     va_list va;
     va_start(va, msg);
     vfprintf(stderr, msg, va);
     va_end(va);
-    next_token(p);
-    return NULL;
+    nexttok();
+    return nullptr;
 }
 
 
-ast_t *parse_expr(parser_t *);
-
-ast_t *parse_num(parser_t *p) {
-    assertf(p->token == TOK_NUM, "number expected\n");
-    double val = p->lex->numtoken;
-    next_token(p);
-    return new_num(val);
+ASTNumber * Parser::number() {
+    assertf(this->tok == Lexer::NUM, "number expected\n");
+    ASTNumber *num = new ASTNumber(this->lex->numval());
+    nexttok();
+    return num;
 }
 
-ast_t *parse_paren_expr(parser_t *p) {
-    assertf(p->token == '(', "parse_paren_expr: expected '('\n");
-    next_token(p);
 
-    ast_t *expr = parse_expr(p);
-    if (!expr) return NULL;
-    if (expr->type == AST_BINOP)
+ASTNode * Parser::parenExpr() {
+    assertf(this->tok == '(', "parse_paren_expr: expected '('\n");
+    nexttok(p);
+
+    ASTNode *expr = parseExpr();
+    if (!expr) return nullptr;
+
+    ASTBinop *binop = dynamic_cast<ASTBinop *>(expr);
+    if (binop)
         expr->as_binop.preced = PAREN_PRECEDENCE;
 
-    assertf(p->token == ')', "parse_paren_expr(): expected ')'\n");
-    next_token(p);
+    assertf(this->tok == ')', "parse_paren_expr: expected ')'\n");
+    nexttok();
     return expr;
 }
 
-ast_t *parse_idexpr(parser_t *p) {
-    assertf(p->token == TOK_ID, "parse_id: TOK_ID expected\n");
+ASTNode *Parser::identExpr() {
+    assertf(this->tok == Lexer::ID, "parse_id: TOK_ID expected\n");
 
-    const char *identifier = strdup(p->lex->strtoken);
-    next_token(p);
+    std::string identifier(lex->strval());
+    nexttok();
 
-    // is it a variable
-    if (p->token != '(') {
-        return new_var(identifier);
-    }
+    // it is a variable
+    if (this->tok != '(') 
+        return new ASTIdentifier(identifier);
 
-    // is it a function call
-    list_t *args = NULL;
-    next_token(p);
-    if (p->token == ')') 
-        next_token(p);
+    // it is a function call
+    std::vector< ASTNode * > args;
+
+    nexttok();
+    if (this->tok == ')') 
+        nexttok();
     else {
-        args = new_list();
-        while (1) {
-            ast_t *expr = parse_expr(p);
+        while (true) {
+            ASTNode *expr = expr();
             if (!expr) 
-                return parse_error(p, "funcall arguments: failed to read expression\n");
-            list_append(args, expr);
+                return error("funcall arguments: failed to read expression\n");
 
-            if (p->token == ')') {
-                next_token(p);
+            args.push_back(expr);
+
+            if (this->tok == ',') {
+                nexttok();
+                continue;
+            }
+
+            if (this->tok == ')') {
+                nexttok();
                 break;
             }
 
-            if (p->token != ',')
-                return parse_error(p, "funcall argmuents: a comma inspected\n");
-
-            next_token(p);
+            return error("funcall argmuents: a comma inspected\n");
         }
     }
 
-    return new_funcall(identifier, args);
+    return new ASTFunCall(identifier, args);
 }
 
-ast_t *parse_if(parser_t *p) {
-    assertf(p->token == TOK_IF, "parse_if: 'if'  expected\n");
+ASTNode *Parser::cond() {
+    assertf(this->tok == Lexer::IF, "parse_if: 'if'  expected\n");
 
-    next_token(p);
-    ast_t *cond = parse_expr(p);
-    assertf(cond, "parse_if: parse_expr(condition) failed\n");
+    nexttok();
+    ASTNode *condb = expr();
+    assertf(condb, "parse_if: parse_expr(condition) failed\n");
 
-    assertf(lexcmp(p->lex, "then"), "parse_if: 'then' expected\n");
+    assertf(this->tok, Lexer::THEN, "parse_if: 'then' expected\n");
 
-    next_token(p);
-    ast_t *thenb = parse_expr(p);
+    nexttok();
+    ASTNode *thenb = expr();
     assertf(thenb, "parse_if: parse_expr(thenb) failed\n");
 
-    assertf(lexcmp(p->lex, "else"), "parse_if: 'else' expected\n");
+    assertf(this->tok, Lexer::ELSE, "parse_if: 'else' expected\n");
 
-    next_token(p);
-    ast_t *elseb = parse_expr(p);
+    nexttok();
+    ASTNode *elseb = expr();
     assertf(elseb, "parse_if: parse_expr(elseb) failed\n");
 
-    return new_if(cond, thenb, elseb);
+    return new ASTIfThenElse(cond, thenb, elseb);
 }
 
-ast_t *parse_binop(parser_t *p, ast_t *lhs) {
-    int op1 = p->lex->op;
-    int p1 = precedence(op1);
+ASTNode * Parser::binop(ASTNode *lhs) {
+    int op1 = this->lex->chrval();
+    int p1 = this->lex->precedence(op1);
 
-    next_token(p);
-    ast_t *expr = parse_expr(p);
-    assertf(expr, "parse_binop: parse_expr() failed\n");
+    nexttok();
+    ASTNode *rhs = expr();
+    assertf(rhs, "parse_binop: parse_expr() failed\n");
 
-    if (expr->type != AST_BINOP)
-        return new_binop(op1, lhs, expr, p1);
+    ASTBinop *binrhs = dynamic_cast<ASTBinop *>(rhs);
+    if (! binrhs)
+        return new ASTBinop(op1, lhs, binrhs, p1);
 
-    int op2 = expr->as_binop.op;
-    int p2 = expr->as_binop.preced;
+    int op2 = binrhs->op;
+    int p2 = binrhs->prec;
 
     //printf("parse_binop(): '%c'[%d], '%c'[%d]\n", op1, p1, op2, p2);
     if (p1 < p2)
-        return new_binop(op1, lhs, expr, p1);
+        return new ASTBinop(op1, lhs, expr, p1);
 
     // rebalance
-    return new_binop(op2,
-            new_binop(op1, lhs, expr->as_binop.lhs, p1),
-            expr->as_binop.rhs, p2);
+    return new ASTBinop(op2,
+            new ASTBinop(op1, lhs, rhs->lhs, p1),
+            rhs->rhs, p2);
 }
 
-ast_t *parse_primary(parser_t *p) {
-    switch (p->token) {
-      case TOK_ID: 
-        return parse_idexpr(p);
-      case TOK_NUM: 
-        return parse_num(p);
-      case TOK_IF:
-        return parse_if(p);
+ASTNode *primary() {
+    switch (this->tok) {
+      case Lexer::ID: 
+        return identExpr();
+      case Lexer::NUM: 
+        return number();
+      case Lexer::IF:
+        return cond();
       case '(' : 
-        return parse_paren_expr(p);
+        return parenExpr();
       default: 
-        return parse_error(p, "parse_primary: unknown token '%1$c' (%1$d)\n", p->token);
+        return error("parse_primary: unknown token '%1$c' (%1$d)\n", this->tok);
     }
 }
 
-ast_t *parse_expr(parser_t *p) {
-    ast_t *expr = parse_primary(p);
-    assertf(expr, "parse_expr: parse_primary() failed\n");
+ASTNode *expr() {
+    ASTNode *e = primary();
+    assertf(e, "parse_expr: parse_primary() failed\n");
 
-    if (p->token == TOK_BINOP)
-        return parse_binop(p, expr);
+    if (this->tok == Lexer::BINOP)
+        return binop(e);
 
-    return expr;
+    return e;
 }
 
-static ast_t * parse_proto(parser_t *p) {
-    assertf(p->token == TOK_ID, "parse_proto: expected function name\n");
-    const char *fname = strdup(p->lex->strtoken);
+ASTNode * Parser::proto() {
+    assertf(this->tok == Lexer::ID, "parse_proto: expected function name\n");
+    std::string fname(this->lex->strval());
 
-    next_token(p);
-    assertf(p->token == '(', "parse_proto: expected '('\n");
+    nexttok();
+    assertf(this->tok == '(', "parse_proto: expected '('\n");
 
-    next_token(p);
-    list_t *args = NULL;
-    if (p->token != ')') {
-        args = new_list();
+    std::vector<std::string> args;
+
+    nexttok();
+    if (this->tok != ')') {
         while (1) {
-            assertf(p->token == TOK_ID, "parse_proto: an identifier expected\n");
+            assertf(this->tok == Lexer::ID, "parse_proto: an identifier expected\n");
+            args.push_back(this->lex->strval());
 
-            list_append(args, strdup(p->lex->strtoken));
-
-            next_token(p);
-            if (p->token == ')')
+            nexttok();
+            if (this->tok == ')')
                 break;
 
-            if (p->token != ',')
-                return parse_error(p, "parse_ext: a comma expected\n");
-            next_token(p);
+            if (this->tok != ',')
+                return error("parse_ext: a comma expected\n");
+            nexttok();
         }
     }
 
-    next_token(p);
-    return new_fundef(fname, args, NULL);
+    nexttok();
+    return new ASTFunDef(fname, args, nullptr);
 }
 
-ast_t *parse_def(parser_t *p) {
-    assertf(p->token == TOK_DEF, "parse_def: 'def' expected\n");
+ASTFunDef *Parser::funcDef() {
+    assertf(this->tok == Lexer::DEF, "parse_def: 'def' expected\n");
     next_token(p);
 
     ast_t *fundef = parse_proto(p);
@@ -497,29 +332,29 @@ ast_t *parse_def(parser_t *p) {
     return fundef;
 }
 
-ast_t *parse_extern(parser_t *p) {
-    assertf(p->token == TOK_EXT, "parse_ext: TOK_EXT expected\n");
+ASTFunDef *Parser::externDef() {
+    assertf(this->tok == Lexer::EXT, "parse_ext: TOK_EXT expected\n");
 
-    next_token(p);
-    return parse_proto(p);
+    nexttok();
+    return proto();
 }
 
-ast_t *parse_toplevel(parser_t *p) {
-    switch (p->token) {
-      case TOK_START: 
-        next_token(p); 
-        return parse_toplevel(p);
-      case TOK_EOF:
-        return NULL;
-      case TOK_EXT: 
-        return parse_extern(p);
-      case TOK_DEF: 
-        return parse_def(p);
+ASTNode *Parser::toplevel() {
+    switch (this->tok) {
+      case Lexer::START: 
+        nexttok(); 
+        return toplevel();
+      case Lexer::EOF:
+        return nullptr;
+      case Lexer::EXT: 
+        return externDef();
+      case Lexer::DEF: 
+        return funcDef();
       case ';':
-        next_token(p);
-        return NULL;
+        nexttok();
+        return nullptr;
       default: 
-        return parse_expr(p);
+        return expr();
     }
 }
 
@@ -528,6 +363,7 @@ ast_t *parse_toplevel(parser_t *p) {
  *  Dumping AST
  */
 
+/*
 inline static void print_indent(int indent) {
     int i;
     for (i = 0; i < indent; ++i) printf("  ");
@@ -597,40 +433,4 @@ void print_ast(int indent, ast_t *ast) {
     }
 }
 
-/*
- * AST operations
- */
-
-void free_ast(ast_t *ast) {
-    switch (ast->type) {
-      case AST_NUM: break;
-      case AST_VAR: 
-        free((void *)ast->as_var); 
-        break;
-      case AST_BINOP:
-        free_ast(ast->as_binop.lhs);
-        free_ast(ast->as_binop.rhs);
-        break;
-      case AST_IF:
-        free_ast(ast->as_if.cond);
-        free_ast(ast->as_if.thenb);
-        free_ast(ast->as_if.elseb);
-        break;
-      case AST_FUNDEF: {
-        list_t *args = ast->as_fundef.args;
-        if (args)
-            free_list(args, NULL);
-
-        ast_t *body = ast->as_fundef.body;
-        if (body) free(body);
-
-        free((void *)ast->as_fundef.name);
-        } break;
-      case AST_CALL:
-        if (ast->as_funcall.args)
-            free_list(ast->as_funcall.args, (void (*)(void *))free_ast);
-        free((void *)ast->as_funcall.name);
-        break;
-    }
-    free(ast);
-}
+*/
