@@ -1,8 +1,9 @@
+#include "ast.h"
+
 #include <cctype>
 #include <cstdlib>
 #include <map>
-
-#include "ast.h"
+#include <initializer_list>
 
 #define DEBUG  (0)
 
@@ -17,26 +18,63 @@
 #define DUMMY_PRECEDENCE   (-1)
 #define PAREN_PRECEDENCE   100
 
-typedef std::map< char, int > precedmap_t;
 
-const precedmap_t initial_precedence = {
+
+
+template <typename T> bool notnull(const T&);
+
+template<> 
+bool notnull<std::string>(const std::string &s) {
+    return ! s.empty();
+}
+
+// make me unseen this:
+template <typename KeyT, typename ValueT>
+class InitializeMap {
+private:
+    std::map<KeyT, ValueT> m_map;
+public:
+    struct InitItem {
+        KeyT key;
+        ValueT value;
+    };
+
+    InitializeMap(const InitItem arr[], size_t n) {
+        for (int i = 0; i < n; ++i) {
+            m_map[arr[i].key] = arr[i].value;
+        }
+    }
+
+    operator std::map<KeyT, ValueT>() {
+        return m_map;
+    }
+};
+
+typedef std::map< char, int > precedmap_t;
+const InitializeMap<char, int>::InitItem initprec[] = {
     { '+', 10},
     { '-', 20},
     { '*', 40},
     { '/', 50},
     { '<', 5 },
+    { '\0', 0 }
 };
+
+precedmap_t initial_precedence = InitializeMap<char,int>(initprec, sizeof(initprec));
 
 
 /*
  *  Lexer
  */
 
-const std::map< std::string, Lexer::Token > keywords = {
-    { "if",     Lexer::IF },
+typedef InitializeMap<std::string, Lexer::Token> InitKeywordMap;
+const InitKeywordMap::InitItem initkeyw[] = {
+    { "if",     Lexer::IF   },
     { "then",   Lexer::THEN },
     { "else",   Lexer::ELSE },
 };
+
+const std::map< std::string, Lexer::Token > keywords = InitKeywordMap(initkeyw, sizeof(initkeyw));
 
 int Lexer::nextchar() {
     this->prev = this->last;
@@ -51,13 +89,13 @@ Lexer& Lexer::nexttok(int tok) {
 
 int Lexer::precedence(char op) {
     auto itprec = initial_precedence.find(op);
-    if (itprec == std::map::end)
+    if (itprec == initial_precedence.end())
         return DUMMY_PRECEDENCE;
-    return *itprec;
+    return itprec->second;
 }
 
 Lexer& Lexer::next() {
-    while (isspace(this->last))
+    while (std::isspace(this->last))
         nextchar();
 
     // parse identifiers|keywords
@@ -68,8 +106,8 @@ Lexer& Lexer::next() {
         while (isalnum(nextchar()));
 
         auto it = keywords.find(this->strtok);
-        if (it == std::map::end)
-            return nexttok(*it);
+        if (it != keywords.end())
+            return nexttok(it->second);
 
         return nexttok(Token::ID);
     }
@@ -102,7 +140,7 @@ Lexer& Lexer::next() {
     }
 
     if (this->last == EOF)
-        return nexttok(Token::EOF);
+        return nexttok(Token::END);
 
     // maybe binary operation
     if (precedence(this->last) != DUMMY_PRECEDENCE) {
@@ -114,7 +152,7 @@ Lexer& Lexer::next() {
     // a symbol
     int c = this->last;
     nextchar();
-    return c;
+    return nexttok(c);
 }
 
 
@@ -128,7 +166,7 @@ int Parser::nexttok() {
 #if DEBUG
     printf("next_token: ");
     switch (this->tok) {
-      case Lexer::Token::EOF: printf("TOK_EOF\n"); return;
+      case Lexer::Token::END: printf("TOK_EOF\n"); return;
       case TOK_NUM: printf("TOK_NUM(%f)\n", p->lex->numtoken); return;
       case TOK_ID: printf("TOK_ID(%s)\n", p->lex->strtoken); return;
       case TOK_BINOP: printf("TOK_BINOP(%c)\n", p->lex->op); return;
@@ -162,18 +200,18 @@ ASTNumber * Parser::number() {
 
 ASTNode * Parser::parenExpr() {
     assertf(this->tok == '(', "parse_paren_expr: expected '('\n");
-    nexttok(p);
+    nexttok();
 
-    ASTNode *expr = parseExpr();
-    if (!expr) return nullptr;
+    ASTNode *inside = expr();
+    if (!inside) return nullptr;
 
-    ASTBinop *binop = dynamic_cast<ASTBinop *>(expr);
+    ASTBinop *binop = dynamic_cast<ASTBinop *>(inside);
     if (binop)
-        expr->as_binop.preced = PAREN_PRECEDENCE;
+        binop->prec = PAREN_PRECEDENCE;
 
     assertf(this->tok == ')', "parse_paren_expr: expected ')'\n");
     nexttok();
-    return expr;
+    return inside;
 }
 
 ASTNode *Parser::identExpr() {
@@ -194,11 +232,11 @@ ASTNode *Parser::identExpr() {
         nexttok();
     else {
         while (true) {
-            ASTNode *expr = expr();
-            if (!expr) 
+            ASTNode *argexpr = expr();
+            if (!argexpr) 
                 return error("funcall arguments: failed to read expression\n");
 
-            args.push_back(expr);
+            args.push_back(argexpr);
 
             if (this->tok == ',') {
                 nexttok();
@@ -224,19 +262,19 @@ ASTNode *Parser::cond() {
     ASTNode *condb = expr();
     assertf(condb, "parse_if: parse_expr(condition) failed\n");
 
-    assertf(this->tok, Lexer::THEN, "parse_if: 'then' expected\n");
+    assertf(this->tok == Lexer::THEN, "parse_if: 'then' expected\n");
 
     nexttok();
     ASTNode *thenb = expr();
     assertf(thenb, "parse_if: parse_expr(thenb) failed\n");
 
-    assertf(this->tok, Lexer::ELSE, "parse_if: 'else' expected\n");
+    assertf(this->tok == Lexer::ELSE, "parse_if: 'else' expected\n");
 
     nexttok();
     ASTNode *elseb = expr();
     assertf(elseb, "parse_if: parse_expr(elseb) failed\n");
 
-    return new ASTIfThenElse(cond, thenb, elseb);
+    return new ASTIfThenElse(condb, thenb, elseb);
 }
 
 ASTNode * Parser::binop(ASTNode *lhs) {
@@ -256,15 +294,15 @@ ASTNode * Parser::binop(ASTNode *lhs) {
 
     //printf("parse_binop(): '%c'[%d], '%c'[%d]\n", op1, p1, op2, p2);
     if (p1 < p2)
-        return new ASTBinop(op1, lhs, expr, p1);
+        return new ASTBinop(op1, lhs, binrhs, p1);
 
     // rebalance
     return new ASTBinop(op2,
-            new ASTBinop(op1, lhs, rhs->lhs, p1),
-            rhs->rhs, p2);
+            new ASTBinop(op1, lhs, binrhs->lhs, p1),
+            binrhs->rhs, p2);
 }
 
-ASTNode *primary() {
+ASTNode * Parser::primary() {
     switch (this->tok) {
       case Lexer::ID: 
         return identExpr();
@@ -279,7 +317,7 @@ ASTNode *primary() {
     }
 }
 
-ASTNode *expr() {
+ASTNode * Parser::expr() {
     ASTNode *e = primary();
     assertf(e, "parse_expr: parse_primary() failed\n");
 
@@ -289,7 +327,7 @@ ASTNode *expr() {
     return e;
 }
 
-ASTNode * Parser::proto() {
+ASTFunDef * Parser::proto() {
     assertf(this->tok == Lexer::ID, "parse_proto: expected function name\n");
     std::string fname(this->lex->strval());
 
@@ -309,7 +347,7 @@ ASTNode * Parser::proto() {
                 break;
 
             if (this->tok != ',')
-                return error("parse_ext: a comma expected\n");
+                return (ASTFunDef *)error("parse_ext: a comma expected\n");
             nexttok();
         }
     }
@@ -320,15 +358,15 @@ ASTNode * Parser::proto() {
 
 ASTFunDef *Parser::funcDef() {
     assertf(this->tok == Lexer::DEF, "parse_def: 'def' expected\n");
-    next_token(p);
+    nexttok();
 
-    ast_t *fundef = parse_proto(p);
+    ASTFunDef *fundef = proto();
     assertf(fundef, "parse_def: parse_proto() failed\n");
 
-    ast_t *body = parse_expr(p);
+    ASTNode *body = expr();
     assertf(body, "parse_def: body expected\n");
 
-    fundef->as_fundef.body = body;
+    fundef->body = body;
     return fundef;
 }
 
@@ -344,7 +382,7 @@ ASTNode *Parser::toplevel() {
       case Lexer::START: 
         nexttok(); 
         return toplevel();
-      case Lexer::EOF:
+      case Lexer::END:
         return nullptr;
       case Lexer::EXT: 
         return externDef();
@@ -363,12 +401,16 @@ ASTNode *Parser::toplevel() {
  *  Dumping AST
  */
 
-/*
 inline static void print_indent(int indent) {
     int i;
     for (i = 0; i < indent; ++i) printf("  ");
 }
 
+void ASTNumber::print(int indent) {
+    print_indent(indent); printf("NUM(%f)\n", this->val);
+}
+
+/*
 void print_ast(int indent, ast_t *ast) {
     switch (ast->type) {
       case AST_NUM:

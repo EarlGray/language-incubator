@@ -1,11 +1,6 @@
 #ifndef __KLDSCP_PARSER__H_
 #define __KLDSCP_PARSER__H_
 
-#ifdef __cplusplus
-extern "C" {
-#include <glob.h>
-#endif
-
 #include <istream>
 #include <string>
 #include <vector>
@@ -19,7 +14,7 @@ typedef int Token;
 class Lexer {
 public:
     enum Token {
-        EOF = -1, 
+        END = -1, 
         DEF = -2,
         EXT = -3,
         ID = -4,
@@ -82,8 +77,13 @@ char Lexer::chrval() const {
 /*
  *  Abstract syntax tree
  */
+#ifndef LLVM_MODULE_H
+class llvm::Value;
+#endif
+
 struct ASTNode {
     virtual void print(int indent) = 0;
+    virtual llvm::Value * codegen() = 0;
 };
 
 struct ASTNumber : public ASTNode {
@@ -92,6 +92,7 @@ struct ASTNumber : public ASTNode {
     ASTNumber(double val): 
         val(val)
     {}
+    void print(int indent);
 }; 
 
 struct ASTIdentifier : public ASTNode {
@@ -122,8 +123,8 @@ struct ASTIfThenElse : public ASTNode {
     ASTNode *condb;
     ASTNode *thenb, *elseb;
 
-    ASTIfThenElse(const ASTNode &&condb, const ASTNode &&thenb, const ASTNode &&elseb):
-        condb(*condb), thenb(*thenb), elseb(*elseb)
+    ASTIfThenElse(ASTNode *condb, ASTNode *thenb, ASTNode *elseb):
+        condb(condb), thenb(thenb), elseb(elseb)
     {}
     ~ASTIfThenElse(); 
 
@@ -134,7 +135,7 @@ struct ASTFunCall : public ASTNode {
     std::vector<ASTNode *> args;
     std::string name;
 
-    ASTFunCall(const std::string &&name, const std::vector<ASTNode *> args):
+    ASTFunCall(const std::string name, const std::vector<ASTNode *> args):
         name(name), args(args)
     {}
     ~ASTFunCall();
@@ -147,7 +148,7 @@ struct ASTFunDef : public ASTNode {
     std::vector< std::string > args;
     ASTNode *body;
 
-    ASTFunDef(const std::string &&name, const std::vector< std::string > args, ASTNode *body):
+    ASTFunDef(const std::string name, const std::vector< std::string > args, ASTNode *body):
         name(name), args(args), body(body)
     {}
     ~ASTFunDef();
@@ -175,7 +176,7 @@ private:
     ASTNode *cond();
     ASTNode *binop(ASTNode *lhs);
     ASTNode *primary();
-    ASTNode *proto();
+    ASTFunDef *proto();
     ASTFunDef *funcDef();
     ASTFunDef *externDef();
 
@@ -192,9 +193,5 @@ public:
 
     ~Parser();
 };
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif //__KLDSCP_PARSER__H_

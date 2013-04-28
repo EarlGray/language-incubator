@@ -51,8 +51,7 @@ void *errorVal(const char *msg, ...) {
 
 Value *codegen(codegen_t &cg, ast_t *ast);
 
-Value *codegenBinop(codegen_t &cg, ast_t *ast) {
-    assert(ast->type == AST_BINOP);
+Value *codegenBinop(codegen_t &cg, ASTBinop *ast) {
     IRBuilder<> &IR = cg.ir_builder;
     Value *lval = codegen(cg, ast->as_binop.lhs);
     Value *rval = codegen(cg, ast->as_binop.rhs);
