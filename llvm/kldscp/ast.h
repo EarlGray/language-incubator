@@ -52,6 +52,7 @@ enum node_type {
     AST_CALL, 
     AST_FUNDEF,
     AST_IF,
+    AST_IMPORT,
 };
 
 typedef  struct ast_node  ast_t;
@@ -88,6 +89,9 @@ struct ast_node {
             int preced;
         } as_binop;
 
+        // AST_IMPORT
+        const char *as_import;
+
         // AST_IF
         struct {
             ast_t *cond;
@@ -104,6 +108,7 @@ typedef enum {
     TOK_BINOP = -5,
     TOK_NUM = -6,
     TOK_IF = -7,
+    TOK_IMPORT = -8,
     TOK_START = 0xffff,
 } token_e ;
 

@@ -173,6 +173,8 @@ int lextoken(lexer_t *lex) {
             return (lex->token = TOK_DEF);
         if (lexcmp(lex, "extern")) 
             return (lex->token = TOK_EXT);
+        if (lexcmp(lex, "import"))
+            return (lex->token = TOK_IMPORT);
         return (lex->token = TOK_ID);
     }
 
@@ -289,6 +291,13 @@ ast_t *new_if(ast_t *cond, ast_t *thenb, ast_t *elseb) {
     ifexpr->as_if.thenb = thenb;
     ifexpr->as_if.elseb = elseb;
     return ifexpr;
+}
+
+ast_t *new_import(const char *name) {
+    ast_t *import = (ast_t *)malloc(sizeof(ast_t));
+    import->type = AST_IMPORT;
+    import->as_import = name;
+    return import;
 }
 
 void next_token(parser_t *p) {
@@ -504,6 +513,19 @@ ast_t *parse_extern(parser_t *p) {
     return parse_proto(p);
 }
 
+ast_t *parse_import(parser_t *p) {
+    assertf(p->token == TOK_IMPORT, "parse_import: TOK_IMPORT expected\n");
+    next_token(p);
+
+    if (p->token == TOK_ID) {
+        char *modname = strdup(p->lex->strtoken);
+        next_token(p);
+        return new_import(modname);
+    }
+
+    return parse_error(p, "parse_import: failed");
+}
+
 ast_t *parse_toplevel(parser_t *p) {
     switch (p->token) {
       case TOK_START: 
@@ -515,6 +537,8 @@ ast_t *parse_toplevel(parser_t *p) {
         return parse_extern(p);
       case TOK_DEF: 
         return parse_def(p);
+      case TOK_IMPORT:
+        return parse_import(p);
       case ';':
         next_token(p);
         return NULL;
@@ -542,6 +566,10 @@ void print_ast(int indent, ast_t *ast) {
       case AST_VAR:
         print_indent(indent);
         printf("VAR(%s)\n", ast->as_var);
+        break;
+      case AST_IMPORT:
+        print_indent(indent);
+        printf("IMPORT(%s)\n", ast->as_import);
         break;
       case AST_BINOP:
         print_indent(indent); printf("BINOP(%c)\n", ast->as_binop.op);
@@ -606,6 +634,9 @@ void free_ast(ast_t *ast) {
       case AST_NUM: break;
       case AST_VAR: 
         free((void *)ast->as_var); 
+        break;
+      case AST_IMPORT: 
+        free((void *)ast->as_import); 
         break;
       case AST_BINOP:
         free_ast(ast->as_binop.lhs);

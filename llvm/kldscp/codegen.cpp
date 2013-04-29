@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
+#include <unistd.h>
 
 //#include <iostream>
 #include <map>
@@ -34,9 +35,10 @@ struct codegen_t {
     IRBuilder<> ir_builder;
     FunctionPassManager *fpm;
     varmap variables;
+    ExecutionEngine *engine;
 
     codegen_t(): 
-        ir_builder(getGlobalContext()), fpm(nullptr) 
+        ir_builder(getGlobalContext()), fpm(nullptr), engine(nullptr)
     {}
 };
 
@@ -48,8 +50,10 @@ void *errorVal(const char *msg, ...) {
     return nullptr;
 }
 
+typedef double (*doublefunc_t)();
 
 Value *codegen(codegen_t &cg, ast_t *ast);
+Function *codegenFunDef(codegen_t &cg, ast_t *ast);
 
 Value *codegenBinop(codegen_t &cg, ast_t *ast) {
     assert(ast->type == AST_BINOP);
@@ -131,9 +135,73 @@ Value *codegenIf(codegen_t &cg, ast_t *ast) {
     return phi;
 }
 
+static FILE *extModule = NULL;
+
+int filegetc(lexer_t *l) {
+    return fgetc(extModule);
+}
+
+Value *codegenImport(codegen_t &cg, ast_t *ast) {
+    assert(ast->type == AST_IMPORT);
+    
+    /// read the module
+    // is there such file?
+    char *modfile = (char *)malloc(5 + strlen(ast->as_import));
+    strcpy(modfile, ast->as_import);
+    strcat(modfile, ".kld");
+
+    if (access(modfile, R_OK)) 
+        return (Value *)errorVal("can't find module %s: %s\n", modfile, strerror(errno));
+
+    extModule = fopen(modfile, "r");
+    if (!extModule)
+        return (Value *)errorVal("failed to open module %s\n", modfile);
+
+    parser_t p;
+    parseinit(&p, new_lexer(filegetc));
+    while (1) {
+        ast_t *ast = parse_toplevel(&p);
+        if (!ast) {
+            if (parse_eof(&p)) break;
+            if (parsed_semicolon(&p)) continue;
+            fprintf(stderr, "Failed to parse a toplevel expression in %s\n", modfile);
+            continue;
+        }
+
+        switch (ast->type) {
+          case AST_FUNDEF: {
+            Function *func = codegenFunDef(cg, ast);
+            if (!func) fprintf(stderr, "codegenImport: failed codegenFunDef\n");
+          } break;
+          default: {
+            ast_t void_proto = { .type = AST_FUNDEF, .as_fundef = { .name = "", .args = NULL, .body = ast } };
+            Function *func = codegenFunDef(cg, &void_proto);
+            if (func) {
+                if (cg.engine) {
+                    void *funcptr = cg.engine->getPointerToFunction(func);
+                    doublefunc_t fp = (doublefunc_t) funcptr;
+                    double result = fp();
+                    fprintf(stderr, "OK: codegenImport toplevel evaluated to %f\n", result);
+                }
+                else fprintf(stderr, "codegenImport: %s: no engine, toplevel can't be evaluated\n", modfile);
+            } else 
+                fprintf(stderr, "codegenImport: failed to codegen toplevel expr in %s\n", modfile);
+          }
+        }
+
+        free_ast(ast);
+    }
+
+    fclose(extModule);
+    extModule = NULL;
+
+    return (Value *)1;
+}
+
 Value *codegenFunCall(codegen_t &cg, ast_t *ast) {
     assert(ast->type == AST_CALL);
     const char *funname = ast->as_funcall.name;
+
     Function *callee = cg.module->getFunction(funname);
     if (!callee)
         return (Value *)errorVal("codegen(funcall): unknown function %s\n", funname);
@@ -273,6 +341,13 @@ void test_codegen(bool interactive) {
             else fprintf(stderr, "test_codegen: codegenFunDef failed\n");
           } break;
 
+          case AST_IMPORT: {
+            if (codegenImport(cg, ast))
+                fprintf(stderr, "OK: import %s", ast->as_import);
+            else
+                fprintf(stderr, "codegenImport(%s) failed\n", ast->as_import);
+          } break;
+
           case AST_BINOP: case AST_VAR: case AST_IF:
           case AST_CALL: case AST_NUM: {
             Value *irval = codegen(cg, ast);
@@ -297,7 +372,6 @@ void test_codegen(bool interactive) {
     }
 }
 
-typedef double (*doublefunc_t)();
 
 void test_interp() {
     parser_t p;
@@ -315,6 +389,7 @@ void test_interp() {
         fprintf(stderr, "Failed to create ExecutionEngine: %s\n", errstr.c_str());
         return;
     }
+    cg.engine = theEngine;
     
     FunctionPassManager funcpass(cg.module);
     funcpass.add(new TargetData(*theEngine->getTargetData()));
@@ -337,6 +412,7 @@ void test_interp() {
             if (parsed_semicolon(&p)) continue;
 
             fprintf(stderr, "==========================\n PARSER ERROR\n\n");
+            continue;
         }
 
         // 
@@ -347,6 +423,13 @@ void test_interp() {
                 printf("OK\n");
             }
             else fprintf(stderr, "test_interp: codegenFunDef() failed\n");
+          } break;
+
+          case AST_IMPORT: {
+            if (codegenImport(cg, ast))
+                fprintf(stderr, "OK: import %s\n", ast->as_import);
+            else
+                fprintf(stderr, "import %s failed\n", ast->as_import);
           } break;
 
           default: {
