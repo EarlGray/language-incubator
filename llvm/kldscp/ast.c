@@ -9,8 +9,11 @@
 #define DEBUG  (0)
 
 #define assertf(cond, ...) do { \
-    if (!cond) { fprintf(stderr, __VA_ARGS__); return NULL; } \
+    if (!(cond)) { fprintf(stderr, __VA_ARGS__); return NULL; } \
     } while (0)
+
+#define assert_parsed(parser, tkn, ...) \
+    if ((parser)->token != (tkn)) return parse_error((parser), __VA_ARGS__);
 
 /*
  * Small in-place list implementation
@@ -155,6 +158,19 @@ inline static int lexcmp(lexer_t *lex, const char *s) {
     return !strncmp(s, lex->strtoken, STRTOKEN_MAX_SIZE);
 }
 
+const struct {
+    const char *word;
+    int token;
+} reserved[] = {
+    { "if",     TOK_IF      },
+    { "then",   TOK_THEN    },
+    { "else",   TOK_ELSE    },
+    { "def",    TOK_DEF     },
+    { "extern", TOK_EXT     },
+    { "import", TOK_IMPORT  },
+    { NULL,     TOK_EOF     },
+};
+
 int lextoken(lexer_t *lex) {
     while (isspace(lex->lastchar))
         lex->lastchar = lex->nextchar(lex);
@@ -167,14 +183,12 @@ int lextoken(lexer_t *lex) {
             *idstr++ = lex->lastchar;
 
         *idstr = 0;
-        if (lexcmp(lex, "if"))
-            return (lex->token = TOK_IF);
-        if (lexcmp(lex, "def"))
-            return (lex->token = TOK_DEF);
-        if (lexcmp(lex, "extern")) 
-            return (lex->token = TOK_EXT);
-        if (lexcmp(lex, "import"))
-            return (lex->token = TOK_IMPORT);
+
+        int i;
+        for (i = 0; reserved[i].word; ++i)
+            if (lexcmp(lex, reserved[i].word))
+                return (lex->token = reserved[i].token);
+
         return (lex->token = TOK_ID);
     }
 
@@ -332,28 +346,28 @@ ast_t *parse_error(parser_t *p, const char *msg, ...) {
 ast_t *parse_expr(parser_t *);
 
 ast_t *parse_num(parser_t *p) {
-    assertf(p->token == TOK_NUM, "number expected\n");
+    assert_parsed(p, TOK_NUM, "number expected\n");
     double val = p->lex->numtoken;
     next_token(p);
     return new_num(val);
 }
 
 ast_t *parse_paren_expr(parser_t *p) {
-    assertf(p->token == '(', "parse_paren_expr: expected '('\n");
+    assert_parsed(p, '(', "parse_paren_expr: expected '('\n");
     next_token(p);
 
     ast_t *expr = parse_expr(p);
-    if (!expr) return NULL;
+    assertf(expr, "parse_paren: parse_expr() failed\n");
     if (expr->type == AST_BINOP)
         expr->as_binop.preced = PAREN_PRECEDENCE;
 
-    assertf(p->token == ')', "parse_paren_expr(): expected ')'\n");
+    assert_parsed(p, ')', "parse_paren_expr(): expected ')'\n");
     next_token(p);
     return expr;
 }
 
 ast_t *parse_idexpr(parser_t *p) {
-    assertf(p->token == TOK_ID, "parse_id: TOK_ID expected\n");
+    assert_parsed(p, TOK_ID, "parse_id: TOK_ID expected\n");
 
     const char *identifier = strdup(p->lex->strtoken);
     next_token(p);
@@ -372,8 +386,8 @@ ast_t *parse_idexpr(parser_t *p) {
         args = new_list();
         while (1) {
             ast_t *expr = parse_expr(p);
-            if (!expr) 
-                return parse_error(p, "funcall arguments: failed to read expression\n");
+            assertf(expr, "funcall arguments: failed to read expression\n");
+
             list_append(args, expr);
 
             if (p->token == ')') {
@@ -381,8 +395,7 @@ ast_t *parse_idexpr(parser_t *p) {
                 break;
             }
 
-            if (p->token != ',')
-                return parse_error(p, "funcall argmuents: a comma inspected\n");
+            assert_parsed(p, ',', "funcall argmuents: a comma inspected\n");
 
             next_token(p);
         }
@@ -392,19 +405,19 @@ ast_t *parse_idexpr(parser_t *p) {
 }
 
 ast_t *parse_if(parser_t *p) {
-    assertf(p->token == TOK_IF, "parse_if: 'if'  expected\n");
+    assert_parsed(p, TOK_IF, "parse_if: 'if'  expected\n");
 
     next_token(p);
     ast_t *cond = parse_expr(p);
     assertf(cond, "parse_if: parse_expr(condition) failed\n");
 
-    assertf(lexcmp(p->lex, "then"), "parse_if: 'then' expected\n");
+    assert_parsed(p, TOK_THEN, "parse_if: 'then' expected\n");
 
     next_token(p);
     ast_t *thenb = parse_expr(p);
     assertf(thenb, "parse_if: parse_expr(thenb) failed\n");
 
-    assertf(lexcmp(p->lex, "else"), "parse_if: 'else' expected\n");
+    assert_parsed(p, TOK_ELSE, "parse_if: 'else' expected\n");
 
     next_token(p);
     ast_t *elseb = parse_expr(p);
@@ -463,18 +476,18 @@ ast_t *parse_expr(parser_t *p) {
 }
 
 static ast_t * parse_proto(parser_t *p) {
-    assertf(p->token == TOK_ID, "parse_proto: expected function name\n");
+    assert_parsed(p, TOK_ID, "parse_proto: expected function name\n");
     const char *fname = strdup(p->lex->strtoken);
 
     next_token(p);
-    assertf(p->token == '(', "parse_proto: expected '('\n");
+    assert_parsed(p, '(', "parse_proto: expected '('\n");
 
     next_token(p);
     list_t *args = NULL;
     if (p->token != ')') {
         args = new_list();
         while (1) {
-            assertf(p->token == TOK_ID, "parse_proto: an identifier expected\n");
+            assert_parsed(p, TOK_ID, "parse_proto: an identifier expected\n");
 
             list_append(args, strdup(p->lex->strtoken));
 
@@ -482,8 +495,7 @@ static ast_t * parse_proto(parser_t *p) {
             if (p->token == ')')
                 break;
 
-            if (p->token != ',')
-                return parse_error(p, "parse_ext: a comma expected\n");
+            assert_parsed(p, ',', "parse_ext: a comma expected\n");
             next_token(p);
         }
     }
@@ -493,7 +505,7 @@ static ast_t * parse_proto(parser_t *p) {
 }
 
 ast_t *parse_def(parser_t *p) {
-    assertf(p->token == TOK_DEF, "parse_def: 'def' expected\n");
+    assert_parsed(p, TOK_DEF, "parse_def: 'def' expected\n");
     next_token(p);
 
     ast_t *fundef = parse_proto(p);
@@ -507,23 +519,21 @@ ast_t *parse_def(parser_t *p) {
 }
 
 ast_t *parse_extern(parser_t *p) {
-    assertf(p->token == TOK_EXT, "parse_ext: TOK_EXT expected\n");
+    assert_parsed(p, TOK_EXT, "parse_ext: TOK_EXT expected\n");
 
     next_token(p);
     return parse_proto(p);
 }
 
 ast_t *parse_import(parser_t *p) {
-    assertf(p->token == TOK_IMPORT, "parse_import: TOK_IMPORT expected\n");
+    assert_parsed(p, TOK_IMPORT, "parse_import: TOK_IMPORT expected\n");
     next_token(p);
 
-    if (p->token == TOK_ID) {
-        char *modname = strdup(p->lex->strtoken);
-        next_token(p);
-        return new_import(modname);
-    }
+    assert_parsed(p, TOK_ID, "parse_import: failed");
 
-    return parse_error(p, "parse_import: failed");
+    char *modname = strdup(p->lex->strtoken);
+    next_token(p);
+    return new_import(modname);
 }
 
 ast_t *parse_toplevel(parser_t *p) {

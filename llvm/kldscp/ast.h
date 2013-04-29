@@ -108,7 +108,9 @@ typedef enum {
     TOK_BINOP = -5,
     TOK_NUM = -6,
     TOK_IF = -7,
-    TOK_IMPORT = -8,
+    TOK_THEN = -8,
+    TOK_ELSE = -9,
+    TOK_IMPORT = -9,
     TOK_START = 0xffff,
 } token_e ;
 

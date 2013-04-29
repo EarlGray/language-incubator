@@ -4,4 +4,4 @@ def fib(n)
   else fib(n - 1) + fib(n - 2)
 
 # do it!
-fib(40)
+#fib(40)

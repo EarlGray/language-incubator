@@ -1,3 +1,4 @@
+#define __cpluplus
 #include "codegen.h"
 
 #include <cassert>
@@ -174,7 +175,7 @@ Value *codegenImport(codegen_t &cg, ast_t *ast) {
             if (!func) fprintf(stderr, "codegenImport: failed codegenFunDef\n");
           } break;
           default: {
-            ast_t void_proto = { .type = AST_FUNDEF, .as_fundef = { .name = "", .args = NULL, .body = ast } };
+            ast_t void_proto = { AST_FUNDEF, { "", NULL, ast } };
             Function *func = codegenFunDef(cg, &void_proto);
             if (func) {
                 if (cg.engine) {
@@ -305,9 +306,7 @@ Value *codegen(codegen_t &cg, ast_t *ast) {
     return (Value *)errorVal("codegen(): unknown ast->type %d\n", ast->type);
 }
 
-extern "C" {
-
-int lexnext(lexer_t *l) {
+static int lexnext(lexer_t *l) {
     return getchar();
 }
 
@@ -433,10 +432,7 @@ void test_interp() {
           } break;
 
           default: {
-            ast_t void_proto = { 
-                .type = AST_FUNDEF, 
-                .as_fundef = { .name = "", .args = 0, .body = ast }
-            };
+            ast_t void_proto = { AST_FUNDEF, { "", 0, ast } };
             Function *func = codegenFunDef(cg, &void_proto);
             if (func) {
                 void *funcptr = theEngine->getPointerToFunction(func);
@@ -453,4 +449,3 @@ void test_interp() {
     }
 }
 
-}

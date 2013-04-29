@@ -1,6 +1,6 @@
-CC 			:= clang
-CXX 		:= clang++
-LD 			:= clang++
+CC 			:= gcc
+CXX 		:= g++
+LD 			:= g++
 LLVMCONF	:= llvm-config-3.1
 CFLAGS 		:= -g $(shell $(LLVMCONF) --cflags) -Wall -Werror
 CXXFLAGS	:= -g $(shell $(LLVMCONF) --cppflags)
@@ -13,7 +13,7 @@ kld: ast.o codegen.o main.o
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .cpp.o :
-	$(CXX) -std=c++11 $(CXXFLAGS) -c $< -o $@
+	$(CXX) -std=gnu++0x $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean, vim_clang
 vim_clang:
