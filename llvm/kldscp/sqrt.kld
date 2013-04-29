@@ -1,0 +1,18 @@
+def average(x, y)  (x + y)/2;
+
+def abs(x)  if x < 0 then 0 - x else x;
+
+def goodenough(guess, x)
+    abs(guess * guess - x) < 0.0000001;
+
+def improveguess(guess, x)  average(guess, x/guess);
+    
+def sqrtiter(guess, x)
+    if goodenough(guess, x)  then x
+    else sqrtiter(improveguess(guess, x), x);
+
+def sqrt(x)   sqrtiter(1.0, x);
+
+### Tests
+sqrt(144);
+sqrt(2);
