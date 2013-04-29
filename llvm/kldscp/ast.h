@@ -26,7 +26,7 @@ void *        list_data(list_node_t *);
  */
 typedef  struct lexstate  lexer_t;
 
-typedef int (*nextchar_func_t)();
+typedef int (*nextchar_func_t)(lexer_t *);
 
 lexer_t *new_lexer(nextchar_func_t next);
 

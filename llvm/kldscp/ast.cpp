@@ -26,7 +26,7 @@ struct list {
 };
 
 list_t *new_list(void) {
-    list_t *l = malloc(sizeof(list_t));
+    list_t *l = (list_t *)malloc(sizeof(list_t));
     l->head = NULL;
     l->last = NULL;
     l->length = 0;
@@ -36,7 +36,7 @@ list_t *new_list(void) {
 list_t *list_append(list_t *l, void *data) {
     assertf(l, "list_append(NULL)\n");
 
-    list_node_t *n = malloc(sizeof(list_node_t));
+    list_node_t *n = (list_node_t*)malloc(sizeof(list_node_t));
     n->data = data;
     n->next = NULL;
 
@@ -146,7 +146,7 @@ void lexinit(lexer_t *lex, nextchar_func_t next) {
 }
 
 lexer_t *new_lexer(nextchar_func_t nextchar) {
-    lexer_t *lex = malloc(sizeof(lexer_t));
+    lexer_t *lex = (lexer_t*)malloc(sizeof(lexer_t));
     lexinit(lex, nextchar);
     return lex;
 }
@@ -223,7 +223,7 @@ int lextoken(lexer_t *lex) {
  */
 
 parser_t *new_parser(lexer_t *lex) {
-    parser_t *p = malloc(sizeof(parser_t));
+    parser_t *p = (parser_t*)malloc(sizeof(parser_t));
     parseinit(p, lex);
     return p;
 }
@@ -242,14 +242,14 @@ int parsed_semicolon(parser_t *p) {
 }
 
 ast_t *new_num(double val) { 
-    ast_t *num = malloc(sizeof(ast_t));
+    ast_t *num = (ast_t *)malloc(sizeof(ast_t));
     num->type = AST_NUM;
     num->as_num = val;
     return num;
 }
 
 ast_t *new_fundef(const char *name, list_t *args, ast_t *body) {
-    ast_t *fundef = malloc(sizeof(ast_t));
+    ast_t *fundef = (ast_t *)malloc(sizeof(ast_t));
     fundef->type = AST_FUNDEF;
     fundef->as_fundef.name = name;
     fundef->as_fundef.args = args;
@@ -258,7 +258,7 @@ ast_t *new_fundef(const char *name, list_t *args, ast_t *body) {
 }
 
 ast_t *new_funcall(const char *name, list_t *args) {
-    ast_t *funcall = malloc(sizeof(ast_t));
+    ast_t *funcall = (ast_t *)malloc(sizeof(ast_t));
     funcall->type = AST_CALL;
     funcall->as_funcall.name = name;
     funcall->as_funcall.args = args;
@@ -266,7 +266,7 @@ ast_t *new_funcall(const char *name, list_t *args) {
 }
 
 ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
-    ast_t *bop = malloc(sizeof(ast_t));
+    ast_t *bop = (ast_t *)malloc(sizeof(ast_t));
     bop->type = AST_BINOP;
     bop->as_binop.op = op;
     bop->as_binop.lhs = lhs;
@@ -276,14 +276,14 @@ ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
 }
 
 ast_t *new_var(const char *varname) {
-    ast_t *var = malloc(sizeof(ast_t));
+    ast_t *var = (ast_t*)malloc(sizeof(ast_t));
     var->type = AST_VAR;
     var->as_var = varname;
     return var;
 }
 
 ast_t *new_if(ast_t *cond, ast_t *thenb, ast_t *elseb) {
-    ast_t *ifexpr = malloc(sizeof(ast_t));
+    ast_t *ifexpr = (ast_t *)malloc(sizeof(ast_t));
     ifexpr->type = AST_IF;
     ifexpr->as_if.cond = cond;
     ifexpr->as_if.thenb = thenb;
@@ -567,7 +567,7 @@ void print_ast(int indent, ast_t *ast) {
             }
         }
         break;
-      case AST_FUNDEF:
+      case AST_FUNDEF: {
         print_indent(indent);
         printf("DEF %s(", ast->as_fundef.name);
         // arguments
@@ -591,7 +591,7 @@ void print_ast(int indent, ast_t *ast) {
             printf("<extern>\n");
         }
 
-        break;
+        } break;
       default:
         printf("PRINT ERROR: unknown ast->type %d\n", ast->type);
     }

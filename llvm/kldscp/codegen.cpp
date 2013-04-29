@@ -239,13 +239,17 @@ Value *codegen(codegen_t &cg, ast_t *ast) {
 
 extern "C" {
 
+int lexnext(lexer_t *l) {
+    return getchar();
+}
+
 void test_codegen(bool interactive) {
     codegen_t cg;
     LLVMContext &llvm_ctx = getGlobalContext();
     cg.module = new Module("kld", llvm_ctx);
 
     parser_t p;
-    parseinit(&p, new_lexer(getchar));
+    parseinit(&p, new_lexer(lexnext));
 
     if (interactive) printf("#IR# ");
 
@@ -297,7 +301,7 @@ typedef double (*doublefunc_t)();
 
 void test_interp() {
     parser_t p;
-    parseinit(&p, new_lexer(getchar));
+    parseinit(&p, new_lexer(lexnext));
 
     codegen_t cg;
     LLVMContext &llvm_ctx = getGlobalContext();

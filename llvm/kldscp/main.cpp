@@ -5,10 +5,14 @@
 #include "codegen.h"
 //#include "interp.h"
 
+int lexnext(lexer_t *) {
+    return getchar();
+}
+
 void test_parser(void) {
     parser_t p;
 
-    parseinit(&p, new_lexer(getchar));
+    parseinit(&p, new_lexer(lexnext));
 
     printf("#AST# ");
     while (1) {
