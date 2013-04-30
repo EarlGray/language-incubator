@@ -6,7 +6,7 @@ CFLAGS 		:= -g $(shell $(LLVMCONF) --cflags) -Wall -Werror
 CXXFLAGS	:= -g $(shell $(LLVMCONF) --cppflags)
 LDFLAGS 	:= $(shell $(LLVMCONF) --libs core native jit) $(shell $(LLVMCONF) --ldflags)
 
-kld: ast.o codegen.o main.o
+kld: ast.o codegen.o main.o 
 	$(LD) $^ $(LDFLAGS) -o $@
 
 .c.o :

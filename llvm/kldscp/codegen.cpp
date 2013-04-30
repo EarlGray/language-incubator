@@ -246,7 +246,11 @@ Function *codegenProto(codegen_t &cg, ast_t *ast) {
     std::vector<Type *> doubles(n_args, Type::getDoubleTy(getGlobalContext()));
 
     FunctionType *functype = FunctionType::get(Type::getDoubleTy(getGlobalContext()), doubles, false);
-    Function *func = Function::Create(functype, Function::ExternalLinkage, funname, cg.module);
+    Function *func;
+    if (ast->as_fundef.body)
+        func = Function::Create(functype, Function::ExternalLinkage, funname, cg.module);
+    else
+        func = cast<Function>(cg.module->getOrInsertFunction(funname, functype));
 
     // WTF? Why is it not checked beforehand?
     if (func->getName() != funname) {
@@ -254,7 +258,7 @@ Function *codegenProto(codegen_t &cg, ast_t *ast) {
         func = cg.module->getFunction(funname);
 
         if (! func->empty())
-            return (Function *)errorVal("codegenProto: redefinition\n");
+            return (Function *)errorVal("codegenProto: %s redefinition\n", ast->as_fundef.name);
 
         if (func->arg_size() != n_args)
             return (Function *)errorVal("codegenProto: redefinition with different argument count\n");
@@ -279,14 +283,14 @@ Function *codegenFunDef(codegen_t &cg, ast_t *ast) {
     if (!func)
         return (Function *)errorVal("codegenFunDef: codegenProto() failed\n");
 
-    BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "entry", func);
-    cg.ir_builder.SetInsertPoint(bb);
-
     ast_t *astbody = ast->as_fundef.body;
     if (!astbody)
         return func; // prototype
 
-    Value *bodyval = codegen(cg, ast->as_fundef.body);
+    BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "entry", func);
+    cg.ir_builder.SetInsertPoint(bb);
+
+    Value *bodyval = codegen(cg, astbody);
     if (! bodyval) {
         func->eraseFromParent();
         return (Function *)errorVal("codegenFunDef: codegen(body) failed\n");
@@ -317,6 +321,12 @@ Value *codegen(codegen_t &cg, ast_t *ast) {
       default: break;
     }
     return (Value *)errorVal("codegen(): unknown ast->type %d\n", ast->type);
+}
+
+extern "C"
+double printd(double x) {
+    printf("%f\n", x);
+    return 0.0;
 }
 
 static int lexnext(lexer_t *l) {

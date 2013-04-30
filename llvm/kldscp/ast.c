@@ -473,11 +473,12 @@ ast_t *parse_primary(parser_t *p) {
       case TOK_ID:    return parse_idexpr(p);
       case TOK_NUM:   return parse_num(p);
       case TOK_IF:    return parse_if(p);
-      case TOK_UNARY: return parse_unary(p);
+      case TOK_BINOP: p->token = TOK_UNARY; // fall through
+      case TOK_UNARY: case TOK_BINARY: 
+                      return parse_unary(p);
       case '(' :      return parse_paren_expr(p);
-      default: 
-        return parse_error(p, "parse_primary: unknown token '%1$c' (%1$d)\n", p->token);
     }
+    return parse_error(p, "parse_primary: unknown token '%1$c' (%1$d)\n", p->token);
 }
 
 ast_t *parse_expr(parser_t *p) {
@@ -528,17 +529,22 @@ ast_t *parse_opdef(parser_t *p) {
     int isbinary = (p->token == TOK_BINARY);
     next_token(p);
 
-    int c = p->lex->token;
+    int c = p->token;
     int prec = DEFAULT_PRECEDENCE;
 
-    char funname[10];
-    snprintf(funname, 10, "%s%c", (isbinary ? "binary" : "unary"), c);
+    // a quick hack to allow user-defined unary operations like '-'
+    if (p->token == TOK_BINOP && !isbinary) {
+        c = p->lex->op;
+    }
 
-    if (binop_precedence(c))
-        return parse_error(p, "%s already defined\n", funname);
+    if (isbinary && binop_precedence(c))
+        return parse_error(p, "op '%c' already defined\n", c);
 
     if (!ispunct(c))
         return parse_error(p, "parse_opdef: token '%1$c' (%1$d) can't be binary/unary op\n", c);
+
+    char funname[10];
+    snprintf(funname, 10, "%s%c", (isbinary ? "binary" : "unary"), c);
 
     next_token(p);
     if (p->token == TOK_NUM) {

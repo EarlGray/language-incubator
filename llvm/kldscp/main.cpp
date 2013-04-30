@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <string>
 
-#define __cplusplus
-
 #include "ast.h"
 #include "codegen.h"
-//#include "interp.h"
 
 static int lexnext(lexer_t *) {
     return getchar();
