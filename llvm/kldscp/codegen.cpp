@@ -62,9 +62,10 @@ Value *codegenBinop(codegen_t &cg, ast_t *ast) {
     Value *lval = codegen(cg, ast->as_binop.lhs);
     Value *rval = codegen(cg, ast->as_binop.rhs);
     if (!rval || !lval)
-        return (Value *)errorVal("codegen(binop): a branch failed\n");
+        return (Value *)errorVal("codegen(binop): codegen for LHS/RHS failed\n");
 
-    switch (ast->as_binop.op) {
+    char op = (char)ast->as_binop.op;
+    switch (op) {
       case '+': return IR.CreateFAdd(lval, rval, "addtmp");
       case '-': return IR.CreateFSub(lval, rval, "subtmp");
       case '*': return IR.CreateFMul(lval, rval, "multmp");
@@ -74,8 +75,21 @@ Value *codegenBinop(codegen_t &cg, ast_t *ast) {
         return IR.CreateUIToFP(lval,
                             Type::getDoubleTy(getGlobalContext()),
                             "booltmp");
-      default: return (Value *)errorVal("codegen: unknown binop %c\n", ast->as_binop.op);
+      default: break;
     }
+
+    if (binop_precedence(op)) {
+        Function *callee = cg.module->getFunction(std::string("binary") + op);
+        if (!callee)
+            return (Value *)errorVal("codegenBinop: no function for operation %c", op);
+        if (callee->arg_size() != 2)
+            return (Value *)errorVal("codegenBinop: binary%c does not take 2 arguments", op);
+
+        std::vector<Value *> argvals = { lval, rval };
+        return IR.CreateCall(callee, argvals, "calltmp");
+    }
+
+    return (Value *)errorVal("codegen: unknown binop %c\n", ast->as_binop.op);
 }
 
 Value *codegenVar(codegen_t &cg, ast_t *ast) {
@@ -300,7 +314,6 @@ Value *codegen(codegen_t &cg, ast_t *ast) {
       case AST_BINOP:   return codegenBinop(cg, ast);
       case AST_IF:      return codegenIf(cg, ast);
       case AST_CALL:    return codegenFunCall(cg, ast);
-      //case AST_FUNDEF:  return codegenFunDef(ast);
       default: break;
     }
     return (Value *)errorVal("codegen(): unknown ast->type %d\n", ast->type);
@@ -331,7 +344,7 @@ void test_codegen(bool interactive) {
         }
 
         switch (ast->type) {
-          case AST_FUNDEF: {
+           case AST_FUNDEF: {
             Function *irfunc = codegenFunDef(cg, ast);
             if (irfunc) {
                 if (interactive) 
@@ -369,6 +382,7 @@ void test_codegen(bool interactive) {
         fprintf(stderr, "=======================================\n");
         fprintf(stderr, "Bye.\n");
     }
+    printf("\n");
 }
 
 
@@ -447,5 +461,6 @@ void test_interp() {
         free_ast(ast);
         printf("#KLD# ");
     }
+    printf("\n");
 }
 

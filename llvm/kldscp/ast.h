@@ -51,7 +51,6 @@ enum node_type {
     AST_BINOP,
     AST_CALL, 
     AST_FUNDEF,
-    AST_OPDEF,
     AST_IF,
     AST_IMPORT,
 };
@@ -63,22 +62,12 @@ struct ast_node {
     union {
         // AST_FUNDEF:
         struct {
-            // prototype:
             const char *name;
             // may be NULL
             list_t/* char * */ *args;
             // may be NULL (it is an extern function)
             struct ast_node *body;
         } as_fundef;
-
-        // AST_OPDEF
-        struct {
-            int name;
-            int preced;
-            const char *larg;
-            const char *rarg;
-            struct ast_node *body;
-        } as_opdef;
 
         // AST_CALL:
         struct {
@@ -111,6 +100,7 @@ struct ast_node {
 };
 
 #define DEFAULT_PRECEDENCE  100
+int binop_precedence(int op);
 
 typedef enum {
     TOK_EOF     = -1,
