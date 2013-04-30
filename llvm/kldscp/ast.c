@@ -92,31 +92,17 @@ void free_list(list_t *l, void (*free_node)(void *)) {
 
 #define PAREN_PRECEDENCE   100
 
-const struct {
-   char name;
-   int preced;
-} binops[] = {
-    [BINOP_PLUS] = { '+', 10},
-    [BINOP_MINUS] = {'-', 20},
-    [BINOP_MUL] =  { '*', 40},
-    [BINOP_DIV] =  { '/', 50},
-    [BINOP_LESS] = { '<', 5 },
-    [BINOP_LESS+1] = { '\0', 0 }
+int binop_preceds[128] = {
+    ['+'] = 10,
+    ['-'] = 20,
+    ['*'] = 40,
+    ['/'] = 50,
+    ['<'] = 5,
 };
 
-int binop_to_code(char op) {
-    int i;
-    for (i = 0; binops[i].name; ++i)
-        if (binops[i].name == op)
-            return i;
-    return -1;
-}
-
-int precedence(char op) {
-    int i;
-    for (i = 0; binops[i].name; ++i)
-        if (binops[i].name == op) 
-            return binops[i].preced;
+int binop_precedence(int op) {
+    if (0 < op && op < 128)
+        return binop_preceds[op];
     return 0;
 }
 
@@ -168,6 +154,8 @@ const struct {
     { "def",    TOK_DEF     },
     { "extern", TOK_EXT     },
     { "import", TOK_IMPORT  },
+    { "binary", TOK_BINARY  },
+    { "unary",  TOK_UNARY   },
     { NULL,     TOK_EOF     },
 };
 
@@ -222,7 +210,7 @@ int lextoken(lexer_t *lex) {
     if (lex->lastchar == EOF)
         return (lex->token = TOK_EOF);
 
-    if (strchr("+-*/<", lex->lastchar)) {
+    if (binop_precedence(lex->lastchar)) {
         lex->op = lex->lastchar;
         lex->lastchar = lex->nextchar(lex);
         return (lex->token = TOK_BINOP);
@@ -237,6 +225,27 @@ int lextoken(lexer_t *lex) {
 /*
  *  Parser
  */
+
+void next_token(parser_t *p) {
+    p->prev_token = p->token;
+    p->token = lextoken(p->lex);
+#if DEBUG
+    printf("next_token: ");
+    int i;
+    for (i = 0; reserved[i].word; ++i) 
+        if (p->token == reserved[i].token) {
+            printf("%s\n", reserved[i].word);
+            return ;
+        }
+    switch (p->token) {
+      case TOK_NUM: printf("NUM(%f)\n", p->lex->numtoken); break;
+      case TOK_ID: printf("ID(%s)\n", p->lex->strtoken); break;
+      case TOK_BINOP: printf("BINOP(%c)\n", p->lex->op); break;
+      case TOK_EOF: printf("EOF\n"); break;
+      default: printf("'%1$c' (%1$d)\n", p->token);
+    }
+#endif
+}
 
 parser_t *new_parser(lexer_t *lex) {
     parser_t *p = (parser_t*)malloc(sizeof(parser_t));
@@ -257,16 +266,20 @@ int parsed_semicolon(parser_t *p) {
     return p->prev_token == ';';
 }
 
+static inline ast_t *astmalloc(int type) {
+    ast_t *ast = (ast_t *)malloc(sizeof(ast_t));
+    ast->type = type;
+    return ast;
+}
+
 ast_t *new_num(double val) { 
-    ast_t *num = (ast_t *)malloc(sizeof(ast_t));
-    num->type = AST_NUM;
+    ast_t *num = astmalloc(AST_NUM);
     num->as_num = val;
     return num;
 }
 
 ast_t *new_fundef(const char *name, list_t *args, ast_t *body) {
-    ast_t *fundef = (ast_t *)malloc(sizeof(ast_t));
-    fundef->type = AST_FUNDEF;
+    ast_t *fundef = astmalloc(AST_FUNDEF);
     fundef->as_fundef.name = name;
     fundef->as_fundef.args = args;
     fundef->as_fundef.body = body;
@@ -274,16 +287,14 @@ ast_t *new_fundef(const char *name, list_t *args, ast_t *body) {
 }
 
 ast_t *new_funcall(const char *name, list_t *args) {
-    ast_t *funcall = (ast_t *)malloc(sizeof(ast_t));
-    funcall->type = AST_CALL;
+    ast_t *funcall = astmalloc(AST_CALL);
     funcall->as_funcall.name = name;
     funcall->as_funcall.args = args;
     return funcall;
 }
 
 ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
-    ast_t *bop = (ast_t *)malloc(sizeof(ast_t));
-    bop->type = AST_BINOP;
+    ast_t *bop = astmalloc(AST_BINOP);
     bop->as_binop.op = op;
     bop->as_binop.lhs = lhs;
     bop->as_binop.rhs = rhs;
@@ -292,15 +303,13 @@ ast_t *new_binop(char op, ast_t *lhs, ast_t *rhs, int prec) {
 }
 
 ast_t *new_var(const char *varname) {
-    ast_t *var = (ast_t*)malloc(sizeof(ast_t));
-    var->type = AST_VAR;
+    ast_t *var = astmalloc(AST_VAR);
     var->as_var = varname;
     return var;
 }
 
 ast_t *new_if(ast_t *cond, ast_t *thenb, ast_t *elseb) {
-    ast_t *ifexpr = (ast_t *)malloc(sizeof(ast_t));
-    ifexpr->type = AST_IF;
+    ast_t *ifexpr = astmalloc(AST_IF);
     ifexpr->as_if.cond = cond;
     ifexpr->as_if.thenb = thenb;
     ifexpr->as_if.elseb = elseb;
@@ -308,29 +317,21 @@ ast_t *new_if(ast_t *cond, ast_t *thenb, ast_t *elseb) {
 }
 
 ast_t *new_import(const char *name) {
-    ast_t *import = (ast_t *)malloc(sizeof(ast_t));
-    import->type = AST_IMPORT;
+    ast_t *import = astmalloc(AST_IMPORT);
     import->as_import = name;
     return import;
 }
 
-void next_token(parser_t *p) {
-    p->prev_token = p->token;
-    p->token = lextoken(p->lex);
-#if DEBUG
-    printf("next_token: ");
-    switch (p->token) {
-      case TOK_EOF: printf("TOK_EOF\n"); return;
-      case TOK_NUM: printf("TOK_NUM(%f)\n", p->lex->numtoken); return;
-      case TOK_ID: printf("TOK_ID(%s)\n", p->lex->strtoken); return;
-      case TOK_BINOP: printf("TOK_BINOP(%c)\n", p->lex->op); return;
-      case TOK_DEF: printf("TOK_DEF\n"); return;
-      case TOK_IF: printf("TOK_IF\n"); return;
-      case TOK_EXT: printf("TOK_EXT\n"); return;
-      default: printf("TOKEN<%c>\n", p->token); 
-    }
-#endif
+ast_t *new_opdef(char op, int prec, const char *larg, const char *rarg, ast_t *body) {
+    ast_t *opdef = astmalloc(AST_OPDEF);
+    opdef->as_opdef.name = op;
+    opdef->as_opdef.preced = prec;
+    opdef->as_opdef.larg = larg;
+    opdef->as_opdef.rarg = rarg;
+    opdef->as_opdef.body = body;
+    return opdef;
 }
+
 
 
 ast_t *parse_error(parser_t *p, const char *msg, ...) {
@@ -428,7 +429,9 @@ ast_t *parse_if(parser_t *p) {
 
 ast_t *parse_binop(parser_t *p, ast_t *lhs) {
     int op1 = p->lex->op;
-    int p1 = precedence(op1);
+    int p1 = binop_precedence(op1);
+    if (p1 == 0)
+        return parse_error(p, "Operation '%c' is not defined\n", op1);
 
     next_token(p);
     ast_t *expr = parse_expr(p);
@@ -504,10 +507,69 @@ static ast_t * parse_proto(parser_t *p) {
     return new_fundef(fname, args, NULL);
 }
 
+ast_t *parse_opdef(parser_t *p) {
+    switch (p->token) {
+      case TOK_UNARY: case TOK_BINARY: break;
+      default: return parse_error(p, "parse_opdef: 'unary' or 'binary' expected\n");
+    }
+
+    int optoken = p->token;
+    next_token(p);
+
+    int c = p->lex->token;
+    int prec = DEFAULT_PRECEDENCE;
+    if (binop_precedence(c))
+        return parse_error(p, "Binop %c already defined\n", c);
+
+    if (!ispunct(c))
+        return parse_error(p, "parse_opdef: token '%1$c' (%1$d) can't be binary/unary op\n", c);
+
+    next_token(p);
+    if (p->token == TOK_NUM) {
+        prec = (int) p->lex->numtoken;
+        next_token(p);
+    }
+    assert_parsed(p, '(', "parse_opdef: '(' expected\n");
+
+    next_token(p);
+    assert_parsed(p, TOK_ID, "parse_opdef: an identifier expected for LHS\n");
+
+    char *rarg = NULL;
+    char *larg = strdup(p->lex->strtoken);
+    next_token(p);
+
+    if (optoken == TOK_BINARY) {
+        assert_parsed(p, ',', "parse_opdef: binary op must have a second argument\n");
+        next_token(p);
+
+        assert_parsed(p, TOK_ID, "parse_opdef: an identifier expected for RHS\n");
+        rarg = strdup(p->lex->strtoken);
+
+        next_token(p);
+    }
+
+    assert_parsed(p, ')', "parse_opdef: %s op must have %d arguments\n",
+                    (optoken == TOK_BINARY ? "binary" : "unary"),
+                    (optoken == TOK_BINARY ? 2 : 1));
+    next_token(p);
+
+    ast_t *body = parse_expr(p);
+    assertf(body, "parse_opdef: body expected\n");
+
+    // commit a new operation
+    if (optoken == TOK_BINARY) {
+        binop_preceds[c] = prec;
+    }
+    return new_opdef(c, prec, larg, rarg, body);
+}
+
 ast_t *parse_def(parser_t *p) {
     assert_parsed(p, TOK_DEF, "parse_def: 'def' expected\n");
     next_token(p);
 
+    if (p->token == TOK_UNARY || p->token == TOK_BINARY)
+        return parse_opdef(p);
+            
     ast_t *fundef = parse_proto(p);
     assertf(fundef, "parse_def: parse_proto() failed\n");
 
@@ -545,7 +607,7 @@ ast_t *parse_toplevel(parser_t *p) {
         return NULL;
       case TOK_EXT: 
         return parse_extern(p);
-      case TOK_DEF: 
+      case TOK_DEF:
         return parse_def(p);
       case TOK_IMPORT:
         return parse_import(p);
@@ -605,6 +667,12 @@ void print_ast(int indent, ast_t *ast) {
             }
         }
         break;
+      case AST_OPDEF: 
+        print_indent(indent);
+        printf("%s(%c) [precedence %d]:\n", 
+                (ast->as_opdef.rarg ? "BINARY" : "UNARY"), 
+                ast->as_opdef.name, ast->as_opdef.preced);
+        break;
       case AST_FUNDEF: {
         print_indent(indent);
         printf("DEF %s(", ast->as_fundef.name);
@@ -656,6 +724,12 @@ void free_ast(ast_t *ast) {
         free_ast(ast->as_if.cond);
         free_ast(ast->as_if.thenb);
         free_ast(ast->as_if.elseb);
+        break;
+      case AST_OPDEF:
+        free((void *)ast->as_opdef.larg);
+        if (ast->as_opdef.rarg)
+            free((void *)ast->as_opdef.rarg);
+        free_ast(ast->as_opdef.body);
         break;
       case AST_FUNDEF: {
         list_t *args = ast->as_fundef.args;

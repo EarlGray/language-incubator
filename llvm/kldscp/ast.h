@@ -51,6 +51,7 @@ enum node_type {
     AST_BINOP,
     AST_CALL, 
     AST_FUNDEF,
+    AST_OPDEF,
     AST_IF,
     AST_IMPORT,
 };
@@ -69,6 +70,15 @@ struct ast_node {
             // may be NULL (it is an extern function)
             struct ast_node *body;
         } as_fundef;
+
+        // AST_OPDEF
+        struct {
+            int name;
+            int preced;
+            const char *larg;
+            const char *rarg;
+            struct ast_node *body;
+        } as_opdef;
 
         // AST_CALL:
         struct {
@@ -100,18 +110,22 @@ struct ast_node {
     };
 };
 
+#define DEFAULT_PRECEDENCE  100
+
 typedef enum {
-    TOK_EOF = -1,
-    TOK_DEF = -2,
-    TOK_EXT = -3,
-    TOK_ID = -4,
-    TOK_BINOP = -5,
-    TOK_NUM = -6,
-    TOK_IF = -7,
-    TOK_THEN = -8,
-    TOK_ELSE = -9,
-    TOK_IMPORT = -9,
-    TOK_START = 0xffff,
+    TOK_EOF     = -1,
+    TOK_DEF     = -2,
+    TOK_EXT     = -3,
+    TOK_ID      = -4,
+    TOK_BINOP   = -5,
+    TOK_NUM     = -6,
+    TOK_IF      = -7,
+    TOK_THEN    = -8,
+    TOK_ELSE    = -9,
+    TOK_BINARY  = -10,
+    TOK_UNARY   = -11,
+    TOK_IMPORT  = -12,
+    TOK_START   = 0xffff,
 } token_e ;
 
 typedef enum {
