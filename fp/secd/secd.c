@@ -45,12 +45,13 @@ enum atom_type {
     ATOM_INT,
     ATOM_SYM,
     ATOM_FUNC,
+    NOT_AN_ATOM = 0xffff
 };
 
 enum operation {
     OP_STOP,
 
-    OP_ADD, OP_SUB, OP_MUL, 
+    OP_ADD, OP_SUB, OP_MUL,
     OP_DIV, OP_REM, OP_LEQ,
 
     OP_CAR, OP_CDR, OP_CONS,
@@ -118,7 +119,7 @@ struct secd  {
 secd_t * init_secd(secd_t *secd) {
     /* allocate memory chunk */
     secd->data = (cell_t *)calloc(N_CELLS, sizeof(cell_t));
-    
+
     /* mark up a list of free cells */
     int i;
     for (i = 0; i < N_CELLS - 1; ++i) {
@@ -149,6 +150,7 @@ inline static secd_t *cell_secd(cell_t *c) {
 }
 
 inline static enum atom_type atom_type(cell_t *c) {
+    if (cell_type(c) != CELL_ATOM) return NOT_AN_ATOM;
     return (enum atom_type)(c->as_atom.type);
 }
 
@@ -287,9 +289,9 @@ cell_t *new_error(secd_t *secd, const char *fmt, ...) {
 
 void free_atom(cell_t *cell) {
     switch (cell->as_atom.type) {
-      case ATOM_SYM: 
+      case ATOM_SYM:
         if (cell->as_atom.as_sym.size != DONT_FREE_THIS)
-          free((char *)cell->as_atom.as_sym.data); 
+          free((char *)cell->as_atom.as_sym.data);
         break;
       default: return;
     }
@@ -298,7 +300,7 @@ void free_atom(cell_t *cell) {
 cell_t *free_cell(cell_t *c) {
     enum cell_type t = cell_type(c);
     switch (t) {
-      case CELL_ATOM: 
+      case CELL_ATOM:
         free_atom(c);
         break;
       case CELL_CONS:
@@ -349,13 +351,11 @@ cell_t *secd_add(secd_t *secd) {
     cell_t *sa = pop_stack(secd);
     assert(sa, "secd_add: pop_stack(a) failed");
     cell_t *a = get_car(sa);
-    assert(cell_type(a) == CELL_ATOM, "secd_add: a is not an atom");
     assert(atom_type(a) == ATOM_INT, "secd_add: a is not int");
 
     cell_t *sb = pop_stack(secd);
     assert(sb, "secd_add: pop_stack(b) failed");
     cell_t *b = get_car(sb);
-    assert(cell_type(a) == CELL_ATOM, "secd_add: b is not an atom");
     assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
 
     int sum = a->as_atom.as_int + b->as_atom.as_int;
@@ -425,24 +425,33 @@ cell_t *secd_ldc(secd_t *secd) {
 cell_t *secd_ld(secd_t *secd) {
     printf("LD\n");
     cell_t *arg = pop_control(secd);
-    assert(cell_type(arg) == CELL_ATOM, "secd_ld: not an atom at [%ld]", cell_index(arg));
     assert(atom_type(arg) == ATOM_SYM, "secd_ld: not a symbol");
     fprintf(stderr, "@@@@ TODO\n");
 }
 
 
-#define INIT_SYM(name) { .type = CELL_ATOM, \
-            .as_atom = { .type = ATOM_SYM,  \
-                         .as_sym = { .size = DONT_FREE_THIS, .data = (name) } }, \
-            .nref = INTPTR_MAX }
-#define INIT_NUM(num) { .type = CELL_ATOM,  \
-            .as_atom = { .type = ATOM_INT,  \
-                         .as_int = (num) }, \
-            .nref = INTPTR_MAX }
-#define INIT_FUNC(func) { .type = CELL_ATOM, \
-            .as_atom = { .type = ATOM_FUNC,  \
-                         .as_ptr = (void *)(func) }, \
-            .nref = INTPTR_MAX }
+#define INIT_SYM(name) {    \
+    .type = CELL_ATOM,      \
+    .as_atom = {            \
+        .type = ATOM_SYM,   \
+        .as_sym = {         \
+            .size = DONT_FREE_THIS, \
+            .data = (name) } }, \
+    .nref = INTPTR_MAX }
+
+#define INIT_NUM(num)  {    \
+    .type = CELL_ATOM,      \
+    .as_atom = {            \
+        .type = ATOM_INT,   \
+        .as_int = (num) },  \
+    .nref = INTPTR_MAX }
+
+#define INIT_FUNC(func){    \
+    .type = CELL_ATOM,      \
+    .as_atom = {            \
+        .type = ATOM_FUNC,  \
+        .as_ptr = (void *)(func) }, \
+    .nref = INTPTR_MAX }
 
 const cell_t cons_func  = INIT_FUNC(secd_cons);
 const cell_t car_func   = INIT_FUNC(secd_car);
@@ -459,7 +468,7 @@ const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t two_num    = INIT_NUM(2);
 
 const struct {
-    const cell_t *sym; 
+    const cell_t *sym;
     const cell_t *val;
 } global_binding[] = {
     { &cons_sym,    &cons_func },
@@ -483,7 +492,7 @@ void fill_global_env(secd_t *secd) {
     int i;
     cell_t *symlist = NIL_CELL;
     cell_t *vallist = NIL_CELL;
-    
+
     for (i = 0; global_binding[i].sym; ++i) {
         cell_t *sym = pop_free(secd);
         cell_t *val = pop_free(secd);
@@ -513,13 +522,13 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
         while (symlist) {
             cell_t *symbol = get_car(symlist);
             if (cell_type(symbol) != CELL_ATOM) {
-                fprintf(stderr, "lookup_env: variable at [%ld] is not an atom: %d\n", 
-                        cell_index(symbol), cell_type(symbol)); 
+                fprintf(stderr, "lookup_env: variable at [%ld] is not an atom: %d\n",
+                        cell_index(symbol), cell_type(symbol));
                 symlist = list_next(symlist); vallist = list_next(vallist);
                 continue;
             }
             if (atom_type(symbol) != ATOM_SYM) {
-                fprintf(stderr, "lookup_env: variable at [%ld] is not a symbol\n", 
+                fprintf(stderr, "lookup_env: variable at [%ld] is not a symbol\n",
                         cell_index(symbol));
                 symlist = list_next(symlist); vallist = list_next(vallist);
                 continue;
@@ -548,8 +557,6 @@ void print_env(secd_t *secd) {
         while (symlist) {
             cell_t *sym = get_car(symlist);
             cell_t *val = get_car(vallist);
-            if (cell_type(sym) != CELL_ATOM)
-                fprintf(stderr, "print_env: not an atom at [%p in vallist\n", sym);
             if (atom_type(sym) != ATOM_SYM)
                 fprintf(stderr, "print_env: not a symbol at *%p in vallist\n", sym);
             printf(" %s => [%ld]\n", sym->as_atom.as_sym.data, cell_index(val));
@@ -583,33 +590,13 @@ void run_test(secd_t *secd) {
     cell_t *op;
     while (NIL_CELL != (op = pop_control(secd))) {
         printf("Read op at [%ld]\n", cell_index(op));
-        if (cell_type(op) != CELL_ATOM) {
-            fprintf(stderr, "run: not an atom at *%p\n", op);
-            continue;
-        }
-
-        if (atom_type(op) != ATOM_SYM) {
-            fprintf(stderr, "run: not a symbol at *%p\n", op);
-            continue;
-        }
+        assert_or_continue(atom_type(op) == ATOM_SYM, "run: [%ld] is not a symbol", cell_index(op));
 
         const char *symname = op->as_atom.as_sym.data;
         cell_t *val = lookup_env(secd, symname);
         drop_cell(op);
-        if (!val) {
-            fprintf(stderr, "run: lookup_env() failed for %s\n", symname);
-            continue;
-        }
-        if (cell_type(val) != CELL_ATOM) {
-            fprintf(stderr, "run: not an atom\n");
-            print_cell(val);
-            continue;
-        }
-        if (atom_type(val) != ATOM_FUNC) {
-            fprintf(stderr, "run: not a ATOM_FUNC\n");
-            print_cell(val);
-            continue;
-        }
+        assert_or_continue(val, "run: lookup_env() failed for %s\n", symname);
+        assert_or_continue(atom_type(val) == ATOM_FUNC, "run: not a ATOM_FUNC\n");
 
         secd_opfunc_t callee = (secd_opfunc_t) val->as_atom.as_ptr;
         callee(secd);
