@@ -4,17 +4,16 @@
 #include <string.h>
 #include <stdarg.h>
 
-#define N_CELLS     256 * 1024
-#define SECD_ALIGN  4
-
-#define DONT_FREE_THIS  INTPTR_MAX
-
-#define NIL_CELL    ((cell_t *)0)
+#define bool    int
+#define TRUE    1
+#define FALSE   0
 
 #define assert_or_continue(cond, ...) \
     if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); continue; }
 #define assert(cond, ...) \
     if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return NIL_CELL; }
+#define asserti(cond, ...) \
+    if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return 0; }
 #define assertv(cond, ...) \
     if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return; }
 
@@ -29,6 +28,19 @@
 # define memdebugf(...)
 # define memtracef(...)
 #endif
+
+#if (1)
+# define ctrldebugf(...) printf(__VA_ARGS__)
+#else
+# define ctrldebugf(...)
+#endif
+
+#define NIL_CELL    ((cell_t *)0)
+
+#define DONT_FREE_THIS  INTPTR_MAX
+
+#define N_CELLS     256 * 1024
+#define SECD_ALIGN  4
 
 typedef  struct secd  secd_t;
 typedef  struct cell  cell_t;
@@ -104,12 +116,14 @@ struct secd  {
 };
 
 
+void print_cell(const cell_t *c);
+cell_t *free_cell(cell_t *c);
+
 cell_t *lookup_env(secd_t *secd, const char *symname);
 
 /*
  *  Cell accessors
  */
-void print_cell(const cell_t *c);
 
 inline static enum cell_type cell_type(const cell_t *c) {
     return ((1 << SECD_ALIGN) - 1) & c->type;
@@ -148,8 +162,9 @@ inline static cell_t *get_car(const cell_t *cons) {
 inline static cell_t *get_cdr(const cell_t *cons) {
     return cons->as_cons.cdr;
 }
-
-cell_t *free_cell(cell_t *c);
+inline static bool is_cons(const cell_t *cell) {
+    return cell_type(cell) == CELL_CONS;
+}
 
 void print_atom(const cell_t *c) {
     switch (atom_type(c)) {
@@ -161,6 +176,7 @@ void print_atom(const cell_t *c) {
 }
 
 void print_cell(const cell_t *c) {
+    if (!c) { printf("NIL\n"); return; }
     secd_t *secd = cell_secd(c);
     printf("[%ld]^%ld: ", cell_index(c), c->nref);
     switch (cell_type(c)) {
@@ -178,7 +194,7 @@ void print_cell(const cell_t *c) {
 void print_list(cell_t *list) {
     printf("  -= ");
     while (list) {
-        assertv(cell_type(list) == CELL_CONS,
+        assertv(is_cons(list),
                 "Not a cons at [%ld]\n", cell_index(list));
         printf("[%ld]:%ld\t", cell_index(list), cell_index(get_car(list)));
         print_cell(get_car(list));
@@ -230,7 +246,7 @@ cell_t *pop_free(secd_t *secd) {
 
 void push_free(cell_t *c) {
     assertv(c, "push_free: NIL_CELL");
-    assertv(c->nref == 0, "push_free: *%p->nref is %d\n", c, (int)c->nref);
+    assertv(c->nref == 0, "push_free: [%ld]->nref is %ld\n", cell_index(c), c->nref);
     secd_t *secd = cell_secd(c);
     c->type = (intptr_t)secd | CELL_CONS;
     c->as_cons.cdr = secd->free;
@@ -322,56 +338,31 @@ cell_t *push_stack(secd_t *secd, cell_t *newc) {
     return top;
 }
 
-static cell_t *pop_stack(secd_t *secd) {
+cell_t *pop_stack(secd_t *secd) {
     assert(secd->stack, "pop_stack: empty\n");
     cell_t *cell = secd->stack;
     secd->stack = list_next(secd->stack);
     memdebugf("POP S[%ld]\n", cell_index(cell));
-    return cell;
+    return cell; // don't forget to drop_call(result)
 }
 
 cell_t *pop_control(secd_t *secd) {
     cell_t *cons = secd->control;
     assert(cons, "pop_control: NIL");
-    assert(cell_type(cons) == CELL_CONS, "pop_control: not a cons at [%ld]\n", cell_index(cons));
+    assert(is_cons(cons), "pop_control: not a cons at [%ld]\n", cell_index(cons));
+
     cell_t *op = share_cell(get_car(cons));
     secd->control = share_cell(list_next(cons));
     drop_cell(cons);
     return op;
 }
 
-
-cell_t *secd_add(secd_t *secd) {
-    printf("ADD\n");
-    cell_t *sa = pop_stack(secd);
-    assert(sa, "secd_add: pop_stack(a) failed");
-    cell_t *a = get_car(sa);
-    assert(atom_type(a) == ATOM_INT, "secd_add: a is not int");
-
-    cell_t *sb = pop_stack(secd);
-    assert(sb, "secd_add: pop_stack(b) failed");
-    cell_t *b = get_car(sb);
-    assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
-
-    int num = a->as_atom.as_int + b->as_atom.as_int;
-    drop_cell(sa);
-    //drop_cell(sb);
-
-    return push_stack(secd, new_number(secd, num));
-}
-
-cell_t *secd_atom(secd_t *secd) {
-    printf("ATOM\n");
-    cell_t *top = pop_stack(secd);
-    assert(top, "secd_atom: pop_stack() failed");
-    cell_t *result = ((cell_type(get_car(top)) == CELL_ATOM) ? lookup_env(secd, "T") : NIL_CELL);
-    cell_t *newtop = push_stack(secd, result);
-    drop_cell(top);
-    return newtop;
-}
+/*
+ *  SECD built-ins
+ */
 
 cell_t *secd_cons(secd_t *secd) {
-    printf("CONS\n");
+    ctrldebugf("CONS\n");
     cell_t *a = pop_stack(secd);
     assert(a, "secd_cons: pop_stack(a) failed");
     cell_t *b = pop_stack(secd);
@@ -386,10 +377,11 @@ cell_t *secd_cons(secd_t *secd) {
 }
 
 cell_t *secd_car(secd_t *secd) {
-    printf("CAR\n");
+    ctrldebugf("CAR\n");
     cell_t *top = pop_stack(secd);
     assert(top, "secd_car: pop_stack() failed");
-    assert(cell_type(top) == CELL_CONS, "secd_car: cons expected");
+    assert(is_cons(top), "secd_car: cons expected");
+
     cell_t *car = share_cell(get_car(top));
     drop_cell(top);
 
@@ -399,10 +391,10 @@ cell_t *secd_car(secd_t *secd) {
 }
 
 cell_t *secd_cdr(secd_t *secd) {
-    printf("CDR\n");
+    ctrldebugf("CDR\n");
     cell_t *top = pop_stack(secd);
     assert(top, "secd_cdr: pop_stack() failed");
-    assert(cell_type(top) == CELL_CONS, "secd_cdr: cons expected");
+    assert(is_cons(top), "secd_cdr: cons expected");
 
     cell_t *cdr = push_stack(secd, get_cdr(top));
     drop_cell(top);
@@ -410,16 +402,100 @@ cell_t *secd_cdr(secd_t *secd) {
 }
 
 cell_t *secd_ldc(secd_t *secd) {
-    printf("LDC\n");
+    ctrldebugf("LDC\n");
     cell_t *arg = pop_control(secd);
-    assert(cell_type(arg) == CELL_ATOM, "secd_ldc: arg at [%ld] is not an atom", cell_index(arg));
+    assert(cell_type(arg) == CELL_ATOM,
+           "secd_ldc: arg at [%ld] is not an atom", cell_index(arg));
     return push_stack(secd, arg);
 }
 
 cell_t *secd_ld(secd_t *secd) {
-    printf("LD\n");
+    ctrldebugf("LD\n");
     cell_t *arg = pop_control(secd);
-    assert(atom_type(arg) == ATOM_SYM, "secd_ld: not a symbol [%ld]", cell_index(arg));
+    assert(atom_type(arg) == ATOM_SYM,
+           "secd_ld: not a symbol [%ld]", cell_index(arg));
+
+    cell_t *val = lookup_env(secd, arg->as_atom.as_sym.data);
+    drop_cell(arg);
+    return push_stack(secd, val);
+}
+
+static inline cell_t *to_bool(secd_t *secd, int cond) {
+    return ((cond)? lookup_env(secd, "T") : NIL_CELL);
+}
+
+bool atom_eq(const cell_t *a1, const cell_t *a2) {
+    enum atom_type atype1 = atom_type(a1);
+    if (a1 == a2)
+        return TRUE;
+    if (atype1 != atom_type(a2))
+        return FALSE;
+    switch (atype1) {
+      case ATOM_INT: return (a1->as_atom.as_int == a2->as_atom.as_int);
+      case ATOM_SYM: return (!strcmp(a1->as_atom.as_sym.data, a2->as_atom.as_sym.data));
+      case ATOM_FUNC: return (a1->as_atom.as_ptr == a2->as_atom.as_ptr);
+      default: fprintf(stderr, "atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
+                       cell_index(a1), cell_index(a2), atype1);
+    }
+    return FALSE;
+}
+
+bool list_eq(const cell_t *xs, const cell_t *ys) {
+    asserti(is_cons(xs), "list_eq: [%ld] is not a cons", cell_index(xs));
+    if (xs == ys)
+        return TRUE;
+    if (!is_cons(ys))
+        return FALSE;
+    while (xs) {
+        if (!ys) return FALSE;
+        const cell_t *x = get_car(xs);
+        const cell_t *y = get_car(ys);
+        if (is_cons(x)) {
+            if (!list_eq(x, y))
+                return FALSE;
+        } else if (!atom_eq(x, y))
+            return FALSE;
+
+        xs = list_next(xs);
+        ys = list_next(ys);
+    }
+    return !ys;
+}
+
+cell_t *secd_atom(secd_t *secd) {
+    ctrldebugf("ATOM\n");
+    cell_t *top = pop_stack(secd);
+    assert(top, "secd_atom: pop_stack() failed");
+    cell_t *result = to_bool(secd, is_cons(get_car(top)));
+    cell_t *newtop = push_stack(secd, result);
+    drop_cell(top);
+    return newtop;
+}
+
+/*
+cell_t *secd_eq(secd_t *secd) {
+    ctrldebugf("EQ\n");
+    cell_t *val = to_bool(secd, );
+    return push_stack(secd, val);
+}
+*/
+
+cell_t *secd_add(secd_t *secd) {
+    ctrldebugf("ADD\n");
+    cell_t *sa = pop_stack(secd);
+    assert(sa, "secd_add: pop_stack(a) failed");
+    cell_t *a = get_car(sa);
+    assert(atom_type(a) == ATOM_INT, "secd_add: a is not int");
+
+    cell_t *sb = pop_stack(secd);
+    assert(sb, "secd_add: pop_stack(b) failed");
+    cell_t *b = get_car(sb);
+    assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
+
+    int num = a->as_atom.as_int + b->as_atom.as_int;
+    drop_cell(sa);
+
+    return push_stack(secd, new_number(secd, num));
 }
 
 
@@ -570,11 +646,6 @@ void fill_control_path(secd_t *secd, cell_t *ops[]) {
     secd->control = share_cell(control);
 }
 
-void print_control(secd_t *secd) {
-    printf("Control path:\n");
-    print_list(secd->control);
-}
-
 secd_t * init_secd(secd_t *secd) {
     /* allocate memory chunk */
     secd->data = (cell_t *)calloc(N_CELLS, sizeof(cell_t));
@@ -597,7 +668,8 @@ secd_t * init_secd(secd_t *secd) {
 void run_secd(secd_t *secd) {
     cell_t *op;
     while (NIL_CELL != (op = pop_control(secd))) {
-        assert_or_continue(atom_type(op) == ATOM_SYM, "run: not a symbol at [%ld]\n", cell_index(op));
+        assert_or_continue(atom_type(op) == ATOM_SYM,
+                "run: not a symbol at [%ld]\n", cell_index(op));
 
         const char *symname = op->as_atom.as_sym.data;
         cell_t *val = lookup_env(secd, symname);
@@ -621,7 +693,8 @@ int main(int argc, char *argv[]) {
     print_env(&secd);
 
     fill_control_path(&secd, (cell_t **)test2plus2);
-    print_control(&secd);
+    printf("Control path:\n");
+    print_list(secd.control);
 
     printf("-----------------------------------\n");
     run_secd(&secd);
