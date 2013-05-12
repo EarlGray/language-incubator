@@ -10,14 +10,15 @@
 #define TRUE    1
 #define FALSE   0
 
+#define errorf(...) fprintf(stderr, __VA_ARGS__)
 #define assert_or_continue(cond, ...) \
-    if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); continue; }
+    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); continue; }
 #define assert(cond, ...) \
-    if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return NIL_CELL; }
+    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return NIL_CELL; }
 #define asserti(cond, ...) \
-    if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return 0; }
+    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return 0; }
 #define assertv(cond, ...) \
-    if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return; }
+    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return; }
 
 #if (0)
 # define memdebugf(...) printf(__VA_ARGS__)
@@ -147,7 +148,7 @@ inline static off_t cell_index(const cell_t *cons) {
 
 inline static cell_t *list_next(const cell_t *cons) {
     if (cell_type(cons) != CELL_CONS) {
-        fprintf(stderr, "list_next: not a cons at [%ld]\n", cell_index(cons));
+        errorf("list_next: not a cons at [%ld]\n", cell_index(cons));
         print_cell(cons);
         return NIL_CELL;
     }
@@ -413,8 +414,10 @@ cell_t *secd_cdr(secd_t *secd) {
 cell_t *secd_ldc(secd_t *secd) {
     ctrldebugf("LDC\n");
     cell_t *arg = pop_control(secd);
+    /*
     assert(cell_type(arg) == CELL_ATOM,
            "secd_ldc: arg at [%ld] is not an atom", cell_index(arg));
+           */
     return push_stack(secd, arg);
 }
 
@@ -485,6 +488,7 @@ cell_t *secd_atom(secd_t *secd) {
 cell_t *secd_eq(secd_t *secd) {
     ctrldebugf("EQ\n");
     cell_t *sa = pop_stack(secd);
+    assert(sa, "secd_eq: pop_stack(a) failed");
     cell_t *a = get_car(sa);
 
     cell_t *sb = pop_stack(secd);
@@ -542,6 +546,7 @@ const cell_t cdr_func   = INIT_FUNC(secd_cdr);
 const cell_t add_func   = INIT_FUNC(secd_add);
 const cell_t ldc_func   = INIT_FUNC(secd_ldc);
 const cell_t ld_func    = INIT_FUNC(secd_ld);
+const cell_t eq_func    = INIT_FUNC(secd_eq);
 const cell_t atom_func  = INIT_FUNC(secd_atom);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
@@ -550,6 +555,7 @@ const cell_t cdr_sym    = INIT_SYM("CDR");
 const cell_t add_sym    = INIT_SYM("ADD");
 const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t ld_sym     = INIT_SYM("LD");
+const cell_t eq_sym     = INIT_SYM("EQ");
 const cell_t atom_sym   = INIT_SYM("ATOM");
 
 const cell_t two_num    = INIT_NUM(2);
@@ -560,13 +566,14 @@ const struct {
     const cell_t *sym;
     const cell_t *val;
 } global_binding[] = {
+    { &atom_sym,    &atom_func },
     { &cons_sym,    &cons_func },
     { &car_sym,     &car_func },
     { &cdr_sym,     &cdr_func },
     { &add_sym,     &add_func },
+    { &eq_sym,      &eq_func  },
     { &ldc_sym,     &ldc_func },
     { &ld_sym,      &ld_func  },
-    { &atom_sym,    &atom_func },
     { &t_sym,       &t_sym    },
     { &nil_sym,     NIL_CELL  },
     { NULL,         NIL_CELL  } // must be last
@@ -618,6 +625,7 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
         env = list_next(env);
     }
     printf("lookup_env: %s not found\n", symname);
+    return NIL_CELL;
 }
 
 cell_t *lookup_symbol(secd_t *secd, const char *symname) {
@@ -641,6 +649,7 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
 
         env = list_next(env);
     }
+    return NIL_CELL;
 }
 
 void print_env(secd_t *secd) {
@@ -658,7 +667,7 @@ void print_env(secd_t *secd) {
             cell_t *val = get_car(vallist);
             if (atom_type(sym) != ATOM_SYM)
                 fprintf(stderr, "print_env: not a symbol at *%p in vallist\n", sym);
-            printf("  %s\t=>\t", sym->as_atom.as_sym.data, cell_index(val));
+            printf("  %s\t=>\t", sym->as_atom.as_sym.data);
             print_cell(val);
 
             symlist = list_next(symlist);
@@ -727,6 +736,7 @@ secd_parser_t *new_parser(FILE *f) {
 }
 
 inline static int nextchar(secd_parser_t *p) {
+    //printf("nextchar\n");
     return p->lc = fgetc(p->f);
 }
 
@@ -791,23 +801,29 @@ void test_lexer(FILE *f) {
     printf("lexbye.\n");
 }
 
-cell_t *read_secd(secd_t *secd, FILE *f) {
-    secd_parser_t p;
-    init_parser(&p, f);
+cell_t *read_list(secd_t *secd, secd_parser_t *p) {
     cell_t *head = NIL_CELL, *tail = NIL_CELL;
     cell_t *newtail, *val;
-
     while (TRUE) {
-        int tok = lexnext(&p);
+        int tok = lexnext(p);
         switch (tok) {
           case TOK_STR:
-              val = new_symbol(secd, p.strtok); break;
+              val = new_symbol(secd, p->strtok); break;
           case TOK_NUM:
-              val = new_number(secd, p.numtok); break;
+              val = new_number(secd, p->numtok); break;
           case TOK_EOF: case ')':
               return head;
           case '(':
-              val = read_secd(secd, f); break;
+              val = read_list(secd, p); 
+              if (p->token == TOK_EOF || p->token == TOK_ERR) 
+                  return head;
+              if (p->token == TOK_ERR) {
+                  free_cell(head); 
+                  errorf("read_list: TOK_ERR\n");
+                  return NIL_CELL;
+              }
+              assert(p->token == ')', "read_list: not a closing bracket");
+              break;
           case TOK_ERR:
               free_cell(head); return NIL_CELL;
         }
@@ -820,6 +836,18 @@ cell_t *read_secd(secd_t *secd, FILE *f) {
             head = tail = newtail;
         }
     }
+}
+
+cell_t *read_secd(secd_t *secd, FILE *f) {
+    secd_parser_t p;
+    init_parser(&p, f);
+
+    cell_t *result = read_list(secd, &p);
+    if (p.token != TOK_EOF) {
+        errorf("read_secd: failed\n");
+        return NIL_CELL;
+    }
+    return result;
 }
 
 /*
@@ -852,6 +880,8 @@ void run_secd(secd_t *secd) {
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
         const char *symname = op->as_atom.as_sym.data;
+        if (!strcmp("STOP", symname)) return;
+
         cell_t *val = lookup_env(secd, symname);
         assert_or_continue(val, "run: lookup_env() failed for %s\n", symname);
         assert_or_continue(atom_type(val) == ATOM_FUNC, "run: not a ATOM_FUNC\n");
@@ -888,6 +918,7 @@ int main(int argc, char *argv[]) {
     fill_global_env(&secd);
     print_env(&secd);
 
+    printf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
 
     push_control(&secd, inp);
@@ -895,6 +926,14 @@ int main(int argc, char *argv[]) {
     printf("Control path:\n");
     print_list(secd.control);
 
-    printf("-----------------------------------\n");
+    printf("<<<<<\n");
     run_secd(&secd);
+
+    printf("-----\n");
+    cell_t *stack_head = secd.stack;
+    if (!stack_head) { printf("stack is empty\n"); return 0; }
+    stack_head = get_car(stack_head);
+    printf("Stack head:\n");
+    if (is_cons(stack_head)) print_list(stack_head);
+    else print_cell(stack_head);
 }
