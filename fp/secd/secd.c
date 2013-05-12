@@ -334,39 +334,57 @@ cell_t *free_cell(cell_t *c) {
     return NIL_CELL;
 }
 
+inline static cell_t *push(secd_t *secd, cell_t **to, cell_t *what) {
+    cell_t *newtop = new_cons(secd, what, *to);
+    drop_cell(*to);
+    return (*to = share_cell(newtop));
+}
+
+inline static cell_t *pop(cell_t **from) {
+    cell_t *top = *from;
+    assert(top, "pop: stack is empty");
+    assert(is_cons(top), "pop: not a cons");
+
+    cell_t *val = share_cell(get_car(top));
+    *from = share_cell(get_cdr(top));
+    drop_cell(top);
+    return val;
+}
+
 cell_t *push_stack(secd_t *secd, cell_t *newc) {
-    cell_t *top = new_cons(secd, newc, secd->stack);
-    drop_cell(secd->stack);
-    secd->stack = share_cell(top);
+    cell_t *top = push(secd, &secd->stack, newc);
     memdebugf("PUSH S[%ld (%ld, %ld)]\n", cell_index(top),
                         cell_index(get_car(top)), cell_index(get_cdr(top)));
     return top;
 }
 
 cell_t *pop_stack(secd_t *secd) {
-    assert(secd->stack, "pop_stack: empty");
-    cell_t *cell = secd->stack;
-    assert(is_cons(cell), "pop_stack: not a cons");
-    secd->stack = list_next(secd->stack);
+    cell_t *cell = pop(&secd->stack);
     memdebugf("POP S[%ld]\n", cell_index(cell));
     return cell; // don't forget to drop_call(result)
 }
 
-cell_t *push_control(secd_t *secd, cell_t *opcons) {
+cell_t *set_control(secd_t *secd, cell_t *opcons) {
     assert(is_cons(opcons),
-           "push_control: failed, not a cons at [%ld]\n", cell_index(opcons));
+           "set_control: failed, not a cons at [%ld]\n", cell_index(opcons));
     return (secd->control = share_cell(opcons));
 }
 
 cell_t *pop_control(secd_t *secd) {
-    cell_t *cons = secd->control;
-    assert(cons, "pop_control: NIL");
-    assert(is_cons(cons), "pop_control: not a cons at [%ld]\n", cell_index(cons));
+    return pop(&secd->control);
+}
 
-    cell_t *op = share_cell(get_car(cons));
-    secd->control = share_cell(list_next(cons));
-    drop_cell(cons);
-    return op;
+cell_t *push_dump(secd_t *secd, cell_t *cell) {
+    cell_t *top = push(secd, &secd->dump, cell);
+    memdebugf("PUSH D[%ld] (%ld, %ld)\n", cell_index(top),
+            cell_index(get_car(top), get_cdr(top)));
+    return top;
+}
+
+cell_t *pop_dump(secd_t *secd) {
+    cell_t *cell = pop(&secd->dump);
+    memdebugf("POP D[%ld]\n", cell_index(cell));
+    return cell;
 }
 
 /*
@@ -377,48 +395,44 @@ cell_t *secd_cons(secd_t *secd) {
     ctrldebugf("CONS\n");
     cell_t *a = pop_stack(secd);
     assert(a, "secd_cons: pop_stack(a) failed");
-    assert(is_cons(a), "secd_cons: S[top] not a cons");
+
     cell_t *b = pop_stack(secd);
     assert(b, "secd_cons: pop_stack(b) failed");
-    assert(is_cons(a), "secd_cons: S[top-1] is not a cons");
 
-    cell_t *cons = new_cons(secd, get_car(a), get_car(b));
-    drop_cell(a);
+    cell_t *cons = new_cons(secd, a, b);
+    drop_cell(a); drop_cell(b);
 
-    push_stack(secd, cons);
-    return cons;
+    return push_stack(secd, cons);
 }
 
 cell_t *secd_car(secd_t *secd) {
     ctrldebugf("CAR\n");
-    cell_t *top = pop_stack(secd);
-    assert(top, "secd_car: pop_stack() failed");
-    assert(is_cons(top), "secd_car: cons expected");
+    cell_t *cons = pop_stack(secd);
+    assert(cons, "secd_car: pop_stack() failed");
+    assert(is_cons(cons), "secd_cdr: cons expected");
 
-    cell_t *car = push_stack(secd, get_car(get_car(top)));
-    drop_cell(top);
+    cell_t *car = push_stack(secd, get_car(cons));
+    drop_cell(cons);
     return car;
 }
 
 cell_t *secd_cdr(secd_t *secd) {
     ctrldebugf("CDR\n");
-    cell_t *top = pop_stack(secd);
-    assert(top, "secd_cdr: pop_stack() failed");
-    assert(is_cons(top), "secd_cdr: cons expected");
+    cell_t *cons = pop_stack(secd);
+    assert(cons, "secd_cdr: pop_stack() failed");
+    assert(is_cons(cons), "secd_cdr: cons expected");
 
-    cell_t *cdr = push_stack(secd, get_cdr(get_car(top)));
-    drop_cell(top);
+    cell_t *cdr = push_stack(secd, get_cdr(cons));
+    drop_cell(cons);
     return cdr;
 }
 
 cell_t *secd_ldc(secd_t *secd) {
     ctrldebugf("LDC\n");
     cell_t *arg = pop_control(secd);
-    /*
-    assert(cell_type(arg) == CELL_ATOM,
-           "secd_ldc: arg at [%ld] is not an atom", cell_index(arg));
-           */
-    return push_stack(secd, arg);
+    push_stack(secd, arg);
+    drop_cell(arg);
+    return arg;
 }
 
 cell_t *secd_ld(secd_t *secd) {
@@ -476,49 +490,73 @@ bool list_eq(const cell_t *xs, const cell_t *ys) {
 
 cell_t *secd_atom(secd_t *secd) {
     ctrldebugf("ATOM\n");
-    cell_t *top = pop_stack(secd);
-    assert(top, "secd_atom: pop_stack() failed");
-    cell_t *val = get_car(top);
+    cell_t *val = pop_stack(secd); 
+    assert(val, "secd_atom: pop_stack() failed");
+
     cell_t *result = to_bool(secd, (val ? !is_cons(val) : TRUE));
-    cell_t *newtop = push_stack(secd, result);
-    drop_cell(top);
-    return newtop;
+    drop_cell(val);
+    return push_stack(secd, result);
 }
 
 cell_t *secd_eq(secd_t *secd) {
     ctrldebugf("EQ\n");
-    cell_t *sa = pop_stack(secd);
-    assert(sa, "secd_eq: pop_stack(a) failed");
-    cell_t *a = get_car(sa);
+    cell_t *a = pop_stack(secd);
+    assert(a, "secd_eq: pop_stack(a) failed");
 
-    cell_t *sb = pop_stack(secd);
-    assert(sb, "secd_eq: pop_stack(b) failed");
-    cell_t *b = get_car(sb);
+    cell_t *b = pop_stack(secd);
+    assert(b, "secd_eq: pop_stack(b) failed");
 
     cell_t *val = is_cons(a) ?
                   to_bool(secd, list_eq(a, b)) :
                   to_bool(secd, atom_eq(a, b)) ;
-    drop_cell(sa);
+    drop_cell(a); drop_cell(b);
     return push_stack(secd, val);
 }
 
 cell_t *secd_add(secd_t *secd) {
     ctrldebugf("ADD\n");
-    cell_t *sa = pop_stack(secd);
-    cell_t *a = get_car(sa);
+
+    cell_t *a = pop_stack(secd);
+    assert(a, "secd_add: pop_stack(a) failed");
     assert(atom_type(a) == ATOM_INT, "secd_add: a is not int");
 
-    cell_t *sb = pop_stack(secd);
-    assert(sb, "secd_add: pop_stack(b) failed");
-    cell_t *b = get_car(sb);
+    cell_t *b = pop_stack(secd);
+    assert(b, "secd_add: pop_stack(b) failed");
     assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
 
     int num = a->as_atom.as_int + b->as_atom.as_int;
-    drop_cell(sa);
-
+    drop_cell(a); drop_cell(b);
     return push_stack(secd, new_number(secd, num));
 }
 
+cell_t *secd_sel(secd_t *secd) {
+    ctrldebugf("SEL\n");
+
+    cell_t *condcell = pop_stack(secd);
+    print_cell(condcell);
+
+    bool cond = condcell ? TRUE : FALSE;
+    drop_cell(condcell);
+
+    cell_t *thenb = pop_control(secd);
+    cell_t *elseb = pop_control(secd);
+    assert(is_cons(thenb) && is_cons(elseb), "secd_sel: both branches must be conses");
+    
+    secd->control = share_cell(cond ? thenb : elseb);
+    push_dump(secd, list_next(elseb));
+
+    drop_cell(thenb); drop_cell(elseb);
+    return secd->control;
+}
+
+cell_t *secd_join(secd_t *secd) {
+    ctrldebugf("JOIN\n");
+
+    cell_t *joinb = pop_dump(secd);
+    assert(joinb, "secd_join: pop_dump() failed");
+
+    secd->control = share_cell(joinb);
+}
 
 #define INIT_SYM(name) {    \
     .type = CELL_ATOM,      \
@@ -548,6 +586,8 @@ const cell_t ldc_func   = INIT_FUNC(secd_ldc);
 const cell_t ld_func    = INIT_FUNC(secd_ld);
 const cell_t eq_func    = INIT_FUNC(secd_eq);
 const cell_t atom_func  = INIT_FUNC(secd_atom);
+const cell_t sel_func   = INIT_FUNC(secd_sel);
+const cell_t join_func  = INIT_FUNC(secd_join);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
@@ -557,6 +597,8 @@ const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t ld_sym     = INIT_SYM("LD");
 const cell_t eq_sym     = INIT_SYM("EQ");
 const cell_t atom_sym   = INIT_SYM("ATOM");
+const cell_t sel_sym    = INIT_SYM("SEL");
+const cell_t join_sym   = INIT_SYM("JOIN");
 
 const cell_t two_num    = INIT_NUM(2);
 const cell_t t_sym      = INIT_SYM("T");
@@ -574,6 +616,9 @@ const struct {
     { &eq_sym,      &eq_func  },
     { &ldc_sym,     &ldc_func },
     { &ld_sym,      &ld_func  },
+    { &sel_sym,     &sel_func },
+    { &join_sym,    &join_func },
+
     { &t_sym,       &t_sym    },
     { &nil_sym,     NIL_CELL  },
     { NULL,         NIL_CELL  } // must be last
@@ -921,7 +966,7 @@ int main(int argc, char *argv[]) {
     printf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
 
-    push_control(&secd, inp);
+    set_control(&secd, inp);
     //fill_control_path(&secd, );
     printf("Control path:\n");
     print_list(secd.control);
@@ -931,9 +976,17 @@ int main(int argc, char *argv[]) {
 
     printf("-----\n");
     cell_t *stack_head = secd.stack;
-    if (!stack_head) { printf("stack is empty\n"); return 0; }
+    if (!stack_head) { 
+        printf("stack is empty\n"); 
+        return 0; 
+    }
+
     stack_head = get_car(stack_head);
     printf("Stack head:\n");
-    if (is_cons(stack_head)) print_list(stack_head);
-    else print_cell(stack_head);
+    if (!stack_head) 
+        printf("NIL\n");
+    else if (is_cons(stack_head)) 
+        print_list(stack_head);
+    else
+        print_cell(stack_head);
 }
