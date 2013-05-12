@@ -19,7 +19,7 @@
 #define assertv(cond, ...) \
     if (!(cond)) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); return; }
 
-#if (1)
+#if (0)
 # define memdebugf(...) printf(__VA_ARGS__)
 # if (0)
 #  define memtracef(...) printf(__VA_ARGS__)
@@ -429,7 +429,7 @@ cell_t *secd_ld(secd_t *secd) {
     return push_stack(secd, val);
 }
 
-static inline cell_t *to_bool(secd_t *secd, int cond) {
+static inline cell_t *to_bool(secd_t *secd, bool cond) {
     return ((cond)? lookup_env(secd, "T") : NIL_CELL);
 }
 
@@ -475,7 +475,8 @@ cell_t *secd_atom(secd_t *secd) {
     ctrldebugf("ATOM\n");
     cell_t *top = pop_stack(secd);
     assert(top, "secd_atom: pop_stack() failed");
-    cell_t *result = to_bool(secd, is_cons(get_car(top)));
+    cell_t *val = get_car(top);
+    cell_t *result = to_bool(secd, (val ? !is_cons(val) : TRUE));
     cell_t *newtop = push_stack(secd, result);
     drop_cell(top);
     return newtop;
@@ -541,6 +542,7 @@ const cell_t cdr_func   = INIT_FUNC(secd_cdr);
 const cell_t add_func   = INIT_FUNC(secd_add);
 const cell_t ldc_func   = INIT_FUNC(secd_ldc);
 const cell_t ld_func    = INIT_FUNC(secd_ld);
+const cell_t atom_func  = INIT_FUNC(secd_atom);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
@@ -548,6 +550,7 @@ const cell_t cdr_sym    = INIT_SYM("CDR");
 const cell_t add_sym    = INIT_SYM("ADD");
 const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t ld_sym     = INIT_SYM("LD");
+const cell_t atom_sym   = INIT_SYM("ATOM");
 
 const cell_t two_num    = INIT_NUM(2);
 const cell_t t_sym      = INIT_SYM("T");
@@ -563,6 +566,7 @@ const struct {
     { &add_sym,     &add_func },
     { &ldc_sym,     &ldc_func },
     { &ld_sym,      &ld_func  },
+    { &atom_sym,    &atom_func },
     { &t_sym,       &t_sym    },
     { &nil_sym,     NIL_CELL  },
     { NULL,         NIL_CELL  } // must be last
@@ -613,6 +617,7 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
 
         env = list_next(env);
     }
+    printf("lookup_env: %s not found\n", symname);
 }
 
 cell_t *lookup_symbol(secd_t *secd, const char *symname) {
