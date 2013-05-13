@@ -68,7 +68,6 @@ enum atom_type {
     ATOM_INT,
     ATOM_SYM,
     ATOM_FUNC,
-    NOT_AN_ATOM = 0xffff
 };
 
 struct atom {
@@ -491,7 +490,7 @@ bool list_eq(const cell_t *xs, const cell_t *ys) {
 
 cell_t *secd_atom(secd_t *secd) {
     ctrldebugf("ATOM\n");
-    cell_t *val = pop_stack(secd); 
+    cell_t *val = pop_stack(secd);
     assert(val, "secd_atom: pop_stack() failed");
 
     cell_t *result = to_bool(secd, (val ? !is_cons(val) : TRUE));
@@ -542,9 +541,10 @@ cell_t *secd_sel(secd_t *secd) {
     cell_t *thenb = pop_control(secd);
     cell_t *elseb = pop_control(secd);
     assert(is_cons(thenb) && is_cons(elseb), "secd_sel: both branches must be conses");
-    
+
+    cell_t *joinb = secd->control;
     secd->control = share_cell(cond ? thenb : elseb);
-    push_dump(secd, list_next(elseb));
+    push_dump(secd, joinb);
 
     drop_cell(thenb); drop_cell(elseb);
     return secd->control;
@@ -860,11 +860,11 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
           case TOK_EOF: case ')':
               return head;
           case '(':
-              val = read_list(secd, p); 
-              if (p->token == TOK_EOF || p->token == TOK_ERR) 
+              val = read_list(secd, p);
+              if (p->token == TOK_EOF || p->token == TOK_ERR)
                   return head;
               if (p->token == TOK_ERR) {
-                  free_cell(head); 
+                  free_cell(head);
                   errorf("read_list: TOK_ERR\n");
                   return NIL_CELL;
               }
@@ -977,16 +977,16 @@ int main(int argc, char *argv[]) {
 
     printf("-----\n");
     cell_t *stack_head = secd.stack;
-    if (!stack_head) { 
-        printf("stack is empty\n"); 
-        return 0; 
+    if (!stack_head) {
+        printf("stack is empty\n");
+        return 0;
     }
 
     stack_head = get_car(stack_head);
     printf("Stack head:\n");
-    if (!stack_head) 
+    if (!stack_head)
         printf("NIL\n");
-    else if (is_cons(stack_head)) 
+    else if (is_cons(stack_head))
         print_list(stack_head);
     else
         print_cell(stack_head);
