@@ -207,6 +207,15 @@ void print_list(cell_t *list) {
     printf("NIL\n");
 }
 
+void printc(cell_t *c) {
+    if (!c)
+        printf("NIL\n");
+    else if (is_cons(c))
+        print_list(c);
+    else
+        print_cell(c);
+}
+
 /*
  * Reference-counting
  */
@@ -477,10 +486,10 @@ bool list_eq(const cell_t *xs, const cell_t *ys) {
         const cell_t *x = get_car(xs);
         const cell_t *y = get_car(ys);
         if (is_cons(x)) {
-            if (!list_eq(x, y))
-                return FALSE;
-        } else if (!atom_eq(x, y))
-            return FALSE;
+            if (!list_eq(x, y)) return FALSE;
+        } else {
+            if (!atom_eq(x, y)) return FALSE;
+        }
 
         xs = list_next(xs);
         ys = list_next(ys);
@@ -546,7 +555,7 @@ cell_t *secd_sel(secd_t *secd) {
     secd->control = share_cell(cond ? thenb : elseb);
     push_dump(secd, joinb);
 
-    drop_cell(thenb); drop_cell(elseb);
+    drop_cell(thenb); drop_cell(elseb); drop_cell(joinb);
     return secd->control;
 }
 
@@ -722,19 +731,6 @@ void print_env(secd_t *secd) {
 
         env = list_next(env);
     }
-}
-
-void fill_control_path(secd_t *secd, cell_t *ops[]) {
-    int i = 0;
-    while (ops[++i]);  // go to the end
-
-    cell_t *control = NIL_CELL;
-    while (i-- > 0) {
-        cell_t *op = new_clone(secd, ops[i]);
-        control = new_cons(secd, op, control);
-    }
-
-    secd->control = share_cell(control);
 }
 
 /*
@@ -940,22 +936,6 @@ void run_secd(secd_t *secd) {
     }
 }
 
-const cell_t *test2plus2[] = {
-    &ldc_sym, &two_num,
-    &ldc_sym, &two_num,
-    &add_sym,
-    NIL_CELL
-};
-
-const cell_t *test_car[] = {
-    &ldc_sym, &two_num,
-    &ldc_sym, &two_num,
-    &ld_sym, &nil_sym,
-    &cons_sym,
-    &cons_sym,
-    NIL_CELL
-};
-
 secd_t __attribute__((aligned(1 << SECD_ALIGN))) secd;
 
 int main(int argc, char *argv[]) {
@@ -968,7 +948,6 @@ int main(int argc, char *argv[]) {
     cell_t *inp = read_secd(&secd, NULL);
 
     set_control(&secd, inp);
-    //fill_control_path(&secd, );
     printf("Control path:\n");
     print_list(secd.control);
 
@@ -982,12 +961,6 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    stack_head = get_car(stack_head);
     printf("Stack head:\n");
-    if (!stack_head)
-        printf("NIL\n");
-    else if (is_cons(stack_head))
-        print_list(stack_head);
-    else
-        print_cell(stack_head);
+    printc(get_car(stack_head));
 }
