@@ -1,14 +1,12 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
 #include <limits.h>
 #include <ctype.h>
 
-#define bool    int
-#define TRUE    1
-#define FALSE   0
+typedef enum { false, true } bool;
 
 #define errorf(...) fprintf(stderr, __VA_ARGS__)
 #define assert_or_continue(cond, ...) \
@@ -180,7 +178,6 @@ void print_atom(const cell_t *c) {
 
 void print_cell(const cell_t *c) {
     if (!c) { printf("NIL\n"); return; }
-    secd_t *secd = cell_secd(c);
     printf("[%ld]^%ld: ", cell_index(c), c->nref);
     switch (cell_type(c)) {
       case CELL_CONS:
@@ -224,7 +221,9 @@ inline static cell_t *share_cell(cell_t *c) {
     if (c) {
         ++c->nref;
         memtracef("share[%ld] %ld\n", cell_index(c), c->nref);
-    } else memdebugf("share[NIL]\n");
+    } else {
+        memdebugf("share[NIL]\n");
+    }
     return c;
 }
 
@@ -447,6 +446,7 @@ cell_t *secd_ldc(secd_t *secd) {
 cell_t *secd_ld(secd_t *secd) {
     ctrldebugf("LD\n");
     cell_t *arg = pop_control(secd);
+    assert(arg, "secd_ld: stack empty");
     assert(atom_type(arg) == ATOM_SYM,
            "secd_ld: not a symbol [%ld]", cell_index(arg));
 
@@ -462,9 +462,9 @@ static inline cell_t *to_bool(secd_t *secd, bool cond) {
 bool atom_eq(const cell_t *a1, const cell_t *a2) {
     enum atom_type atype1 = atom_type(a1);
     if (a1 == a2)
-        return TRUE;
+        return true;
     if (atype1 != atom_type(a2))
-        return FALSE;
+        return false;
     switch (atype1) {
       case ATOM_INT: return (a1->as_atom.as_int == a2->as_atom.as_int);
       case ATOM_SYM: return (!strcmp(a1->as_atom.as_sym.data, a2->as_atom.as_sym.data));
@@ -472,23 +472,23 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
       default: fprintf(stderr, "atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
                        cell_index(a1), cell_index(a2), atype1);
     }
-    return FALSE;
+    return false;
 }
 
 bool list_eq(const cell_t *xs, const cell_t *ys) {
     asserti(is_cons(xs), "list_eq: [%ld] is not a cons", cell_index(xs));
     if (xs == ys)
-        return TRUE;
+        return true;
     if (!is_cons(ys))
-        return FALSE;
+        return false;
     while (xs) {
-        if (!ys) return FALSE;
+        if (!ys) return false;
         const cell_t *x = get_car(xs);
         const cell_t *y = get_car(ys);
         if (is_cons(x)) {
-            if (!list_eq(x, y)) return FALSE;
+            if (!list_eq(x, y)) return false;
         } else {
-            if (!atom_eq(x, y)) return FALSE;
+            if (!atom_eq(x, y)) return false;
         }
 
         xs = list_next(xs);
@@ -502,7 +502,7 @@ cell_t *secd_atom(secd_t *secd) {
     cell_t *val = pop_stack(secd);
     assert(val, "secd_atom: pop_stack() failed");
 
-    cell_t *result = to_bool(secd, (val ? !is_cons(val) : TRUE));
+    cell_t *result = to_bool(secd, (val ? !is_cons(val) : true));
     drop_cell(val);
     return push_stack(secd, result);
 }
@@ -544,7 +544,7 @@ cell_t *secd_sel(secd_t *secd) {
     cell_t *condcell = pop_stack(secd);
     print_cell(condcell);
 
-    bool cond = condcell ? TRUE : FALSE;
+    bool cond = condcell ? true : false;
     drop_cell(condcell);
 
     cell_t *thenb = pop_control(secd);
@@ -565,7 +565,7 @@ cell_t *secd_join(secd_t *secd) {
     cell_t *joinb = pop_dump(secd);
     assert(joinb, "secd_join: pop_dump() failed");
 
-    secd->control = share_cell(joinb);
+    return (secd->control = share_cell(joinb));
 }
 
 #define INIT_SYM(name) {    \
@@ -764,11 +764,11 @@ secd_parser_t *init_parser(secd_parser_t *p, FILE *f) {
     p->lc = ' ';
     p->f = (f ? f : stdin);
 
-    memset(p->issymbc, FALSE, 0x20);
-    memset(p->issymbc + 0x20, TRUE, UCHAR_MAX - 0x20);
+    memset(p->issymbc, false, 0x20);
+    memset(p->issymbc + 0x20, true, UCHAR_MAX - 0x20);
     char *s = " ();\n";
     while (*s)
-        p->issymbc[(unsigned char)*s++] = FALSE;
+        p->issymbc[(unsigned char)*s++] = false;
     return p;
 }
 
@@ -826,7 +826,7 @@ token_t lexnext(secd_parser_t *p) {
     return TOK_ERR;
 }
 
-void test_lexer(FILE *f) {
+void test_lexer(void) {
     secd_parser_t p;
     init_parser(&p, NULL);
     int tok;
@@ -846,7 +846,7 @@ void test_lexer(FILE *f) {
 cell_t *read_list(secd_t *secd, secd_parser_t *p) {
     cell_t *head = NIL_CELL, *tail = NIL_CELL;
     cell_t *newtail, *val;
-    while (TRUE) {
+    while (true) {
         int tok = lexnext(p);
         switch (tok) {
           case TOK_STR:
@@ -938,7 +938,7 @@ void run_secd(secd_t *secd) {
 
 secd_t __attribute__((aligned(1 << SECD_ALIGN))) secd;
 
-int main(int argc, char *argv[]) {
+int main() {
     init_secd(&secd);
 
     fill_global_env(&secd);
@@ -946,6 +946,7 @@ int main(int argc, char *argv[]) {
 
     printf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
+    asserti(inp, "read_secd failed");
 
     set_control(&secd, inp);
     printf("Control path:\n");
@@ -955,12 +956,10 @@ int main(int argc, char *argv[]) {
     run_secd(&secd);
 
     printf("-----\n");
-    cell_t *stack_head = secd.stack;
-    if (!stack_head) {
-        printf("stack is empty\n");
-        return 0;
-    }
-
-    printf("Stack head:\n");
-    printc(get_car(stack_head));
+    if (secd.stack) {
+        printf("Stack head:\n");
+        printc(get_car(secd.stack));
+    } else
+        printf("Stack is empty\n");
+    return 0;
 }
