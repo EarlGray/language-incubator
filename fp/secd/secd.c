@@ -120,6 +120,7 @@ struct secd  {
 void print_cell(const cell_t *c);
 cell_t *free_cell(cell_t *c);
 
+void print_env(secd_t *secd);
 cell_t *lookup_env(secd_t *secd, const char *symname);
 
 /*
@@ -402,10 +403,8 @@ cell_t *pop_dump(secd_t *secd) {
 cell_t *secd_cons(secd_t *secd) {
     ctrldebugf("CONS\n");
     cell_t *a = pop_stack(secd);
-    assert(a, "secd_cons: pop_stack(a) failed");
 
     cell_t *b = pop_stack(secd);
-    assert(b, "secd_cons: pop_stack(b) failed");
 
     cell_t *cons = new_cons(secd, a, b);
     drop_cell(a); drop_cell(b);
@@ -522,21 +521,57 @@ cell_t *secd_eq(secd_t *secd) {
     return push_stack(secd, val);
 }
 
-cell_t *secd_add(secd_t *secd) {
-    ctrldebugf("ADD\n");
-
+static cell_t *arithm_op(secd_t *secd, int op(int, int)) {
     cell_t *a = pop_stack(secd);
-    assert(a, "secd_add: pop_stack(a) failed");
+    assert(a, "secd_add: pop_stack(a) failed")
     assert(atom_type(a) == ATOM_INT, "secd_add: a is not int");
 
     cell_t *b = pop_stack(secd);
     assert(b, "secd_add: pop_stack(b) failed");
     assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
 
-    int num = a->as_atom.as_int + b->as_atom.as_int;
+    int res = op(a->as_atom.as_int, b->as_atom.as_int);
     drop_cell(a); drop_cell(b);
-    return push_stack(secd, new_number(secd, num));
+    return push_stack(secd, new_number(secd, res));
 }
+
+inline static int iplus(int x, int y) {
+    return x + y;
+}
+inline static int iminus(int x, int y) {
+    return y - x;
+}
+inline static int imult(int x, int y) {
+    return x * y;
+}
+inline static int idiv(int x, int y) {
+    return y / x;
+}
+inline static int irem(int x, int y) {
+    return y % x;
+}
+
+cell_t *secd_add(secd_t *secd) {
+    ctrldebugf("ADD\n");
+    return arithm_op(secd, iplus);
+}
+cell_t *secd_sub(secd_t *secd) {
+    ctrldebugf("SUB\n");
+    return arithm_op(secd, iminus);
+}
+cell_t *secd_mul(secd_t *secd) {
+    ctrldebugf("MUL\n");
+    return arithm_op(secd, imult);
+}
+cell_t *secd_div(secd_t *secd) {
+    ctrldebugf("SUB\n");
+    return arithm_op(secd, idiv);
+}
+cell_t *secd_rem(secd_t *secd) {
+    ctrldebugf("SUB\n");
+    return arithm_op(secd, irem);
+}
+
 
 cell_t *secd_sel(secd_t *secd) {
     ctrldebugf("SEL\n");
@@ -568,6 +603,69 @@ cell_t *secd_join(secd_t *secd) {
     return (secd->control = share_cell(joinb));
 }
 
+cell_t *secd_ldf(secd_t *secd) {
+    ctrldebugf("LDF\n");
+
+    cell_t *func = pop_control(secd);
+    assert(func, "secd_ldf: failed to get the control path");
+
+    cell_t *closure = new_cons(secd, func, secd->env);
+    drop_cell(func);
+    return push_stack(secd, closure);
+}
+
+cell_t *secd_ap(secd_t *secd) {
+    ctrldebugf("AP\n");
+
+    cell_t *closure = pop_stack(secd);
+    cell_t *argvals = pop_stack(secd);
+
+    cell_t *newenv = get_cdr(closure);
+    cell_t *func = get_car(closure);
+    cell_t *argnames = get_car(func);
+    cell_t *control = get_car(list_next(func));
+
+    push_dump(secd, secd->control);
+    push_dump(secd, secd->env);
+    push_dump(secd, secd->stack);
+
+    cell_t *frame = new_cons(secd, argnames, argvals);
+    printf("new frame: \n"); print_cell(frame);
+    printf(" argnames: \n"); printc(argnames);
+    printf(" argvals : \n"); printc(argvals);
+    secd->stack = NIL_CELL;
+    secd->env = share_cell(new_cons(secd, frame, newenv));
+    print_env(secd);
+    secd->control = share_cell(control);
+
+    drop_cell(closure); drop_cell(argvals);
+
+    return control;
+}
+
+cell_t *secd_rtn(secd_t *secd) {
+    ctrldebugf("RTN\n");
+
+    drop_cell(secd->env);
+
+    assert(secd->stack, "secd_rtn: stack is empty");
+    cell_t *top = pop_stack(secd);
+    assert(secd->stack == NIL_CELL, "secd_rtn: stack holds more than 1 value");
+
+    cell_t *prevstack = pop_dump(secd);
+    cell_t *prevenv = pop_dump(secd);
+    cell_t *prevcontrol = pop_dump(secd);
+
+    secd->stack = share_cell(new_cons(secd, top, prevstack));
+    secd->env = share_cell(prevenv);
+    secd->control = share_cell(prevcontrol);
+
+    drop_cell(top); drop_cell(prevstack); 
+    drop_cell(prevenv); drop_cell(prevcontrol);
+
+    return top;
+}
+
 #define INIT_SYM(name) {    \
     .type = CELL_ATOM,      \
     .as_atom = {            \
@@ -592,23 +690,37 @@ const cell_t cons_func  = INIT_FUNC(secd_cons);
 const cell_t car_func   = INIT_FUNC(secd_car);
 const cell_t cdr_func   = INIT_FUNC(secd_cdr);
 const cell_t add_func   = INIT_FUNC(secd_add);
+const cell_t sub_func   = INIT_FUNC(secd_sub);
+const cell_t mul_func   = INIT_FUNC(secd_mul);
+const cell_t div_func   = INIT_FUNC(secd_div);
+const cell_t rem_func   = INIT_FUNC(secd_rem);
 const cell_t ldc_func   = INIT_FUNC(secd_ldc);
 const cell_t ld_func    = INIT_FUNC(secd_ld);
 const cell_t eq_func    = INIT_FUNC(secd_eq);
 const cell_t atom_func  = INIT_FUNC(secd_atom);
 const cell_t sel_func   = INIT_FUNC(secd_sel);
 const cell_t join_func  = INIT_FUNC(secd_join);
+const cell_t ldf_func   = INIT_FUNC(secd_ldf);
+const cell_t ap_func    = INIT_FUNC(secd_ap);
+const cell_t rtn_func   = INIT_FUNC(secd_rtn);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
 const cell_t cdr_sym    = INIT_SYM("CDR");
 const cell_t add_sym    = INIT_SYM("ADD");
+const cell_t sub_sym    = INIT_SYM("SUB");
+const cell_t mul_sym    = INIT_SYM("MUL");
+const cell_t div_sym    = INIT_SYM("DIV");
+const cell_t rem_sym    = INIT_SYM("REM");
 const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t ld_sym     = INIT_SYM("LD");
 const cell_t eq_sym     = INIT_SYM("EQ");
 const cell_t atom_sym   = INIT_SYM("ATOM");
 const cell_t sel_sym    = INIT_SYM("SEL");
 const cell_t join_sym   = INIT_SYM("JOIN");
+const cell_t ldf_sym    = INIT_SYM("LDF");
+const cell_t ap_sym     = INIT_SYM("AP");
+const cell_t rtn_sym    = INIT_SYM("RTN");
 
 const cell_t two_num    = INIT_NUM(2);
 const cell_t t_sym      = INIT_SYM("T");
@@ -622,12 +734,22 @@ const struct {
     { &cons_sym,    &cons_func },
     { &car_sym,     &car_func },
     { &cdr_sym,     &cdr_func },
+
     { &add_sym,     &add_func },
+    { &sub_sym,     &sub_func },
+    { &mul_sym,     &mul_func },
+    { &div_sym,     &div_func },
+    { &rem_sym,     &rem_func },
+
     { &eq_sym,      &eq_func  },
     { &ldc_sym,     &ldc_func },
     { &ld_sym,      &ld_func  },
+
     { &sel_sym,     &sel_func },
     { &join_sym,    &join_func },
+    { &ldf_sym,     &ldf_func },
+    { &ap_sym,      &ap_func  },
+    { &rtn_sym,     &rtn_func },
 
     { &t_sym,       &t_sym    },
     { &nil_sym,     NIL_CELL  },
@@ -712,7 +834,7 @@ void print_env(secd_t *secd) {
     int i = 0;
     printf("Environment:\n");
     while (env) {
-        printf(" Frame #%d:\n", i);
+        printf(" Frame #%d:\n", i++);
         cell_t *frame = get_car(env);
         cell_t *symlist = get_car(frame);
         cell_t *vallist = get_cdr(frame);
@@ -918,6 +1040,7 @@ secd_t * init_secd(secd_t *secd) {
 void run_secd(secd_t *secd) {
     cell_t *op;
     while (NIL_CELL != (op = pop_control(secd))) {
+        print_cell(op);
         assert_or_continue(atom_type(op) == ATOM_SYM,
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
