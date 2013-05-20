@@ -6,13 +6,11 @@
 #include <limits.h>
 #include <ctype.h>
 
-typedef enum { false, true } bool;
-
 #define errorf(...) fprintf(stderr, __VA_ARGS__)
 #define assert_or_continue(cond, ...) \
     if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); continue; }
 #define assert(cond, ...) \
-    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return NIL_CELL; }
+    if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return NULL; }
 #define asserti(cond, ...) \
     if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return 0; }
 #define assertv(cond, ...) \
@@ -36,17 +34,16 @@ typedef enum { false, true } bool;
 # define ctrldebugf(...)
 #endif
 
-#define NIL_CELL    ((cell_t *)0)
-
 #define DONT_FREE_THIS  INTPTR_MAX
 
 #define N_CELLS     256 * 1024
 #define SECD_ALIGN  4
 
-typedef  struct secd  secd_t;
-typedef  struct cell  cell_t;
+typedef enum { false, true } bool;
 
-typedef  enum operation  opcode_t;
+typedef  struct secd    secd_t;
+typedef  struct cell    cell_t;
+typedef  unsigned long  index_t;
 
 typedef  struct atom  atom_t;
 typedef  struct cons  cons_t;
@@ -107,13 +104,14 @@ struct cell {
 
 // must be aligned at 1<<SECD_ALIGN
 struct secd  {
-    cell_t *stack;
-    cell_t *env;
-    cell_t *control;
-    cell_t *dump;
+    cell_t *stack;      // list
+    cell_t *env;        // list
+    cell_t *control;    // list
+    cell_t *dump;       // list
 
-    cell_t *free;
-    cell_t *data;
+    cell_t *free;       // list
+    cell_t *data;       // array
+    cell_t *nil;        // pointer
 };
 
 
@@ -140,8 +138,16 @@ inline static enum atom_type atom_type(const cell_t *c) {
     return (enum atom_type)(c->as_atom.type);
 }
 
+inline static bool is_nil(const cell_t *cell) {
+    secd_t *secd = cell_secd(cell);
+    return cell == secd->nil;
+}
+inline static bool not_nil(const cell_t *cell) {
+    return !is_nil(cell);
+}
+
 inline static off_t cell_index(const cell_t *cons) {
-    if (cons == NIL_CELL) return -1;
+    if (is_nil(cons)) return -1;
     return cons - cell_secd(cons)->data;
 }
 
@@ -149,7 +155,7 @@ inline static cell_t *list_next(const cell_t *cons) {
     if (cell_type(cons) != CELL_CONS) {
         errorf("list_next: not a cons at [%ld]\n", cell_index(cons));
         print_cell(cons);
-        return NIL_CELL;
+        return NULL;
     }
     return cons->as_cons.cdr;
 }
@@ -178,7 +184,11 @@ void print_atom(const cell_t *c) {
 }
 
 void print_cell(const cell_t *c) {
-    if (!c) { printf("NIL\n"); return; }
+    assertv(c, "print_cell(NULL)\n");
+    if (is_nil(c)) {
+         printf("NIL\n");
+         return;
+    }
     printf("[%ld]^%ld: ", cell_index(c), c->nref);
     switch (cell_type(c)) {
       case CELL_CONS:
@@ -194,7 +204,7 @@ void print_cell(const cell_t *c) {
 
 void print_list(cell_t *list) {
     printf("  -= ");
-    while (list) {
+    while (not_nil(list)) {
         assertv(is_cons(list),
                 "Not a cons at [%ld]\n", cell_index(list));
         printf("[%ld]:%ld\t", cell_index(list), cell_index(get_car(list)));
@@ -206,9 +216,8 @@ void print_list(cell_t *list) {
 }
 
 void printc(cell_t *c) {
-    if (!c)
-        printf("NIL\n");
-    else if (is_cons(c))
+    assertv(c, "printc(NULL)");
+    if (is_cons(c))
         print_list(c);
     else
         print_cell(c);
@@ -219,7 +228,7 @@ void printc(cell_t *c) {
  */
 
 inline static cell_t *share_cell(cell_t *c) {
-    if (c) {
+    if (not_nil(c)) {
         ++c->nref;
         memtracef("share[%ld] %ld\n", cell_index(c), c->nref);
     } else {
@@ -229,7 +238,7 @@ inline static cell_t *share_cell(cell_t *c) {
 }
 
 inline static cell_t *drop_cell(cell_t *c) {
-    if (!c) {
+    if (is_nil(c)) {
         memdebugf("drop [NIL]\n");
         return NULL;
     }
@@ -247,7 +256,7 @@ inline static cell_t *drop_cell(cell_t *c) {
 
 cell_t *pop_free(secd_t *secd) {
     cell_t *cell = secd->free;
-    assert(cell != NIL_CELL, "pop_free: no free memory");
+    assert(not_nil(cell), "pop_free: no free memory");
 
     secd->free = list_next(cell);
     memdebugf("NEW [%ld]\n", cell_index(cell));
@@ -257,7 +266,7 @@ cell_t *pop_free(secd_t *secd) {
 }
 
 void push_free(cell_t *c) {
-    assertv(c, "push_free: NIL_CELL");
+    assertv(c, "push_free(NULL)");
     assertv(c->nref == 0, "push_free: [%ld]->nref is %ld\n", cell_index(c), c->nref);
     secd_t *secd = cell_secd(c);
     c->type = (intptr_t)secd | CELL_CONS;
@@ -292,7 +301,7 @@ cell_t *new_symbol(secd_t *secd, const char *sym) {
 }
 
 cell_t *new_clone(secd_t *secd, const cell_t *from) {
-    if (!from) return NIL_CELL;
+    if (!from) return NULL;
     cell_t *clone = pop_free(secd);
     memcpy(clone, from, sizeof(cell_t));
     clone->type = (intptr_t)secd | cell_type(from);
@@ -340,7 +349,7 @@ cell_t *free_cell(cell_t *c) {
         return new_error(cell_secd(c), "free_cell: unknown cell_type 0x%x", t);
     }
     push_free(c);
-    return NIL_CELL;
+    return NULL;
 }
 
 inline static cell_t *push(secd_t *secd, cell_t **to, cell_t *what) {
@@ -351,7 +360,7 @@ inline static cell_t *push(secd_t *secd, cell_t **to, cell_t *what) {
 
 inline static cell_t *pop(cell_t **from) {
     cell_t *top = *from;
-    assert(top, "pop: stack is empty");
+    assert(not_nil(top), "pop: stack is empty");
     assert(is_cons(top), "pop: not a cons");
 
     cell_t *val = share_cell(get_car(top));
@@ -416,7 +425,8 @@ cell_t *secd_car(secd_t *secd) {
     ctrldebugf("CAR\n");
     cell_t *cons = pop_stack(secd);
     assert(cons, "secd_car: pop_stack() failed");
-    assert(is_cons(cons), "secd_cdr: cons expected");
+    assert(not_nil(cons), "secd_car: stack is empty");
+    assert(is_cons(cons), "secd_car: cons expected");
 
     cell_t *car = push_stack(secd, get_car(cons));
     drop_cell(cons);
@@ -427,6 +437,7 @@ cell_t *secd_cdr(secd_t *secd) {
     ctrldebugf("CDR\n");
     cell_t *cons = pop_stack(secd);
     assert(cons, "secd_cdr: pop_stack() failed");
+    assert(not_nil(cons), "secd_cdr: stack is empty");
     assert(is_cons(cons), "secd_cdr: cons expected");
 
     cell_t *cdr = push_stack(secd, get_cdr(cons));
@@ -437,6 +448,8 @@ cell_t *secd_cdr(secd_t *secd) {
 cell_t *secd_ldc(secd_t *secd) {
     ctrldebugf("LDC\n");
     cell_t *arg = pop_control(secd);
+    assert(arg, "secd_ldc: pop_control failed");
+    assert(not_nil(arg), "secd_ldc: empty control path");
     push_stack(secd, arg);
     drop_cell(arg);
     return arg;
@@ -455,7 +468,7 @@ cell_t *secd_ld(secd_t *secd) {
 }
 
 static inline cell_t *to_bool(secd_t *secd, bool cond) {
-    return ((cond)? lookup_env(secd, "T") : NIL_CELL);
+    return ((cond)? lookup_env(secd, "T") : secd->nil);
 }
 
 bool atom_eq(const cell_t *a1, const cell_t *a2) {
@@ -476,30 +489,35 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
 
 bool list_eq(const cell_t *xs, const cell_t *ys) {
     asserti(is_cons(xs), "list_eq: [%ld] is not a cons", cell_index(xs));
-    if (xs == ys)
-        return true;
-    if (!is_cons(ys))
-        return false;
-    while (xs) {
-        if (!ys) return false;
+    if (xs == ys)   return true;
+    while (not_nil(xs)) {
+        if (!is_cons(xs)) return atom_eq(xs, ys);
+        if (is_nil(ys)) return false;
+        if (!is_cons(ys)) return false;
         const cell_t *x = get_car(xs);
         const cell_t *y = get_car(ys);
-        if (is_cons(x)) {
-            if (!list_eq(x, y)) return false;
+        if (not_nil(x)) {
+            if (is_nil(y)) return false;
+            if (is_cons(x)) {
+                if (!list_eq(x, y)) return false;
+            } else {
+                if (!atom_eq(x, y)) return false;
+            }
         } else {
-            if (!atom_eq(x, y)) return false;
+            if (not_nil(y)) return false;
         }
 
         xs = list_next(xs);
         ys = list_next(ys);
     }
-    return !ys;
+    return not_nil(ys);
 }
 
 cell_t *secd_atom(secd_t *secd) {
     ctrldebugf("ATOM\n");
     cell_t *val = pop_stack(secd);
     assert(val, "secd_atom: pop_stack() failed");
+    assert(not_nil(val), "secd_atom: empty stack");
 
     cell_t *result = to_bool(secd, (val ? !is_cons(val) : true));
     drop_cell(val);
@@ -514,9 +532,9 @@ cell_t *secd_eq(secd_t *secd) {
     cell_t *b = pop_stack(secd);
     assert(b, "secd_eq: pop_stack(b) failed");
 
-    cell_t *val = is_cons(a) ?
-                  to_bool(secd, list_eq(a, b)) :
-                  to_bool(secd, atom_eq(a, b)) ;
+    bool eq = (is_cons(a) ? list_eq(a, b) : atom_eq(a, b));
+                
+    cell_t *val = to_bool(secd, eq);
     drop_cell(a); drop_cell(b);
     return push_stack(secd, val);
 }
@@ -579,7 +597,7 @@ cell_t *secd_sel(secd_t *secd) {
     cell_t *condcell = pop_stack(secd);
     print_cell(condcell);
 
-    bool cond = condcell ? true : false;
+    bool cond = not_nil(condcell) ? true : false;
     drop_cell(condcell);
 
     cell_t *thenb = pop_control(secd);
@@ -633,7 +651,7 @@ cell_t *secd_ap(secd_t *secd) {
     printf("new frame: \n"); print_cell(frame);
     printf(" argnames: \n"); printc(argnames);
     printf(" argvals : \n"); printc(argvals);
-    secd->stack = NIL_CELL;
+    secd->stack = secd->nil;
     secd->env = share_cell(new_cons(secd, frame, newenv));
     print_env(secd);
     secd->control = share_cell(control);
@@ -648,9 +666,9 @@ cell_t *secd_rtn(secd_t *secd) {
 
     drop_cell(secd->env);
 
-    assert(secd->stack, "secd_rtn: stack is empty");
+    assert(not_nil(secd->stack), "secd_rtn: stack is empty");
     cell_t *top = pop_stack(secd);
-    assert(secd->stack == NIL_CELL, "secd_rtn: stack holds more than 1 value");
+    assert(is_nil(secd->stack), "secd_rtn: stack holds more than 1 value");
 
     cell_t *prevstack = pop_dump(secd);
     cell_t *prevenv = pop_dump(secd);
@@ -752,14 +770,13 @@ const struct {
     { &rtn_sym,     &rtn_func },
 
     { &t_sym,       &t_sym    },
-    { &nil_sym,     NIL_CELL  },
-    { NULL,         NIL_CELL  } // must be last
+    { NULL,         NULL  } // must be last
 };
 
 void fill_global_env(secd_t *secd) {
     int i;
-    cell_t *symlist = NIL_CELL;
-    cell_t *vallist = NIL_CELL;
+    cell_t *symlist = secd->nil;
+    cell_t *vallist = secd->nil;
 
     for (i = 0; global_binding[i].sym; ++i) {
         cell_t *sym = new_clone(secd, global_binding[i].sym);
@@ -768,8 +785,13 @@ void fill_global_env(secd_t *secd) {
         vallist = new_cons(secd, val, vallist);
     }
 
+    cell_t *sym = new_clone(secd, &nil_sym);
+    cell_t *val = secd->nil;
+    symlist = new_cons(secd, sym, symlist);
+    vallist = new_cons(secd, val, vallist);
+
     cell_t *frame = new_cons(secd, symlist, vallist);
-    cell_t *env = new_cons(secd, frame, NIL_CELL);
+    cell_t *env = new_cons(secd, frame, secd->nil);
 
     secd->env = share_cell(env);
 }
@@ -778,12 +800,12 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
     cell_t *env = secd->env;
     assert(cell_type(env) == CELL_CONS, "lookup_env: environment is not a list\n");
 
-    while (env) {       // walk through frames
+    while (not_nil(env)) {       // walk through frames
         cell_t *frame = get_car(env);
         cell_t *symlist = get_car(frame);
         cell_t *vallist = get_cdr(frame);
 
-        while (symlist) {   // walk through symbols
+        while (not_nil(symlist)) {   // walk through symbols
             cell_t *symbol = get_car(symlist);
             if (atom_type(symbol) != ATOM_SYM) {
                 fprintf(stderr, "lookup_env: variable at [%ld] is not a symbol\n",
@@ -802,18 +824,18 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
         env = list_next(env);
     }
     printf("lookup_env: %s not found\n", symname);
-    return NIL_CELL;
+    return NULL;
 }
 
 cell_t *lookup_symbol(secd_t *secd, const char *symname) {
     cell_t *env = secd->env;
     assert(cell_type(env) == CELL_CONS, "lookup_symbol: environment is not a list\n");
 
-    while (env) {       // walk through frames
+    while (not_nil(env)) {       // walk through frames
         cell_t *frame = get_car(env);
         cell_t *symlist = get_car(frame);
 
-        while (symlist) {   // walk through symbols
+        while (not_nil(symlist)) {   // walk through symbols
             cell_t *symbol = get_car(symlist);
             assert(atom_type(symbol) != ATOM_SYM,
                     "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(symbol));
@@ -826,20 +848,20 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
 
         env = list_next(env);
     }
-    return NIL_CELL;
+    return NULL;
 }
 
 void print_env(secd_t *secd) {
     cell_t *env = secd->env;
     int i = 0;
     printf("Environment:\n");
-    while (env) {
+    while (not_nil(env)) {
         printf(" Frame #%d:\n", i++);
         cell_t *frame = get_car(env);
         cell_t *symlist = get_car(frame);
         cell_t *vallist = get_cdr(frame);
 
-        while (symlist) {
+        while (not_nil(symlist)) {
             cell_t *sym = get_car(symlist);
             cell_t *val = get_car(vallist);
             if (atom_type(sym) != ATOM_SYM)
@@ -966,7 +988,7 @@ void test_lexer(void) {
 }
 
 cell_t *read_list(secd_t *secd, secd_parser_t *p) {
-    cell_t *head = NIL_CELL, *tail = NIL_CELL;
+    cell_t *head = secd->nil, *tail = secd->nil;
     cell_t *newtail, *val;
     while (true) {
         int tok = lexnext(p);
@@ -979,21 +1001,23 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
               return head;
           case '(':
               val = read_list(secd, p);
-              if (p->token == TOK_EOF || p->token == TOK_ERR)
-                  return head;
               if (p->token == TOK_ERR) {
                   free_cell(head);
                   errorf("read_list: TOK_ERR\n");
-                  return NIL_CELL;
+                  return NULL;
+              }
+              if (p->token == TOK_EOF) {
+                  free_cell(head);
+                  errorf("read_list: TOK_EOF, ')' expected");
               }
               assert(p->token == ')', "read_list: not a closing bracket");
               break;
           case TOK_ERR:
-              free_cell(head); return NIL_CELL;
+              free_cell(head); return NULL;
         }
 
-        newtail = new_cons(secd, val, NIL_CELL);
-        if (head) {
+        newtail = new_cons(secd, val, secd->nil);
+        if (not_nil(head)) {
             tail->as_cons.cdr = share_cell(newtail);
             tail = newtail;
         } else {
@@ -1009,7 +1033,8 @@ cell_t *read_secd(secd_t *secd, FILE *f) {
     cell_t *result = read_list(secd, &p);
     if (p.token != TOK_EOF) {
         errorf("read_secd: failed\n");
-        return NIL_CELL;
+        if (result) drop_cell(result);
+        return NULL;
     }
     return result;
 }
@@ -1030,16 +1055,22 @@ secd_t * init_secd(secd_t *secd) {
         c->as_cons.cdr = secd->data + i + 1;
     }
     cell_t * c = secd->data + N_CELLS - 1;
+    secd->nil = c;
     c->type = (intptr_t)secd | CELL_CONS;
-    c->as_cons.cdr = NIL_CELL;
+    c->as_cons.cdr = NULL;
 
     secd->free = secd->data;
+    secd->stack = secd->dump =  secd->nil;
+    secd->control = secd->env =  secd->nil;
     return secd;
 }
 
 void run_secd(secd_t *secd) {
     cell_t *op;
-    while (NIL_CELL != (op = pop_control(secd))) {
+    while (true)  {
+        op = pop_control(secd);
+        assertv(op, "run_secd: no command");
+
         print_cell(op);
         assert_or_continue(atom_type(op) == ATOM_SYM,
                 "run: not a symbol at [%ld]\n", cell_index(op));
@@ -1070,6 +1101,10 @@ int main() {
     printf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
     asserti(inp, "read_secd failed");
+    if (is_nil(inp)) {
+        printf("no commands.");
+        return 0;
+    }
 
     set_control(&secd, inp);
     printf("Control path:\n");
@@ -1079,7 +1114,7 @@ int main() {
     run_secd(&secd);
 
     printf("-----\n");
-    if (secd.stack) {
+    if (not_nil(secd.stack)) {
         printf("Stack head:\n");
         printc(get_car(secd.stack));
     } else
