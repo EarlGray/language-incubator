@@ -684,6 +684,48 @@ cell_t *secd_rtn(secd_t *secd) {
     return top;
 }
 
+
+cell_t *secd_dum(secd_t *secd) {
+    ctrldebugf("DUM\n");
+
+    cell_t *newtop = new_cons(secd, secd->nil, secd->stack);
+    drop_cell(secd->stack);
+    secd->stack = share_cell(newtop);
+    return newtop;
+}
+
+cell_t *secd_rap(secd_t *secd) {
+    ctrldebugf("RAP\n");
+
+    cell_t *closure = pop_stack(secd);
+    cell_t *argvals = pop_stack(secd);
+
+    cell_t *newenv = get_cdr(closure);
+    cell_t *func = get_car(closure);
+    cell_t *argnames = get_car(func);
+    cell_t *control = get_car(list_next(func));
+
+    push_dump(secd, secd->control);
+    push_dump(secd, get_cdr(secd->env));
+    push_dump(secd, secd->stack);
+
+    cell_t *frame = new_cons(secd, argnames, argvals);
+    printf("new frame: \n"); print_cell(frame);
+    printf(" argnames: \n"); printc(argnames);
+    printf(" argvals : \n"); printc(argvals);
+    newenv->as_cons.car = share_cell(frame);
+
+    secd->stack = secd->nil;
+    secd->env = share_cell(newenv);
+    print_env(secd);
+
+    secd->control = share_cell(control);
+
+    drop_cell(closure); drop_cell(argvals);
+
+    return control;
+}
+
 #define INIT_SYM(name) {    \
     .type = CELL_ATOM,      \
     .as_atom = {            \
@@ -721,6 +763,8 @@ const cell_t join_func  = INIT_FUNC(secd_join);
 const cell_t ldf_func   = INIT_FUNC(secd_ldf);
 const cell_t ap_func    = INIT_FUNC(secd_ap);
 const cell_t rtn_func   = INIT_FUNC(secd_rtn);
+const cell_t dum_func   = INIT_FUNC(secd_dum);
+const cell_t rap_func   = INIT_FUNC(secd_rap);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
@@ -739,6 +783,8 @@ const cell_t join_sym   = INIT_SYM("JOIN");
 const cell_t ldf_sym    = INIT_SYM("LDF");
 const cell_t ap_sym     = INIT_SYM("AP");
 const cell_t rtn_sym    = INIT_SYM("RTN");
+const cell_t dum_sym    = INIT_SYM("DUM");
+const cell_t rap_sym    = INIT_SYM("RAP");
 
 const cell_t two_num    = INIT_NUM(2);
 const cell_t t_sym      = INIT_SYM("T");
@@ -768,6 +814,8 @@ const struct {
     { &ldf_sym,     &ldf_func },
     { &ap_sym,      &ap_func  },
     { &rtn_sym,     &rtn_func },
+    { &dum_sym,     &dum_func },
+    { &rap_sym,     &rap_func },
 
     { &t_sym,       &t_sym    },
     { NULL,         NULL  } // must be last
