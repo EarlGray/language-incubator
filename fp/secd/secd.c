@@ -449,7 +449,6 @@ cell_t *secd_ldc(secd_t *secd) {
     ctrldebugf("LDC\n");
     cell_t *arg = pop_control(secd);
     assert(arg, "secd_ldc: pop_control failed");
-    assert(not_nil(arg), "secd_ldc: empty control path");
     push_stack(secd, arg);
     drop_cell(arg);
     return arg;
@@ -557,16 +556,16 @@ inline static int iplus(int x, int y) {
     return x + y;
 }
 inline static int iminus(int x, int y) {
-    return y - x;
+    return x - y;
 }
 inline static int imult(int x, int y) {
     return x * y;
 }
 inline static int idiv(int x, int y) {
-    return y / x;
+    return x / y;
 }
 inline static int irem(int x, int y) {
-    return y % x;
+    return x % y;
 }
 
 cell_t *secd_add(secd_t *secd) {
@@ -688,10 +687,13 @@ cell_t *secd_rtn(secd_t *secd) {
 cell_t *secd_dum(secd_t *secd) {
     ctrldebugf("DUM\n");
 
-    cell_t *newtop = new_cons(secd, secd->nil, secd->stack);
-    drop_cell(secd->stack);
-    secd->stack = share_cell(newtop);
-    return newtop;
+    cell_t *oldenv = secd->env;
+    cell_t *newenv = new_cons(secd, secd->nil, oldenv);
+
+    secd->env = share_cell(newenv);
+    drop_cell(oldenv);
+
+    return newenv;
 }
 
 cell_t *secd_rap(secd_t *secd) {
@@ -850,6 +852,11 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
 
     while (not_nil(env)) {       // walk through frames
         cell_t *frame = get_car(env);
+        if (is_nil(frame)) {
+            printf("lookup_env: warning: skipping OMEGA-frame...\n");
+            env = list_next(env);
+            continue;
+        }
         cell_t *symlist = get_car(frame);
         cell_t *vallist = get_cdr(frame);
 

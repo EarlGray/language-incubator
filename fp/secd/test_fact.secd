@@ -1,0 +1,20 @@
+;;; this is a test for recursion: factorial(4)
+
+DUM
+ LDC ()             ; the same as LD NIL
+ ;; factorial body:
+ LDF ((n)
+      (LD n  LDC 0  EQ
+       SEL (LDC 1  JOIN)
+           (LDC  ()  LDC 1  LD n  SUB  CONS
+            LD fact  AP
+            LD n  MUL
+            JOIN)
+       RTN))
+ CONS
+
+ ;; factorial(4):
+ LDF ((fact)
+      (LDC ()  LDC 4  CONS
+       LD fact  AP RTN))
+RAP

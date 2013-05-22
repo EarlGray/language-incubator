@@ -1,0 +1,10 @@
+; make a lambda and pass it to a function which applies it
+
+; make a list of arguments: ((lambda (x) (* x x)))
+LD NIL
+LDF ((x) (LD x LD x MUL RTN))
+CONS        
+
+; apply lambda: (lambda (f) (f 12))
+LDF ((f) (LD NIL LDC 12 CONS LD f AP RTN))
+AP
