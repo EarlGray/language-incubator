@@ -788,7 +788,6 @@ const cell_t rtn_sym    = INIT_SYM("RTN");
 const cell_t dum_sym    = INIT_SYM("DUM");
 const cell_t rap_sym    = INIT_SYM("RAP");
 
-const cell_t two_num    = INIT_NUM(2);
 const cell_t t_sym      = INIT_SYM("T");
 const cell_t nil_sym    = INIT_SYM("NIL");
 
