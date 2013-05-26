@@ -1,7 +1,11 @@
 CC 			:= gcc
 CXX 		:= g++
 LD 			:= g++
+ifeq ($(shell uname),Darwin)
+LLVMCONF	:= llvm-config-mp-3.1
+else
 LLVMCONF	:= llvm-config-3.1
+endif
 CFLAGS 		:= -g $(shell $(LLVMCONF) --cflags) -Wall -Werror
 CXXFLAGS	:= -g $(shell $(LLVMCONF) --cppflags)
 LDFLAGS 	:= $(shell $(LLVMCONF) --libs core native jit) $(shell $(LLVMCONF) --ldflags)

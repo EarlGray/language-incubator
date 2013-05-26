@@ -68,14 +68,14 @@ enum atom_type {
 struct atom {
     enum atom_type type;
     union {
-        int as_int;
+        int num;
         struct {
             size_t size;
             const char *data;
-        } as_sym;
+        } sym;
 
-        void *as_ptr;
-    };
+        void *ptr;
+    } as;
 };
 
 struct cons {
@@ -94,10 +94,10 @@ struct cell {
     //      bits SECD_ALIGN .. CHAR_BIT * (sizeof(intptr_t)-1)   - (secd_t *)
     intptr_t type;
     union {
-        atom_t  as_atom;
-        cons_t  as_cons;
-        error_t as_err;
-    };
+        atom_t  atom;
+        cons_t  cons;
+        error_t err;
+    } as;
 
     size_t nref;
 };
@@ -135,7 +135,7 @@ inline static secd_t *cell_secd(const cell_t *c) {
 
 inline static enum atom_type atom_type(const cell_t *c) {
     if (cell_type(c) != CELL_ATOM) return NOT_AN_ATOM;
-    return (enum atom_type)(c->as_atom.type);
+    return (enum atom_type)(c->as.atom.type);
 }
 
 inline static bool is_nil(const cell_t *cell) {
@@ -146,7 +146,7 @@ inline static bool not_nil(const cell_t *cell) {
     return !is_nil(cell);
 }
 
-inline static off_t cell_index(const cell_t *cons) {
+inline static long cell_index(const cell_t *cons) {
     if (is_nil(cons)) return -1;
     return cons - cell_secd(cons)->data;
 }
@@ -157,18 +157,18 @@ inline static cell_t *list_next(const cell_t *cons) {
         print_cell(cons);
         return NULL;
     }
-    return cons->as_cons.cdr;
+    return cons->as.cons.cdr;
 }
 
 inline static cell_t *list_head(const cell_t *cons) {
-    return cons->as_cons.car;
+    return cons->as.cons.car;
 }
 
 inline static cell_t *get_car(const cell_t *cons) {
-    return cons->as_cons.car;
+    return cons->as.cons.car;
 }
 inline static cell_t *get_cdr(const cell_t *cons) {
-    return cons->as_cons.cdr;
+    return cons->as.cons.cdr;
 }
 inline static bool is_cons(const cell_t *cell) {
     return cell_type(cell) == CELL_CONS;
@@ -176,9 +176,9 @@ inline static bool is_cons(const cell_t *cell) {
 
 void print_atom(const cell_t *c) {
     switch (atom_type(c)) {
-      case ATOM_INT: printf("INT(%d)", c->as_atom.as_int); break;
-      case ATOM_SYM: printf("SYM(%s)", c->as_atom.as_sym.data); break;
-      case ATOM_FUNC: printf("BUILTIN(%p)", c->as_atom.as_ptr); break;
+      case ATOM_INT: printf("INT(%d)", c->as.atom.as.num); break;
+      case ATOM_SYM: printf("SYM(%s)", c->as.atom.as.sym.data); break;
+      case ATOM_FUNC: printf("BUILTIN(%p)", c->as.atom.as.ptr); break;
       case NOT_AN_ATOM: printf("ERROR(not an atom)");
     }
 }
@@ -270,7 +270,7 @@ void push_free(cell_t *c) {
     assertv(c->nref == 0, "push_free: [%ld]->nref is %ld\n", cell_index(c), c->nref);
     secd_t *secd = cell_secd(c);
     c->type = (intptr_t)secd | CELL_CONS;
-    c->as_cons.cdr = secd->free;
+    c->as.cons.cdr = secd->free;
     secd->free = c;
     memdebugf("FREE[%ld]\n", cell_index(c));
 }
@@ -278,25 +278,25 @@ void push_free(cell_t *c) {
 cell_t *new_cons(secd_t *secd, cell_t *car, cell_t *cdr) {
     cell_t *cell = pop_free(secd);
     cell->type |= CELL_CONS;
-    cell->as_cons.car = share_cell(car);
-    cell->as_cons.cdr = share_cell(cdr);
+    cell->as.cons.car = share_cell(car);
+    cell->as.cons.cdr = share_cell(cdr);
     return cell;
 }
 
 cell_t *new_number(secd_t *secd, int num) {
     cell_t *cell = pop_free(secd);
     cell->type |= CELL_ATOM;
-    cell->as_atom.type = ATOM_INT;
-    cell->as_atom.as_int = num;
+    cell->as.atom.type = ATOM_INT;
+    cell->as.atom.as.num = num;
     return cell;
 }
 
 cell_t *new_symbol(secd_t *secd, const char *sym) {
     cell_t *cell = pop_free(secd);
     cell->type |= CELL_ATOM;
-    cell->as_atom.type = ATOM_SYM;
-    cell->as_atom.as_sym.size = strlen(sym);
-    cell->as_atom.as_sym.data = strdup(sym);
+    cell->as.atom.type = ATOM_SYM;
+    cell->as.atom.as.sym.size = strlen(sym);
+    cell->as.atom.as.sym.data = strdup(sym);
     return cell;
 }
 
@@ -319,16 +319,16 @@ cell_t *new_error(secd_t *secd, const char *fmt, ...) {
 
     cell_t *err = pop_free(secd);
     err->type |= CELL_ERROR;
-    err->as_err.len = strlen(buf);
-    err->as_err.msg = strdup(buf);
+    err->as.err.len = strlen(buf);
+    err->as.err.msg = strdup(buf);
     return err;
 }
 
 void free_atom(cell_t *cell) {
-    switch (cell->as_atom.type) {
+    switch (cell->as.atom.type) {
       case ATOM_SYM:
-        if (cell->as_atom.as_sym.size != DONT_FREE_THIS)
-            free((char *)cell->as_atom.as_sym.data); break;
+        if (cell->as.atom.as.sym.size != DONT_FREE_THIS)
+            free((char *)cell->as.atom.as.sym.data); break;
       default: return;
     }
 }
@@ -461,7 +461,7 @@ cell_t *secd_ld(secd_t *secd) {
     assert(atom_type(arg) == ATOM_SYM,
            "secd_ld: not a symbol [%ld]", cell_index(arg));
 
-    cell_t *val = lookup_env(secd, arg->as_atom.as_sym.data);
+    cell_t *val = lookup_env(secd, arg->as.atom.as.sym.data);
     drop_cell(arg);
     return push_stack(secd, val);
 }
@@ -477,9 +477,9 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
     if (atype1 != atom_type(a2))
         return false;
     switch (atype1) {
-      case ATOM_INT: return (a1->as_atom.as_int == a2->as_atom.as_int);
-      case ATOM_SYM: return (!strcmp(a1->as_atom.as_sym.data, a2->as_atom.as_sym.data));
-      case ATOM_FUNC: return (a1->as_atom.as_ptr == a2->as_atom.as_ptr);
+      case ATOM_INT: return (a1->as.atom.as.num == a2->as.atom.as.num);
+      case ATOM_SYM: return (!strcmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
+      case ATOM_FUNC: return (a1->as.atom.as.ptr == a2->as.atom.as.ptr);
       default: fprintf(stderr, "atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
                        cell_index(a1), cell_index(a2), atype1);
     }
@@ -547,7 +547,7 @@ static cell_t *arithm_op(secd_t *secd, int op(int, int)) {
     assert(b, "secd_add: pop_stack(b) failed");
     assert(atom_type(b) == ATOM_INT, "secd_add: b is not int");
 
-    int res = op(a->as_atom.as_int, b->as_atom.as_int);
+    int res = op(a->as.atom.as.num, b->as.atom.as.num);
     drop_cell(a); drop_cell(b);
     return push_stack(secd, new_number(secd, res));
 }
@@ -715,7 +715,7 @@ cell_t *secd_rap(secd_t *secd) {
     printf("new frame: \n"); print_cell(frame);
     printf(" argnames: \n"); printc(argnames);
     printf(" argvals : \n"); printc(argvals);
-    newenv->as_cons.car = share_cell(frame);
+    newenv->as.cons.car = share_cell(frame);
 
     secd->stack = secd->nil;
     secd->env = share_cell(newenv);
@@ -730,22 +730,22 @@ cell_t *secd_rap(secd_t *secd) {
 
 #define INIT_SYM(name) {    \
     .type = CELL_ATOM,      \
-    .as_atom = {            \
+    .as.atom = {            \
         .type = ATOM_SYM,   \
-        .as_sym = { .size = DONT_FREE_THIS, \
+        .as.sym = { .size = DONT_FREE_THIS, \
                     .data = (name) } }, \
     .nref = INTPTR_MAX }
 
 #define INIT_NUM(num) {     \
     .type = CELL_ATOM,      \
-    .as_atom = { .type = ATOM_INT,  \
-                 .as_int = (num) }, \
+    .as.atom = { .type = ATOM_INT,  \
+                 .as.num = (num) }, \
     .nref = INTPTR_MAX }
 
 #define INIT_FUNC(func) {   \
     .type = CELL_ATOM,      \
-    .as_atom = { .type = ATOM_FUNC,  \
-                 .as_ptr = (void *)(func) }, \
+    .as.atom = { .type = ATOM_FUNC,  \
+                 .as.ptr = (void *)(func) }, \
     .nref = INTPTR_MAX }
 
 const cell_t cons_func  = INIT_FUNC(secd_cons);
@@ -868,7 +868,7 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
                 continue;
             }
 
-            if (!strcmp(symname, symbol->as_atom.as_sym.data)) {
+            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
                 return get_car(vallist);
             }
             symlist = list_next(symlist);
@@ -894,7 +894,7 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
             assert(atom_type(symbol) != ATOM_SYM,
                     "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(symbol));
 
-            if (!strcmp(symname, symbol->as_atom.as_sym.data)) {
+            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
                 return symbol;
             }
             symlist = list_next(symlist);
@@ -920,7 +920,7 @@ void print_env(secd_t *secd) {
             cell_t *val = get_car(vallist);
             if (atom_type(sym) != ATOM_SYM)
                 fprintf(stderr, "print_env: not a symbol at *%p in vallist\n", sym);
-            printf("  %s\t=>\t", sym->as_atom.as_sym.data);
+            printf("  %s\t=>\t", sym->as.atom.as.sym.data);
             print_cell(val);
 
             symlist = list_next(symlist);
@@ -1072,7 +1072,7 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
 
         newtail = new_cons(secd, val, secd->nil);
         if (not_nil(head)) {
-            tail->as_cons.cdr = share_cell(newtail);
+            tail->as.cons.cdr = share_cell(newtail);
             tail = newtail;
         } else {
             head = tail = newtail;
@@ -1106,12 +1106,12 @@ secd_t * init_secd(secd_t *secd) {
     for (i = 0; i < N_CELLS - 1; ++i) {
         cell_t *c = secd->data + i;
         c->type = (intptr_t)secd | CELL_CONS;
-        c->as_cons.cdr = secd->data + i + 1;
+        c->as.cons.cdr = secd->data + i + 1;
     }
     cell_t * c = secd->data + N_CELLS - 1;
     secd->nil = c;
     c->type = (intptr_t)secd | CELL_CONS;
-    c->as_cons.cdr = NULL;
+    c->as.cons.cdr = NULL;
 
     secd->free = secd->data;
     secd->stack = secd->dump =  secd->nil;
@@ -1129,7 +1129,7 @@ void run_secd(secd_t *secd) {
         assert_or_continue(atom_type(op) == ATOM_SYM,
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
-        const char *symname = op->as_atom.as_sym.data;
+        const char *symname = op->as.atom.as.sym.data;
         if (!strcmp("STOP", symname)) return;
 
         cell_t *val = lookup_env(secd, symname);
@@ -1137,7 +1137,7 @@ void run_secd(secd_t *secd) {
         assert_or_continue(atom_type(val) == ATOM_FUNC, "run: not a ATOM_FUNC\n");
         drop_cell(op);
 
-        secd_opfunc_t callee = (secd_opfunc_t) val->as_atom.as_ptr;
+        secd_opfunc_t callee = (secd_opfunc_t) val->as.atom.as.ptr;
         callee(secd);
 
         printf("Stack:\n"); print_list(secd->stack);
