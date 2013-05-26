@@ -662,6 +662,12 @@ cell_t *secd_ldf(secd_t *secd) {
     return push_stack(secd, closure);
 }
 
+static bool tail_recursive(cell_t *control) {
+    cell_t *nextop = get_car(control);
+    if (atom_type(nextop) != ATOM_SYM) return false;
+    return !strcmp("RTN", nextop->as.atom.as.sym.data);
+}
+
 cell_t *secd_ap(secd_t *secd) {
     ctrldebugf("AP\n");
 
@@ -673,9 +679,11 @@ cell_t *secd_ap(secd_t *secd) {
     cell_t *argnames = get_car(func);
     cell_t *control = get_car(list_next(func));
 
-    push_dump(secd, secd->control);
-    push_dump(secd, secd->env);
-    push_dump(secd, secd->stack);
+    if (!tail_recursive(secd->control)) {
+        push_dump(secd, secd->control);
+        push_dump(secd, secd->env);
+        push_dump(secd, secd->stack);
+    }
 
     cell_t *frame = new_cons(secd, argnames, argvals);
     /*
