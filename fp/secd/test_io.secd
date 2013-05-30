@@ -1,0 +1,22 @@
+;;; READ->PROCESS->PRINT loop test
+
+DUM
+ LDC ()
+ LDF (()
+      (READ
+       ATOM
+       SEL (LDC (It looks like an atom) JOIN)
+           (LDC (I doubt it`s an atom) JOIN)
+       PRINT
+       LD loop
+       AP
+       RTN))
+ CONS
+
+ ;; the call
+ LDF ((loop)
+      (LDC () 
+       LD loop 
+       AP RTN))
+RAP
+STOP
