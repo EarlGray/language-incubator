@@ -18,3 +18,4 @@ DUM
       (LDC ()  LDC 4  CONS
        LD fact  AP RTN))
 RAP
+STOP
