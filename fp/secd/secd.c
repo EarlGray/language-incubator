@@ -28,7 +28,7 @@
 # define memtracef(...)
 #endif
 
-#if (1)
+#if (0)
 # define ctrldebugf(...) printf(__VA_ARGS__)
 #else
 # define ctrldebugf(...)

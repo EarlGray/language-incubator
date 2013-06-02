@@ -1,4 +1,4 @@
-{- 
+{-
  -  This is strictly 32-bit mode x86 assembler.
  -}
 
@@ -21,59 +21,142 @@ data GPRegister = RegEAX | RegECX | RegEDX | RegEBX | RegESP | RegEBP | RegESI |
                     deriving (Show, Read, Eq)
 data GPRegisterW = RegAX | RegCX | RegDX | RegBX | RegSP | RegBP | RegSI | RegDI
                     deriving (Show, Read, Eq)
-data GPRegisterB = RegAL | RegCL | RegDL | RegBL 
-                 | RegAH | RegCH | RegDH | RegBH 
+data GPRegisterB = RegAL | RegCL | RegDL | RegBL
+                 | RegAH | RegCH | RegDH | RegBH
                  | RegSPL | RegBPL | RegSIL | RegDIL
                deriving (Show, Read, Eq)
 data SegRegister = RegCS | RegSS | RegDS | RegES | RegFS | RegGS
                     deriving (Show, Read, Eq)
- 
+
 allGPRegs = [RegEAX, RegECX, RegEDX, RegEBX, RegESP, RegEBP, RegESI, RegEDI]
 allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
 allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
 allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
 
 data Directive = DrctvText | DrctvData | DrctvAsciz String | DrctvAscii String
-               | DrctvAlign Int | DrctvFile String 
+               | DrctvAlign Int | DrctvFile String
 
 data Label = Label String
 
-data OpPrefix 
+data OpPrefix
     = PreLock | PreREP | PreREPE | PreREPZ | PreREPNE | PreREPNZ
-    | PreCS | PreSS | PreDS | PreES | PreFS | PreGS 
+    | PreCS | PreSS | PreDS | PreES | PreFS | PreGS
     | PreAddrOverride | PreOffsetOverride
   deriving (Show, Read, Eq)
 
 data OpOperand
-    = OpndRel8 Int8 | OpndRel32 Int32 | OpndPtr Int16 Int32
-    | OpndReg8 GPRegisterB | OpndGPReg16 GPRegisterW | OpndSegReg SegRegister
-    | OpndReg GPRegister | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
-    | OpndMem8 Int8 | OpndRM SIB Displacement | OpndZero
+    = OpndRelB Int8 | OpndRel Int32
+    | OpndPtr Int16 Int32
+    | OpndRegB GPRegisterB | OpndRegW GPRegisterW
+    | OpndReg GPRegister
+    | OpndSegReg SegRegister
+    | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
+    | OpndMemW Int16 | OpndMem Int32 | OpndRM SIB Displacement
  deriving (Show, Read)
 
 
-data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32 deriving (Show, Read)
-data SIB = SIB { 
-    sibScale :: Word8, 
-    sibIndex :: Maybe GPRegister, 
-    base :: Maybe GPRegister }
-  deriving (Show, Read)
+data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
+                      deriving (Show, Read)
+{-
+data SIB = SIB {
+    sibScale :: Word8,
+    sibIndex :: Maybe GPRegister,
+    sibBase :: Maybe GPRegister
+  } deriving (Show, Read, Eq)
+-}
+data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister) deriving (Show, Read, Eq)
 
-makeSIB ::  {-Scaling:-}Word8 -> GPRegister -> Maybe GPRegister -> Word8
-makeSIB sc ind reg = 
-   case lookup sc (zip [1,2,4,8] [0, 1, 2, 3]) of
-     Nothing -> error "scaling must be one of [1,2,4,8]"
-     Just scbits -> (scbits `shiftL` 6) .|. (indbits `shiftL` 3) .|. basebits
-  where basebits = maybe 5 index reg
-        indbits = fromJust $ lookup ind (zip reglist [0,1,2,3,5,6,7])
-        reglist = [RegEAX, RegECX, RegEDX, RegEBX, RegEBP, RegESI, RegEDI]
+-- make ModRM, possible SIB and/or Displacement taken from the second OpOperand
+makeModRM :: OpOperand -> OpOperand -> [Word8]
 
-              
-data Operation 
+makeModRM (OpndReg lhs) (OpndReg rhs) = [modRM]
+  where modRM = 0xC0 .|. (index lhs `shiftL` 3) .|. index rhs
+makeModRM (OpndRegW lhs) (OpndRegW rhs) = [modRM]
+  where modRM = 0xC0 .|. (index lhs `shiftL` 3) .|. index rhs
+makeModRM (OpndRegB lhs) (OpndRegB rhs) = [modRM]
+  where modRM = 0xC0 .|. (index lhs `shiftL` 3) .|. index rhs
+
+makeModRM (OpndSegReg sreg) (OpndRegW reg) = [ modRM ]
+  where modRM = 0xc0 .|. (index sreg `shiftL` 3) .|. index reg
+
+makeModRM (OpndReg src) (OpndRM sib displ) = [modRM .|. (index src `shiftL` 3) ] ++ sibs
+  where (modRM, sibs) = case (sib, displ) of
+                          -- 32-bit memory offset
+                            ((SIB _ Nothing Nothing), Displ32 dspl) ->
+                                (0x05, bytecode dspl)
+
+                          -- (%reg), NoDiplacement:
+                            -- (%ebp): an exception from registers, do a special street magic:
+                            ((SIB _ Nothing (Just reg)), NoDispl) | reg == RegEBP ->
+                                (useSIB, [0x65, 0x00])
+                            -- (%reg):
+                            ((SIB _ Nothing (Just reg)), NoDispl) ->
+                                (useSIB, [0x20 .|. index reg])
+
+                          -- the same with Displ8:
+                            -- $displ8(%esp) : it's a kind of magic again:
+                            ((SIB _ Nothing (Just reg)), Displ8 dspl8) | reg == RegESP ->
+                                (useSIB .|. useDisplB, [0x24, int dspl8])
+                            -- $displ8(%reg)
+                            ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
+                                (index reg .|. useDisplB, [int dspl8])
+
+                          -- $displ32(%reg)
+                            -- $displ32(%esp)
+                            ((SIB _ Nothing (Just reg)), Displ32 dspl32) | reg == RegESP ->
+                                (useSIB .|. useDisplL, (0x24 : bytecode dspl32))
+                            -- $displ32(%reg)
+                            ((SIB _ Nothing (Just reg)), Displ32 dspl32) ->
+                                (index reg .|. useDisplL, bytecode dspl32)
+
+                          -- %esp cannot be index, never:
+                            ((SIB _ (Just ind) (Just base)), _) | ind == RegESP ->
+                                error "%esp cannot be index"
+                          -- (%ebp,%ind,sc)
+                            ((SIB sc (Just ind) (Just base)), NoDispl) | base == RegEBP ->
+                                (useSIB .|. useDisplB, [ sibbyte sc ind base, 0x00 ])
+                          -- (%base,%ind,sc)
+                            ((SIB sc (Just ind) (Just base)), NoDispl) ->
+                                (useSIB, [sibbyte sc ind base])
+                          -- $displ8(%base,%ind,sc)
+                            ((SIB sc (Just ind) (Just base)), Displ8 dspl8) ->
+                                (useSIB .|. useDisplB, [sibbyte sc ind base, int dspl8])
+                          -- $displ32(%base,%ind,sc)
+                            ((SIB sc (Just ind) (Just base)), Displ32 dspl32) ->
+                                (useSIB .|. useDisplL, (sibbyte sc ind base : bytecode dspl32))
+
+                          -- just-index addressing not possible?
+                            _ -> error $ "This addressing scheme is not supported: " ++ show (OpndRM sib displ)
+
+
+-- this is a shortcut for /0 operations, RegEAX represented like /0
+makeModRM0 :: OpOperand -> [Word8]
+makeModRM0 = makeModRM zeroReg
+
+-- these are stubs for embedding numerical value into modRM
+--  as required by /0 or /6 commands
+zeroReg = OpndReg RegEAX    -- sometimes: use immediate value
+sixReg = OpndReg RegEBP     -- use bare displacement
+
+-- modRM flags:
+useSIB = 0x04
+useAbsDispl = 0x05
+useDisplB = 0x40
+useDisplL = 0x80
+useRegisters = 0xC0
+
+scaling :: Word8 -> Word8
+scaling factor = case lookup factor (zip [1,2,4,8] [0,1,2,3]) of
+                    Just sc -> sc
+                    Nothing -> error "scaling must be one of 1,2,4,8"
+sibbyte sc ind base = (scaling sc `shiftL` 6) .|. (index ind `shiftL` 3) .|. index base
+
+data Operation
     = OpPush OpOperand
     | OpRet (Maybe Word16)
     | OpLRet (Maybe Word16)
     | OpAdd OpOperand OpOperand
+    | OpMov OpOperand OpOperand
   deriving (Show, Read)
 
 data HAsmStmt = HAsmDirective Directive
@@ -83,23 +166,27 @@ data HAsmStmt = HAsmDirective Directive
 type HAsmSource = [HAsmStmt]
 
 
+{-
+ - Indexable: enumerations to bit representation
+ -}
 class Indexable a where
     index :: a -> Word8
-    
+
 instance Indexable GPRegister where
-    index reg = case lookup reg (zip allGPRegs [0..7]) of
-                    Just ind -> ind
+    index reg = fromJust $ lookup reg (zip allGPRegs [0..7])
 instance Indexable GPRegisterW where
-    index reg = case lookup reg (zip allGPWRegs [0..7]) of
-                    Just ind -> ind
+    index reg = fromJust $ lookup reg (zip allGPWRegs [0..7])
 instance Indexable GPRegisterB where
     index reg = case lookup reg (zip allGPBRegs [0..7]) of
                     Just ind -> ind
                     Nothing -> error "SPL/BPL/SIL/DIL registers can't be indexed"
 instance Indexable SegRegister where
-    index reg = case lookup reg (zip allSegRegs [0..5]) of  
-                    Just ind -> ind
+    index reg = fromJust $ lookup reg (zip allSegRegs [0..5])
 
+
+{-
+ - Serializale: make bytecode from an assembly expression
+ -}
 
 class Serializable a where
     bytecode :: a -> [Word8]
@@ -117,8 +204,10 @@ instance Serializable OpPrefix where
     bytecode pre | pre `elem` [PreREPNE, PreREPNZ] = [0xf2]
     bytecode pre | pre `elem` [PreREP, PreREPE, PreREPZ] = [0xf3]
 
+preLW = head $ bytecode PreAddrOverride
+
 instance Serializable Word8 where
-    bytecode imm8 = [imm8] 
+    bytecode imm8 = [imm8]
 instance Serializable Word16 where
     bytecode = unpackBytes . runPut . putWord16le
 instance Serializable Word32 where
@@ -126,24 +215,29 @@ instance Serializable Word32 where
 
 instance Serializable Int8 where
     bytecode imm8 = [fromIntegral imm8]
+instance Serializable Int16 where
+    bytecode = unpackBytes . runPut . putWord32le . int
 instance Serializable Int32 where
-    bytecode = unpackBytes . runPut . putWord32le . fromIntegral
+    bytecode = unpackBytes . runPut . putWord32le . int
+
+instance Serializable Operation where
+    bytecode (OpPush op) = bytesPush op
+    bytecode (OpRet mbClear) = bytesRet mbClear
+    bytecode (OpLRet mbClear) = bytesLRet mbClear
+    bytecode (OpAdd op1 op2) = bytesAdd op1 op2
+    bytecode (OpMov op1 op2) = bytesMov op1 op2
 
 -- PUSH
 bytesPush :: OpOperand -> [Word8]
-bytesPush (OpndSegReg sReg) = 
+bytesPush (OpndSegReg sReg) =
     case lookup sReg opcodes of
-      Just bytes -> bytes                            
+      Just bytes -> bytes
     where opcodes = [(RegES, [0x06]), (RegCS, [0x0e]), (RegSS, [0x16]),
                      (RegDS, [0x1e]), (RegFS, [0x0f, 0xa0]), (RegGS, [0x0f, 0xa8])]
 bytesPush (OpndImmB imm8) = [0x6a, imm8]
 bytesPush (OpndImmL imm) = (0x68 : bytecode imm)
-bytesPush (OpndReg reg) = [0x50 + int (index reg)]
-{--bytesPush (OpndRM sib Nothing) =
-    case base sib of
-      Just reg ->
-        case sibIndex sib of
---}
+bytesPush (OpndReg reg) = [0x50 + index reg]
+bytesPush oprm@(OpndRM _ _) = (0xff : makeModRM sixReg oprm)
 
 -- RET, LRET
 bytesRet, bytesLRet :: (Maybe Word16) -> [Word8]
@@ -154,47 +248,75 @@ bytesLRet _            = [0xcb]
 
 -- ADD
 bytesAdd :: OpOperand -> OpOperand -> [Word8]
-bytesAdd (OpndImmB imm) (OpndReg8 reg) | reg == RegAL  = [0x04, imm]
+bytesAdd (OpndImmB imm) (OpndRegB reg) | reg == RegAL  = [0x04, imm]
+bytesAdd (OpndImmW imm) (OpndRegW reg) | reg == RegAX  = (preLW : 0x05 : bytecode imm)
 bytesAdd (OpndImmL imm) (OpndReg reg) | reg == RegEAX  = (0x05 : bytecode imm)
-bytesAdd (OpndImmB imm) (OpndRM sib displ) = [0x80] ++ (modRM:byteSIB) ++ disp ++ [imm]
-  where modRM = (mod `shiftL` 6) .|. bitsRM
-        (mod, disp) = case displ of
-                        NoDispl -> (0, [])
-                        Displ8 dspl -> (1, bytecode dspl)
-                        Displ32 dspl -> (2, bytecode dspl)
-        (bitsRM, byteSIB) = case sib of
-            (SIB sc (Just ind) (Just reg)) -> (4, [makeSIB sc ind (Just reg)])
-            (SIB _ Nothing (Just reg)) ->
-                case reg of
-                  RegEAX -> (0, [])
-                  RegECX -> (1, [])
-                  RegEDX -> (2, [])
-                  RegEBX -> (3, [])
-                  RegESI -> (6, [])
-                  RegEDI -> (7, [])
-                  RegESP -> (4, [0x24])
-                  RegEBP -> error "%ebp can't be SIB base" 
-            (SIB sc (Just ind) Nothing) ->
-                if mod == 0 then (4, [ makeSIB sc ind Nothing ])
-                            else error "aaa"
 
-bytesAdd (OpndImmB imm) (OpndReg8 reg) = [0x80, modRM, imm]
-   where modRM = 0xC0 .|. bitsRM 
-         bitsRM = case lookup reg (zip allGPBRegs [0..7]) of 
-                    Just bits -> bits
+bytesAdd (OpndImmB imm)   op2@(OpndRM _ _) = [0x80] ++ makeModRM0 op2 ++ bytecode imm
+bytesAdd (OpndImmW imm)   op2@(OpndRM _ _) = [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
+bytesAdd (OpndImmL imm)   op2@(OpndRM _ _) = [0x81] ++ makeModRM0 op2 ++ bytecode imm
 
-bytesAdd (OpndImmL imm) (OpndReg reg) = (0x81 : modRM : bytecode imm)
-   where modRM = 0xC0 .|. index reg
+bytesAdd (OpndImmB imm) opreg@(OpndRegB _) = [0x80] ++ makeModRM0 opreg ++ bytecode imm
+bytesAdd (OpndImmW imm) opreg@(OpndRegW _) = [preLW, 0x81] ++ makeModRM0 opreg ++ bytecode imm
+bytesAdd (OpndImmL imm) opreg@(OpndReg _) = [0x81] ++ makeModRM0 opreg ++ bytecode imm
 
-instance Serializable Operation where
-    bytecode (OpPush op) = bytesPush op
-    bytecode (OpRet mbClear) = bytesRet mbClear
-    bytecode (OpLRet mbClear) = bytesLRet mbClear
-    bytecode (OpAdd op1 op2) = bytesAdd op1 op2
+bytesAdd (OpndImmB imm) opreg@(OpndReg _) = [0x83] ++ makeModRM0 opreg ++ bytecode imm
+bytesAdd (OpndImmB imm) opreg@(OpndRegW _) = [preLW, 0x83] ++ makeModRM0 opreg ++ bytecode imm
+
+bytesAdd op1@(OpndReg _)    op2@(OpndReg _) = (0x01 : makeModRM op1 op2)
+bytesAdd op1@(OpndRegW _)   op2@(OpndRegW _) = (preLW : 0x01 : makeModRM op1 op2)
+bytesAdd op1@(OpndRegB _)   op2@(OpndRegB _) = (0x00 : makeModRM op1 op2)
+
+bytesAdd op1@(OpndReg _)    op2@(OpndRM _ _) = (0x01 : makeModRM op1 op2)
+bytesAdd op1@(OpndRegW _)   op2@(OpndRM _ _) = (preLW : 0x01 : makeModRM op1 op2)
+bytesAdd op1@(OpndRegB _)   op2@(OpndRM _ _) = (0x00 : makeModRM op1 op2)
+
+bytesAdd op1@(OpndRM _ _)   op2@(OpndRegB _) = (0x02 : makeModRM op2 op1)
+bytesAdd op1@(OpndRM _ _)   op2@(OpndRegW _) = (preLW : 0x03 : makeModRM op2 op1)
+bytesAdd op1@(OpndRM _ _)   op2@(OpndReg _)  = (0x03 : makeModRM op2 op1)
+
+bytesAdd _ _ = error "ADD: invalid operands"
+
+
+-- MOV
+bytesMov :: OpOperand -> OpOperand -> [Word8]
+
+bytesMov (OpndMem moffs) (OpndReg reg) | reg == RegEAX = (0xa1 : bytecode moffs)
+bytesMov (OpndMem moffs) (OpndRegW reg) | reg == RegAX = (preLW : 0xa1 : bytecode moffs)
+bytesMov (OpndMem moffs) (OpndRegB reg) | reg == RegAL = (0xa0 : bytecode moffs)
+
+bytesMov (OpndReg reg) (OpndMem moffs) | reg == RegEAX = (0xa3 : bytecode moffs)
+bytesMov (OpndRegW reg) (OpndMem moffs) | reg == RegAX = (preLW : 0xa3 : bytecode moffs)
+bytesMov (OpndRegB reg) (OpndMem moffs) | reg == RegAL = (0xa2 : bytecode moffs)
+
+bytesMov op1@(OpndReg _)    op2@(OpndReg _) = [0x89] ++ makeModRM op1 op2
+bytesMov op1@(OpndRegW _)   op2@(OpndRegW _) = (preLW : 0x89 : makeModRM op1 op2)
+bytesMov op1@(OpndRegB _)   op2@(OpndRegB _) = [0x88] ++ makeModRM op1 op2
+
+bytesMov op1@(OpndReg _)    op2@(OpndRM _ _) = [0x89] ++ makeModRM op1 op2
+bytesMov op1@(OpndRegW _)   op2@(OpndRM _ _) = (preLW : 0x89 : makeModRM op1 op2)
+bytesMov op1@(OpndRegB _)   op2@(OpndRM _ _) = [0x88] ++ makeModRM op1 op2
+
+bytesMov op2@(OpndRM _ _)   op1@(OpndReg _)    = [0x8b] ++ makeModRM op1 op2
+bytesMov op2@(OpndRM _ _)   op1@(OpndRegW _)   = (preLW : 0x8b : makeModRM op1 op2)
+bytesMov op2@(OpndRM _ _)   op1@(OpndRegB _)   = [0x8a] ++ makeModRM op1 op2
+
+bytesMov (OpndImmL imm) (OpndReg reg) = (0xb8 + index reg : bytecode imm)
+bytesMov (OpndImmW imm) (OpndRegW reg) = (preLW : 0xb8 + index reg : bytecode imm)
+bytesMov (OpndImmB imm) (OpndRegB reg) = (0xb0 + index reg : bytecode imm)
+
+bytesMov (OpndImmL imm) oprm@(OpndRM _ _) = [0xc6] ++ makeModRM0 oprm ++ bytecode imm
+bytesMov (OpndImmW imm) oprm@(OpndRM _ _) = [preLW, 0xc7] ++ makeModRM0 oprm ++ bytecode imm
+bytesMov (OpndImmB imm) oprm@(OpndRM _ _) = [0xc7] ++ makeModRM0 oprm ++ bytecode imm
+
+bytesMov opr@(OpndRegW _) opsr@(OpndSegReg _) = (0x8e : makeModRM opsr opr)
+bytesMov opsr@(OpndSegReg _) opr@(OpndRegW _) = (0x8c : makeModRM opsr opr)
+
+bytesMov _ _ = error "Invalid operands"
+
 
 main = do
     putStr "**HASM**> " >> hFlush stdout
     op <- readLn :: IO Operation
-    mapM_ (putStr . printf "%02x ") $ bytecode op 
-    putStrLn ""
+    putStrLn . concat . map (printf "%02x ") $ bytecode op
     main
