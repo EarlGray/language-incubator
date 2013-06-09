@@ -1,0 +1,26 @@
+;;; this is a test for recursion: factorial(4)
+
+DUM
+ LDC ()             ; the same as LD NIL
+ ;; factorial body:
+ LDF ((n acc)
+      (LD n  LDC 0  EQ
+       SEL (LD acc  
+            JOIN)
+           (LDC ()  
+            LD acc  LD n  MUL
+            CONS
+            LDC 1  LD n  SUB
+            CONS
+            LD fact
+            APT
+            JOIN)
+       RTN))
+ CONS
+
+ ;; factorial(6):
+ LDF ((fact)
+      (LDC ()  LDC 1 CONS  LDC 6  CONS
+       LD fact  AP RTN))
+RAP
+STOP
