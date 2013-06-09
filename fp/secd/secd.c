@@ -112,6 +112,8 @@ struct secd  {
     cell_t *free;       // list
     cell_t *data;       // array
     cell_t *nil;        // pointer
+
+    bool tlrec;
 };
 
 
@@ -636,7 +638,8 @@ cell_t *secd_sel(secd_t *secd) {
 
     cell_t *joinb = secd->control;
     secd->control = share_cell(cond ? thenb : elseb);
-    push_dump(secd, joinb);
+    if (!secd->tlrec)
+        push_dump(secd, joinb);
 
     drop_cell(thenb); drop_cell(elseb); drop_cell(joinb);
     return secd->control;
@@ -721,6 +724,7 @@ cell_t *secd_rtn(secd_t *secd) {
     drop_cell(top); drop_cell(prevstack);
     drop_cell(prevenv); drop_cell(prevcontrol);
 
+    secd->tlrec = false;
     return top;
 }
 
@@ -770,6 +774,39 @@ cell_t *secd_rap(secd_t *secd) {
 
     return control;
 }
+
+cell_t *secd_apt(secd_t *secd) {
+    ctrldebugf("APT\n");
+
+    cell_t *closure = pop_stack(secd);
+    cell_t *argvals = pop_stack(secd);
+
+    cell_t *newenv = get_cdr(closure);
+    cell_t *func = get_car(closure);
+    cell_t *argnames = get_car(func);
+    cell_t *control = get_car(list_next(func));
+
+    cell_t *frame = new_cons(secd, argnames, argvals);
+    /*
+    printf("new frame: \n"); print_cell(frame);
+    printf(" argnames: \n"); printc(argnames);
+    printf(" argvals : \n"); printc(argvals);
+    // */
+    drop_cell(secd->stack);
+    secd->stack = secd->nil;
+
+    secd->env = share_cell(new_cons(secd, frame, newenv));
+
+    drop_cell(secd->control);
+    secd->control = share_cell(control);
+    //print_env(secd);
+
+    drop_cell(closure); drop_cell(argvals);
+    secd->tlrec = true;
+
+    return control;
+}
+
 
 
 cell_t *sexp_read(secd_t *secd, FILE *f);
@@ -832,6 +869,7 @@ const cell_t dum_func   = INIT_FUNC(secd_dum);
 const cell_t rap_func   = INIT_FUNC(secd_rap);
 const cell_t read_func  = INIT_FUNC(secd_read);
 const cell_t print_func = INIT_FUNC(secd_print);
+const cell_t apt_func   = INIT_FUNC(secd_apt);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
@@ -854,6 +892,7 @@ const cell_t dum_sym    = INIT_SYM("DUM");
 const cell_t rap_sym    = INIT_SYM("RAP");
 const cell_t read_sym   = INIT_SYM("READ");
 const cell_t print_sym  = INIT_SYM("PRINT");
+const cell_t apt_sym    = INIT_SYM("APT");
 
 const cell_t t_sym      = INIT_SYM("T");
 const cell_t nil_sym    = INIT_SYM("NIL");
@@ -886,6 +925,7 @@ const struct {
     { &rap_sym,     &rap_func },
     { &read_sym,    &read_func},
     { &print_sym,   &print_func },
+    { &apt_sym,     &apt_func },
 
     { &t_sym,       &t_sym    },
     { NULL,         NULL  } // must be last
@@ -1229,6 +1269,8 @@ secd_t * init_secd(secd_t *secd) {
     secd->free = secd->data;
     secd->stack = secd->dump =  secd->nil;
     secd->control = secd->env =  secd->nil;
+
+    secd->tlrec = false;
     return secd;
 }
 
