@@ -1,0 +1,57 @@
+;;;
+;;; This is barebones for LispKit compiler
+;;; 
+
+DUM
+ LDC ()
+
+ ;LDF (() ())
+ ;CONS
+
+ ;; comp -- compile the sexp
+ LDF ((sexp) (
+    LD sexp
+    ATOM
+    SEL
+     (LDC ()
+      LD sexp  CONS
+      LD sexp  SYMP
+      SEL (LDC LD  JOIN) (LDC LDC  JOIN)
+      CONS
+      JOIN)
+    ;; not an atom
+     (LD sexp
+      CAR
+      LDC eq
+      EQ
+      SEL (LDC eq_form JOIN) (
+       LDC unknown_form
+       JOIN)
+      JOIN)
+    RTN))
+ CONS
+
+ ;; repl -- the REPL loop
+ LDF (() (
+    LDC ()
+    READ
+    CONS
+    LD comp
+    AP
+    PRINT
+    
+    LDC ()  ;; call repl recursively
+    LD repl
+    AP
+    RTN     ;; to optimize AP into a forever tail call
+    ))
+ CONS
+
+ ;; body
+ LDF ((repl comp) (
+    LDC ()
+    LD repl
+    AP
+    RTN))
+RAP
+STOP
