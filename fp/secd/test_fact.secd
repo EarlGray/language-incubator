@@ -13,9 +13,9 @@ DUM
        RTN))
  CONS
 
- ;; factorial(4):
+ ;; factorial(6):
  LDF ((fact)
-      (LDC ()  LDC 4  CONS
+      (LDC ()  LDC 6  CONS
        LD fact  AP RTN))
 RAP
 STOP
