@@ -1,0 +1,22 @@
+(define (compile-form f)
+  (let ((hd (car f))
+        (tl (cdr f)))
+    (cond 
+      ((eq? hd '+) 
+        (append (compile (car tl)) (compile (cadr tl)) '(ADD)))
+      ((eq? hd 'atom?) 
+        (append (compile (car tl)) '(ATOM)))
+      ((eq? hd 'car)
+        (append (compile (car tl)) '(CAR)))
+      ((eq? hd 'cdr)
+        (append (compile (car tl)) '(CDR)))
+      ((eq? hd 'quote)
+        (list 'LDC (car tl)))
+      (else '(TODO))
+    )))
+
+(define (compile s)
+  (cond
+    ((symbol? s) (list 'LD s))
+    ((number? s) (list 'LDC s))
+    (else (compile-form s))))
