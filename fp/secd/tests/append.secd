@@ -1,0 +1,21 @@
+DUM 
+ LDC () 
+ LDF ((xs ys) (
+    LD xs LDC () EQ 
+    SEL (LD ys JOIN) 
+        (LDC () 
+         LD ys CONS 
+         LD xs CDR CONS 
+         LD append AP 
+         LD xs CAR CONS 
+         JOIN) 
+    RTN)) 
+ CONS 
+ LDF ((append) (
+    LDC () 
+    LDC (4 5 6) CONS 
+    LDC (1 2 3) CONS 
+    LD append AP 
+    PRINT 
+    RTN)) 
+RAP

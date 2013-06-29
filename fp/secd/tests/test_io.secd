@@ -1,6 +1,6 @@
 ;;; READ->PROCESS->PRINT loop test
 
-DUM
+(DUM
  LDC ()
  LDF (()
       (READ
@@ -18,5 +18,4 @@ DUM
       (LDC () 
        LD loop 
        AP RTN))
-RAP
-STOP
+RAP)

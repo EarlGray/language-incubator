@@ -542,7 +542,7 @@ bool list_eq(const cell_t *xs, const cell_t *ys) {
         xs = list_next(xs);
         ys = list_next(ys);
     }
-    return not_nil(ys);
+    return is_nil(ys);
 }
 
 cell_t *secd_atom(secd_t *secd) {
@@ -666,6 +666,7 @@ cell_t *secd_ldf(secd_t *secd) {
 }
 
 static bool tail_recursive(cell_t *control) {
+    if (is_nil(control)) return false;
     cell_t *nextop = get_car(control);
     if (atom_type(nextop) != ATOM_SYM) return false;
     return !strcmp("RTN", nextop->as.atom.as.sym.data);
@@ -1237,9 +1238,14 @@ cell_t *read_secd(secd_t *secd, FILE *f) {
     secd_parser_t p;
     init_parser(&p, f);
 
+    if (lexnext(&p) != '(') {
+        errorf("read_secd: a list of commands expected");
+        return NULL;
+    }
+
     cell_t *result = read_list(secd, &p);
-    if (p.token != TOK_EOF) {
-        errorf("read_secd: failed\n");
+    if (p.token != ')') {
+        errorf("read_secd: the end bracket expected\n");
         if (result) drop_cell(result);
         return NULL;
     }

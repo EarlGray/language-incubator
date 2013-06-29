@@ -1,4 +1,6 @@
+(
 ; an anonymous square function applied to value 12
 LDC (12)                        ; this is argvals
 LDF ((x) (LD x LD x MUL RTN))   ; LDF (argnames body)
 AP                              ; apply top of the stack to the list of arguments below
+)

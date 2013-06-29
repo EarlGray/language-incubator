@@ -1,0 +1,25 @@
+DUM
+ LDC ()
+ ;; inc
+ LDF ((x) (LD x LDC 1 ADD RTN))
+ CONS
+ ;; iter
+ LDF (() (LDC () READ CONS LD inc AP PRINT RTN))
+ CONS
+ ;; loop
+ LDF ((iterf) (LDC () LDC () LD iterf AP CONS LD loop AP RTN))
+ CONS
+ ;; 
+ LDF ((loop iter inc) 
+      (LDC ()
+       LD iter
+       CONS
+       LD loop
+       AP
+       RTN))
+RAP
+STOP
+
+1
+2
+3

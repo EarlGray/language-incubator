@@ -1,6 +1,6 @@
 ;;; this is a test for recursion: factorial(4)
 
-DUM
+(DUM
  LDC ()             ; the same as LD NIL
  ;; factorial body:
  LDF ((n)
@@ -17,5 +17,4 @@ DUM
  LDF ((fact)
       (LDC ()  LDC 6  CONS
        LD fact  AP RTN))
-RAP
-STOP
+RAP)

@@ -38,7 +38,7 @@
       ((eq? hd 'cdr)
         (append (compile (car tl)) '(CDR)))
       ((eq? hd 'cons)
-        (append (compile (car tl)) (compile (cadr tl)) '(CONS)))
+        (append (compile (cadr tl)) (compile (car tl)) '(CONS)))
       ((eq? hd 'eq? )
         (append (compile (car tl)) (compile (cadr tl)) '(EQ)))
       ((eq? hd 'if )
