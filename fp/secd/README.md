@@ -13,7 +13,7 @@ It's state is representated as a tuple of 4 lists:
 * C for control flow (list of opcodes to execute)
 * D for dump (stack): it's for storing S/E/C that must be restored later
 
-Also there is `compile.scm` which is a compiler from Scheme to SECD codes written in Scheme. It is not self-hosted yet, you need some existing interpreter to be installed, I use `mzscheme` from Dr.Racket.
+Also there is `scm2secd.scm` which is a compiler from Scheme to SECD codes written in Scheme. It is not self-hosted yet, you need some existing interpreter to be installed, I use `mzscheme` from Dr.Racket.
 
 
 Opcodes and operational semantics
@@ -70,11 +70,11 @@ See `tests/` directory for more examples of closures/recursion/IO in SECD codes.
 Examples of compiling Scheme files into SECD codes:
 
     # a working scheme interpreter is required, `mzscheme` here:
-    $ mzscheme -f compile.scm <tests/append.scm 2>/dev/null >append.secd
+    $ mzscheme -f scm2secd.scm <tests/append.scm 2>/dev/null >append.secd
 
 
 Examples of running Scheme files using a bootstrapping interpreter:
 
-    $ cat tests/append.scm | mzscheme -f compile.scm 2>/dev/null | ./secd
+    $ cat tests/append.scm | mzscheme -f scm2secd.scm 2>/dev/null | ./secd
     (1 2 3 4 5 6)
 
