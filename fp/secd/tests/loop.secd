@@ -1,4 +1,4 @@
-DUM
+(DUM
  LDC ()
  ;; inc
  LDF ((x) (LD x LDC 1 ADD RTN))
@@ -17,8 +17,7 @@ DUM
        LD loop
        AP
        RTN))
-RAP
-STOP
+RAP)
 
 1
 2

@@ -13,7 +13,7 @@ It's state is representated as a tuple of 4 lists:
 * C for control flow (list of opcodes to execute)
 * D for dump (stack): it's for storing S/E/C that must be restored later
 
-Also there is `eval.scm` which is a compiler from Scheme to SECD codes written in Scheme. It is not self-hosted yet, you need some existing interpreter to be installed, I use `mzscheme` from Dr.Racket.
+Also there is `compile.scm` which is a compiler from Scheme to SECD codes written in Scheme. It is not self-hosted yet, you need some existing interpreter to be installed, I use `mzscheme` from Dr.Racket.
 
 
 Opcodes and operational semantics
@@ -28,21 +28,21 @@ The current opcode set and the operational semantics is:
     CDR     :     ((_.x) . s), e, c, d)  -> (x.s, e, c, d)
     CONS    :     ((x y . s), e, c, d)   -> ((x.y).s, e, c, d)
        
-    LDC v   :    (s, e, c, d)           -> (v.s, e, c, d)
-    LD sym  :   (s, e, c, d)           -> ((*lookup* e sym).s, e, c, d)`
+    LDC v   :     (s, e, c, d)           -> (v.s, e, c, d)
+    LD sym  :     (s, e, c, d)           -> ((*lookup* e sym).s, e, c, d)`
 
-    ATOM    :     `(v.s, e, c, d)         -> ((*atom?* v).s, e, c, d)` 
-    EQ      :       `(v1 v2 . s, e, c, d)   -> ((*eq* v1 v2).s, e, c, d)`
+    ATOM    :     (v.s, e, c, d)         -> ((*atom?* v).s, e, c, d)` 
+    EQ      :     (v1 v2 . s, e, c, d)   -> ((*eq* v1 v2).s, e, c, d)`
 
-    SEL tb eb:  (v.s, e, c, d)  -> (s, e, (if v then thenb else elseb), (c.d))`
+    SEL tb eb:    (v.s, e, c, d)         -> (s, e, (if v then thenb else elseb), (c.d))`
     JOIN    :     (s, e, nil, s0.e0.c0.d) -> (s.s0, e0, c0, d)`
 
-    LDF     :      `(s, e, (args body).c, d) -> ((args body).e, e, c, d)
-    AP      :       `(((argnames c1) . e1).argvals.s, e, c, d) -> 
+    LDF     :     (s, e, (args body).c, d) -> ((args body).e, e, c, d)
+    AP      :     (((argnames c1) . e1).argvals.s, e, c, d) -> 
                                            (nil, (zip argnames argvals).e1, c1, s.e.c.d)`
-    RTN    :      `(v, e, nil, s0.e0.c0.d) -> (v.s0, e0, c0, d)`
-    DUM    :      `(s, e, c, d)            -> (s, dummy.e, c, d)`
-    RAP    :      `()         `
+    RTN    :      (v, e, nil, s0.e0.c0.d) -> (v.s0, e0, c0, d)
+    DUM    :      (s, e, c, d)            -> (s, dummy.e, c, d)
+    RAP    :      () # todo
     PRINT`:    side-effect of printing the head of S
     READ`:     puts the input s-expression on top of S
 
@@ -52,6 +52,7 @@ How to run
 
 Examples of running the SECD codes:
 
+    $ gcc secd.c -o secd
     $ echo "(LDC 2  LDC 2  ADD PRINT)" | ./secd
     4
 
@@ -69,11 +70,11 @@ See `tests/` directory for more examples of closures/recursion/IO in SECD codes.
 Examples of compiling Scheme files into SECD codes:
 
     # a working scheme interpreter is required, `mzscheme` here:
-    $ mzscheme -f eval.scm <tests/append.scm 2>/dev/null >append.secd
+    $ mzscheme -f compile.scm <tests/append.scm 2>/dev/null >append.secd
 
 
 Examples of running Scheme files using a bootstrapping interpreter:
 
-    $ cat tests/append.scm | mzscheme -f eval.scm 2>/dev/null | ./secd
+    $ cat tests/append.scm | mzscheme -f compile.scm 2>/dev/null | ./secd
     (1 2 3 4 5 6)
 

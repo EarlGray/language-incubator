@@ -1,4 +1,4 @@
-DUM 
+(DUM 
  LDC () 
  LDF ((xs ys) (
     LD xs LDC () EQ 
@@ -18,4 +18,4 @@ DUM
     LD append AP 
     PRINT 
     RTN)) 
-RAP
+RAP)
