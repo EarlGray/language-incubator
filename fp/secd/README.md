@@ -52,18 +52,20 @@ How to run
 
 Examples of running the SECD codes:
 
-    $ gcc secd.c -o secd
-    $ echo "(LDC 2  LDC 2  ADD PRINT)" | ./secd
-    4
+```bash
+$ gcc secd.c -o secd
+$ echo "(LDC 2  LDC 2  ADD PRINT)" | ./secd
+4
 
-    $ ./secd < tests/test_fact.secd
-    720
+$ ./secd < tests/test_fact.secd
+720
 
-    # read from file first, then from the stdin
-    $ cat tests/test_io.secd - | ./secd
-    1
-    (Looks like an atom)
-    ^D
+# read from file first, then from the stdin
+$ cat tests/test_io.secd - | ./secd
+1
+(Looks like an atom)
+^D
+```
 
 See `tests/` directory for more examples of closures/recursion/IO in SECD codes.
 
