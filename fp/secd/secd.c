@@ -1197,10 +1197,12 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
             head = tail = newtail;
         }
 
+        /*
         if (p->nested == 0 && p->token == TOK_STR && !strcmp(p->strtok, "STOP")) {
             p->token = TOK_EOF;
             return head;
         }
+        */
     }
 }
 

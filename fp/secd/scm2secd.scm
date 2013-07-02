@@ -21,6 +21,13 @@
                 (compile (car bs))
                 '(CONS)))))
 
+(compile-begin-acc
+  (lambda (stmts acc)   ; acc must be '(LDC ()) at the beginning
+    (if (null? stmts)
+        (append acc '(CAR))
+        (compile-begin-acc (cdr stmts)
+                           (append acc (compile (car stmts)) '(CONS))))))
+
 (compile-cond
   (lambda (conds)
     (if (null? conds)
@@ -81,7 +88,10 @@
                       (compile-bindings exprs)
                       (list 'LDF (list args (append (compile body) '(RTN))))
                       '(RAP)))))
-      ;((eq? hd 'begin)
+
+      ;; (begin (e1) (e2) ... (eN)) => LDC () <e1> CONS <e2> CONS ... <eN> CONS CAR
+      ((eq? hd 'begin)
+        (compile-begin-acc tl '(LDC ())))
       ((eq? hd 'cond)
         (compile-cond tl))
       ((eq? hd 'display)
