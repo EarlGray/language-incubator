@@ -34,6 +34,12 @@
 # define ctrldebugf(...)
 #endif
 
+#ifdef CASESENSITIVE
+# define str_eq(s1, s2)  !strcmp(s1, s2)
+#else
+# define str_eq(s1, s2) !strcasecmp(s1, s2)
+#endif
+
 #define DONT_FREE_THIS  INTPTR_MAX
 
 #define N_CELLS     256 * 1024
@@ -511,7 +517,7 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
         return false;
     switch (atype1) {
       case ATOM_INT: return (a1->as.atom.as.num == a2->as.atom.as.num);
-      case ATOM_SYM: return (!strcmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
+      case ATOM_SYM: return (!strcasecmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
       case ATOM_FUNC: return (a1->as.atom.as.ptr == a2->as.atom.as.ptr);
       default: errorf("atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
                        cell_index(a1), cell_index(a2), atype1);
@@ -669,7 +675,7 @@ static bool tail_recursive(cell_t *control) {
     if (is_nil(control)) return false;
     cell_t *nextop = get_car(control);
     if (atom_type(nextop) != ATOM_SYM) return false;
-    return !strcmp("RTN", nextop->as.atom.as.sym.data);
+    return str_eq("RTN", nextop->as.atom.as.sym.data);
 }
 
 cell_t *secd_ap(secd_t *secd) {
@@ -978,7 +984,7 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
                 continue;
             }
 
-            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
+            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
                 return get_car(vallist);
             }
             symlist = list_next(symlist);
@@ -1004,7 +1010,7 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
             assert(atom_type(symbol) != ATOM_SYM,
                     "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(symbol));
 
-            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
+            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
                 return symbol;
             }
             symlist = list_next(symlist);
@@ -1196,13 +1202,6 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
         } else {
             head = tail = newtail;
         }
-
-        /*
-        if (p->nested == 0 && p->token == TOK_STR && !strcmp(p->strtok, "STOP")) {
-            p->token = TOK_EOF;
-            return head;
-        }
-        */
     }
 }
 
@@ -1293,7 +1292,7 @@ void run_secd(secd_t *secd) {
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
         const char *symname = op->as.atom.as.sym.data;
-        if (!strcmp("STOP", symname)) return;
+        if (str_eq("STOP", symname)) return;
 
         cell_t *val = lookup_env(secd, symname);
         assert_or_continue(val, "run: lookup_env() failed for %s\n", symname);
