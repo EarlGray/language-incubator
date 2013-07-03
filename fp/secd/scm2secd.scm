@@ -58,6 +58,8 @@
         (append (compile (car tl)) '(CAR)))
       ((eq? hd 'cdr)
         (append (compile (car tl)) '(CDR)))
+      ((eq? hd 'cadr)
+        (append (compile (car tl)) '(CDR CAR)))
       ((eq? hd 'cons)
         (append (compile (cadr tl)) (compile (car tl)) '(CONS)))
       ((eq? hd 'eq? )
@@ -102,8 +104,7 @@
         '(STOP))
       (else
         (append (compile-bindings tl)
-                (list 'LD hd)
-                '(AP)))
+                (list 'LD hd 'AP)))
     ))))
 
 (compile (lambda (s)
@@ -112,13 +113,14 @@
     ((number? s) (list 'LDC s))
     (else (compile-form s)))))
 
-(loop (lambda (body)
-   (begin
-     (body) (loop body))))
+(repl (lambda () 
+    (let ((inp (read)))
+      (if (null? inp)
+        (display 'done)
+        (begin
+          (display (append (compile inp) '(STOP)))
+          (repl))))))
 )
 
 ;; <let> in
-(loop (lambda ()
-    (display (compile (read)))
-    (newline)))
-)
+(repl))

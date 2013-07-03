@@ -16,9 +16,14 @@
 #define assertv(cond, ...) \
     if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return; }
 
-#if (0)
+#define MEMDEBUG    0
+#define MEMTRACE    0
+#define CTRLDEBUG   0
+#define ENVDEBUG    0
+
+#if (MEMDEBUG)
 # define memdebugf(...) printf(__VA_ARGS__)
-# if (0)
+# if (MEMTRACE)
 #  define memtracef(...) printf(__VA_ARGS__)
 # else
 #  define memtracef(...)
@@ -28,10 +33,16 @@
 # define memtracef(...)
 #endif
 
-#if (1)
+#if (CTRLDEBUG)
 # define ctrldebugf(...) printf(__VA_ARGS__)
 #else
 # define ctrldebugf(...)
+#endif
+
+#if (ENVDEBUG)
+# define envdebugf(...) printf(__VA_ARGS__)
+#else
+# define envdebugf(...)
 #endif
 
 #ifdef CASESENSITIVE
@@ -693,6 +704,9 @@ cell_t *secd_ap(secd_t *secd) {
     cell_t *newenv = get_cdr(closure);
 
     if (atom_type(func) == ATOM_FUNC) {
+        assert(argvals, "secd_ap: native(NULL)");
+        assert(is_cons(argvals), "secdf_copy: a list expected");
+
         secd_nativefunc_t native = (secd_nativefunc_t)func->as.atom.as.ptr;
         cell_t *result = push_stack(secd, native(secd, argvals));
 
@@ -856,6 +870,21 @@ cell_t *secdf_list(secd_t *secd, cell_t *args) {
     return args;
 }
 
+cell_t *secdf_null(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, is_nil(list_head(args)));
+}
+
+cell_t *secdf_nump(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, atom_type(list_head(args)) == ATOM_INT);
+}
+
+cell_t *secdf_symp(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, atom_type(list_head(args)) == ATOM_SYM);
+}
+
 static cell_t *list_end(cell_t *list) {
     if (is_nil(list))
         return NULL;
@@ -883,9 +912,6 @@ static cell_t *list_copy(secd_t *secd, cell_t *list, cell_t **out_tail) {
 }
 
 cell_t *secdf_copy(secd_t *secd, cell_t *args) {
-    assert(args, "secdf_copy: NULL");
-    assert(not_nil(args), "secdf_copy: one argument expected");
-    assert(is_cons(args), "secdf_copy: a list expected");
     return list_copy(secd, list_head(args), NULL);
 }
 
@@ -1024,9 +1050,17 @@ const struct {
 
 const cell_t list_sym   = INIT_SYM("list");
 const cell_t append_sym = INIT_SYM("append");
+const cell_t copy_sym   = INIT_SYM("copy");
+const cell_t nullp_sym  = INIT_SYM("null?");
+const cell_t nump_sym   = INIT_SYM("number?");
+const cell_t symp_sym   = INIT_SYM("symbol?");
 
 const cell_t list_func  = INIT_FUNC(secdf_list);
 const cell_t append_func = INIT_FUNC(secdf_append);
+const cell_t copy_func  = INIT_FUNC(secdf_copy);
+const cell_t nullp_func = INIT_FUNC(secdf_null);
+const cell_t nump_func  = INIT_FUNC(secdf_nump);
+const cell_t symp_func  = INIT_FUNC(secdf_symp);
 
 const struct {
     const cell_t *sym;
@@ -1035,6 +1069,10 @@ const struct {
     // native functions
     { &list_sym,    &list_func },
     { &append_sym,  &append_func },
+    { &nullp_sym,   &nullp_func },
+    { &nump_sym,    &nump_func },
+    { &symp_sym,    &symp_func },
+    { &copy_sym,    &copy_func  },
 
     { NULL,         NULL } // must be last
 };
@@ -1424,9 +1462,9 @@ int main() {
     init_secd(&secd);
 
     fill_global_env(&secd);
-    print_env(&secd);
+    if (ENVDEBUG) print_env(&secd);
 
-    printf(">>>>>\n");
+    envdebugf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
     asserti(inp, "read_secd failed");
     if (is_nil(inp)) {
@@ -1435,17 +1473,20 @@ int main() {
     }
 
     set_control(&secd, inp);
-    printf("Control path:\n");
-    print_list(secd.control);
+    if (ENVDEBUG) {
+        envdebugf("Control path:\n");
+        print_list(secd.control);
+    }
 
-    printf("<<<<<\n");
+    envdebugf("<<<<<\n");
     run_secd(&secd);
 
-    printf("-----\n");
+    envdebugf("-----\n");
     if (not_nil(secd.stack)) {
-        printf("Stack head:\n");
+        envdebugf("Stack head:\n");
         printc(get_car(secd.stack));
-    } else
-        printf("Stack is empty\n");
+    } else {
+        envdebugf("Stack is empty\n");
+    }
     return 0;
 }
