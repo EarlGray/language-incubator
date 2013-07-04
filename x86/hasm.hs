@@ -57,14 +57,11 @@ data OpOperand
 
 data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
                       deriving (Show, Read)
-{-
-data SIB = SIB {
-    sibScale :: Word8,
-    sibIndex :: Maybe GPRegister,
-    sibBase :: Maybe GPRegister
-  } deriving (Show, Read, Eq)
--}
-data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister) deriving (Show, Read, Eq)
+
+-- don't use record syntax here because `deriving Read` requires all
+-- fields to be explicitly named, it's burdensome.
+data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
+             deriving (Show, Read, Eq)
 
 -- make ModRM, possible SIB and/or Displacement taken from the second OpOperand
 makeModRM :: OpOperand -> OpOperand -> [Word8]
@@ -80,53 +77,60 @@ makeModRM (OpndSegReg sreg) (OpndRegW reg) = [ modRM ]
   where modRM = 0xc0 .|. (index sreg `shiftL` 3) .|. index reg
 
 makeModRM (OpndReg src) (OpndRM sib displ) = [modRM .|. (index src `shiftL` 3) ] ++ sibs
-  where (modRM, sibs) = case (sib, displ) of
-                          -- 32-bit memory offset
-                            ((SIB _ Nothing Nothing), Displ32 dspl) ->
-                                (0x05, bytecode dspl)
+  where (modRM, sibs) =
+            case (sib, displ) of
+               -- 32-bit memory offset
+                 ((SIB _ Nothing Nothing), Displ32 dspl) ->
+                     (useAbsDispl, bytecode dspl)
 
-                          -- (%reg), NoDiplacement:
-                            -- (%ebp): an exception from registers, do a special street magic:
-                            ((SIB _ Nothing (Just reg)), NoDispl) | reg == RegEBP ->
-                                (useSIB, [0x65, 0x00])
-                            -- (%reg):
-                            ((SIB _ Nothing (Just reg)), NoDispl) ->
-                                (useSIB, [0x20 .|. index reg])
+               -- (%reg), NoDisplacement:
+                 -- (%ebp): an exception from registers, do a special street magic:
+                 ((SIB _ Nothing (Just reg)), NoDispl) | reg == RegEBP ->
+                     (useSIB, [0x65, 0x00])
+                 -- (%reg):
+                 ((SIB _ Nothing (Just reg)), NoDispl) ->
+                     (useSIB, [0x20 .|. index reg])
 
-                          -- the same with Displ8:
-                            -- $displ8(%esp) : it's a kind of magic again:
-                            ((SIB _ Nothing (Just reg)), Displ8 dspl8) | reg == RegESP ->
-                                (useSIB .|. useDisplB, [0x24, int dspl8])
-                            -- $displ8(%reg)
-                            ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
-                                (index reg .|. useDisplB, [int dspl8])
+               -- the same with Displ8:
+                 -- $displ8(%esp) : it's a kind of magic again:
+                 ((SIB _ Nothing (Just reg)), Displ8 dspl8) | reg == RegESP ->
+                     (useSIB .|. useDisplB, [0x24, int dspl8])
+                 -- $displ8(%reg)
+                 ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
+                     (index reg .|. useDisplB, [int dspl8])
 
-                          -- $displ32(%reg)
-                            -- $displ32(%esp)
-                            ((SIB _ Nothing (Just reg)), Displ32 dspl32) | reg == RegESP ->
-                                (useSIB .|. useDisplL, (0x24 : bytecode dspl32))
-                            -- $displ32(%reg)
-                            ((SIB _ Nothing (Just reg)), Displ32 dspl32) ->
-                                (index reg .|. useDisplL, bytecode dspl32)
+               -- $displ32(%reg)
+                 -- $displ32(%esp)
+                 ((SIB _ Nothing (Just reg)), Displ32 dspl32) | reg == RegESP ->
+                     (useSIB .|. useDisplL, (0x24 : bytecode dspl32))
+                 -- $displ32(%reg)
+                 ((SIB _ Nothing (Just reg)), Displ32 dspl32) ->
+                     (index reg .|. useDisplL, bytecode dspl32)
 
-                          -- %esp cannot be index, never:
-                            ((SIB _ (Just ind) (Just base)), _) | ind == RegESP ->
-                                error "%esp cannot be index"
-                          -- (%ebp,%ind,sc)
-                            ((SIB sc (Just ind) (Just base)), NoDispl) | base == RegEBP ->
-                                (useSIB .|. useDisplB, [ sibbyte sc ind base, 0x00 ])
-                          -- (%base,%ind,sc)
-                            ((SIB sc (Just ind) (Just base)), NoDispl) ->
-                                (useSIB, [sibbyte sc ind base])
-                          -- $displ8(%base,%ind,sc)
-                            ((SIB sc (Just ind) (Just base)), Displ8 dspl8) ->
-                                (useSIB .|. useDisplB, [sibbyte sc ind base, int dspl8])
-                          -- $displ32(%base,%ind,sc)
-                            ((SIB sc (Just ind) (Just base)), Displ32 dspl32) ->
-                                (useSIB .|. useDisplL, (sibbyte sc ind base : bytecode dspl32))
+               -- %esp cannot be index, never:
+                 ((SIB _ (Just ind) (Just base)), _) | ind == RegESP ->
+                     error "%esp cannot be index"
+               -- (%ebp,%ind,sc)
+                 ((SIB sc (Just ind) (Just base)), NoDispl) | base == RegEBP ->
+                     (useSIB .|. useDisplB, [ sibbyte sc ind base, 0x00 ])
+               -- (%base,%ind,sc)
+                 ((SIB sc (Just ind) (Just base)), NoDispl) ->
+                     (useSIB, [sibbyte sc ind base])
+               -- $displ8(%base,%ind,sc)
+                 ((SIB sc (Just ind) (Just base)), Displ8 dspl8) ->
+                     (useSIB .|. useDisplB, (sibbyte sc ind base : bytecode dspl8))
+               -- $displ32(%base,%ind,sc)
+                 ((SIB sc (Just ind) (Just base)), Displ32 dspl32) ->
+                     (useSIB .|. useDisplL, (sibbyte sc ind base : bytecode dspl32))
 
-                          -- just-index addressing not possible?
-                            _ -> error $ "This addressing scheme is not supported: " ++ show (OpndRM sib displ)
+              -- addressing without base:
+                 ((SIB sc (Just ind) Nothing), displ) ->
+                     (useSIB, (sibbyte sc ind RegEBP : displbytes))
+                     where displbytes = case displ of
+                                         NoDispl -> bytecode (0 :: Word32)
+                                         Displ8 disp8 -> bytecode (int disp8 :: Word32)
+                                         Displ32 disp32 -> bytecode disp32
+                 _ -> error $ "This addressing scheme is not supported: " ++ show (OpndRM sib displ)
 
 
 -- this is a shortcut for /0 operations, RegEAX represented like /0
@@ -185,7 +189,7 @@ instance Indexable SegRegister where
 
 
 {-
- - Serializale: make bytecode from an assembly expression
+ - Serializable: make bytecode from an assembly expression
  -}
 
 class Serializable a where
@@ -234,7 +238,7 @@ bytesPush (OpndSegReg sReg) =
       Just bytes -> bytes
     where opcodes = [(RegES, [0x06]), (RegCS, [0x0e]), (RegSS, [0x16]),
                      (RegDS, [0x1e]), (RegFS, [0x0f, 0xa0]), (RegGS, [0x0f, 0xa8])]
-bytesPush (OpndImmB imm8) = [0x6a, imm8]
+bytesPush (OpndImmB imm8) = (0x6a : bytecode imm8)
 bytesPush (OpndImmL imm) = (0x68 : bytecode imm)
 bytesPush (OpndReg reg) = [0x50 + index reg]
 bytesPush oprm@(OpndRM _ _) = (0xff : makeModRM sixReg oprm)
@@ -248,7 +252,7 @@ bytesLRet _            = [0xcb]
 
 -- ADD
 bytesAdd :: OpOperand -> OpOperand -> [Word8]
-bytesAdd (OpndImmB imm) (OpndRegB reg) | reg == RegAL  = [0x04, imm]
+bytesAdd (OpndImmB imm) (OpndRegB reg) | reg == RegAL  = (0x04 : bytecode imm)
 bytesAdd (OpndImmW imm) (OpndRegW reg) | reg == RegAX  = (preLW : 0x05 : bytecode imm)
 bytesAdd (OpndImmL imm) (OpndReg reg) | reg == RegEAX  = (0x05 : bytecode imm)
 
@@ -289,17 +293,17 @@ bytesMov (OpndReg reg) (OpndMem moffs) | reg == RegEAX = (0xa3 : bytecode moffs)
 bytesMov (OpndRegW reg) (OpndMem moffs) | reg == RegAX = (preLW : 0xa3 : bytecode moffs)
 bytesMov (OpndRegB reg) (OpndMem moffs) | reg == RegAL = (0xa2 : bytecode moffs)
 
-bytesMov op1@(OpndReg _)    op2@(OpndReg _) = [0x89] ++ makeModRM op1 op2
+bytesMov op1@(OpndReg _)    op2@(OpndReg _) = (0x89 : makeModRM op1 op2)
 bytesMov op1@(OpndRegW _)   op2@(OpndRegW _) = (preLW : 0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegB _)   op2@(OpndRegB _) = [0x88] ++ makeModRM op1 op2
+bytesMov op1@(OpndRegB _)   op2@(OpndRegB _) = (0x88 : makeModRM op1 op2)
 
-bytesMov op1@(OpndReg _)    op2@(OpndRM _ _) = [0x89] ++ makeModRM op1 op2
+bytesMov op1@(OpndReg _)    op2@(OpndRM _ _) = (0x89 : makeModRM op1 op2)
 bytesMov op1@(OpndRegW _)   op2@(OpndRM _ _) = (preLW : 0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegB _)   op2@(OpndRM _ _) = [0x88] ++ makeModRM op1 op2
+bytesMov op1@(OpndRegB _)   op2@(OpndRM _ _) = (0x88 : makeModRM op1 op2)
 
-bytesMov op2@(OpndRM _ _)   op1@(OpndReg _)    = [0x8b] ++ makeModRM op1 op2
+bytesMov op2@(OpndRM _ _)   op1@(OpndReg _)    = (0x8b : makeModRM op1 op2)
 bytesMov op2@(OpndRM _ _)   op1@(OpndRegW _)   = (preLW : 0x8b : makeModRM op1 op2)
-bytesMov op2@(OpndRM _ _)   op1@(OpndRegB _)   = [0x8a] ++ makeModRM op1 op2
+bytesMov op2@(OpndRM _ _)   op1@(OpndRegB _)   = (0x8a : makeModRM op1 op2)
 
 bytesMov (OpndImmL imm) (OpndReg reg) = (0xb8 + index reg : bytecode imm)
 bytesMov (OpndImmW imm) (OpndRegW reg) = (preLW : 0xb8 + index reg : bytecode imm)
@@ -314,9 +318,11 @@ bytesMov opsr@(OpndSegReg _) opr@(OpndRegW _) = (0x8c : makeModRM opsr opr)
 
 bytesMov _ _ = error "Invalid operands"
 
+hexBytecode :: [Word8] -> String
+hexBytecode = concat . map (printf "%02x ")
 
 main = do
     putStr "**HASM**> " >> hFlush stdout
     op <- readLn :: IO Operation
-    putStrLn . concat . map (printf "%02x ") $ bytecode op
+    putStrLn $ hexBytecode $ bytecode op
     main

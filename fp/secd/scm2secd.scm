@@ -21,6 +21,27 @@
                 (compile (car bs))
                 '(CONS)))))
 
+(compile-begin-acc
+  (lambda (stmts acc)   ; acc must be '(LDC ()) at the beginning
+    (if (null? stmts)
+        (append acc '(CAR))
+        (compile-begin-acc (cdr stmts)
+                           (append acc (compile (car stmts)) '(CONS))))))
+
+(compile-cond
+  (lambda (conds)
+    (if (null? conds)
+        '(LDC ())
+        (letrec ((hd (car conds))
+                 (tl (cdr conds))
+                 (this-cond (car hd))
+                 (this-expr (cadr hd)))
+          (if (eq? this-cond 'else)
+              (compile this-expr)
+              (append (compile this-cond) '(SEL)
+                      (list (append (compile this-expr) '(JOIN)))
+                      (list (append (compile-cond tl) '(JOIN)))))))))
+
 (compile-form (lambda (f)
   (let ((hd (car f))
         (tl (cdr f)))
@@ -37,6 +58,8 @@
         (append (compile (car tl)) '(CAR)))
       ((eq? hd 'cdr)
         (append (compile (car tl)) '(CDR)))
+      ((eq? hd 'cadr)
+        (append (compile (car tl)) '(CDR CAR)))
       ((eq? hd 'cons)
         (append (compile (cadr tl)) (compile (car tl)) '(CONS)))
       ((eq? hd 'eq? )
@@ -67,7 +90,12 @@
                       (compile-bindings exprs)
                       (list 'LDF (list args (append (compile body) '(RTN))))
                       '(RAP)))))
-      ;((eq? hd 'begin)
+
+      ;; (begin (e1) (e2) ... (eN)) => LDC () <e1> CONS <e2> CONS ... <eN> CONS CAR
+      ((eq? hd 'begin)
+        (compile-begin-acc tl '(LDC ())))
+      ((eq? hd 'cond)
+        (compile-cond tl))
       ((eq? hd 'display)
         (append (compile (car tl)) '(PRINT)))
       ((eq? hd 'read)
@@ -76,8 +104,7 @@
         '(STOP))
       (else
         (append (compile-bindings tl)
-                (list 'LD hd)
-                '(AP)))
+                (list 'LD hd 'AP)))
     ))))
 
 (compile (lambda (s)
@@ -86,13 +113,14 @@
     ((number? s) (list 'LDC s))
     (else (compile-form s)))))
 
-(loop (lambda (body)
-   (begin
-     (body) (loop body))))
+(repl (lambda () 
+    (let ((inp (read)))
+      (if (null? inp)
+        (display 'done)
+        (begin
+          (display (append (compile inp) '(STOP)))
+          (repl))))))
 )
 
 ;; <let> in
-(loop (lambda ()
-    (display (compile (read)))
-    (newline)))
-)
+(repl))

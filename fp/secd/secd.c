@@ -16,9 +16,14 @@
 #define assertv(cond, ...) \
     if (!(cond)) { errorf(__VA_ARGS__); fprintf(stderr, "\n"); return; }
 
-#if (0)
+#define MEMDEBUG    0
+#define MEMTRACE    0
+#define CTRLDEBUG   0
+#define ENVDEBUG    0
+
+#if (MEMDEBUG)
 # define memdebugf(...) printf(__VA_ARGS__)
-# if (0)
+# if (MEMTRACE)
 #  define memtracef(...) printf(__VA_ARGS__)
 # else
 #  define memtracef(...)
@@ -28,10 +33,22 @@
 # define memtracef(...)
 #endif
 
-#if (0)
+#if (CTRLDEBUG)
 # define ctrldebugf(...) printf(__VA_ARGS__)
 #else
 # define ctrldebugf(...)
+#endif
+
+#if (ENVDEBUG)
+# define envdebugf(...) printf(__VA_ARGS__)
+#else
+# define envdebugf(...)
+#endif
+
+#ifdef CASESENSITIVE
+# define str_eq(s1, s2)  !strcmp(s1, s2)
+#else
+# define str_eq(s1, s2) !strcasecmp(s1, s2)
 #endif
 
 #define DONT_FREE_THIS  INTPTR_MAX
@@ -50,6 +67,7 @@ typedef  struct cons  cons_t;
 typedef  struct error error_t;
 
 typedef cell_t* (*secd_opfunc_t)(secd_t *);
+typedef cell_t* (*secd_nativefunc_t)(secd_t *, cell_t *);
 
 enum cell_type {
     CELL_UNDEF,
@@ -122,6 +140,8 @@ cell_t *free_cell(cell_t *c);
 
 void print_env(secd_t *secd);
 cell_t *lookup_env(secd_t *secd, const char *symname);
+cell_t *sexp_read(secd_t *secd, FILE *f);
+
 
 /*
  *  Cell accessors
@@ -494,13 +514,15 @@ cell_t *secd_ld(secd_t *secd) {
     assert(atom_type(arg) == ATOM_SYM,
            "secd_ld: not a symbol [%ld]", cell_index(arg));
 
-    cell_t *val = lookup_env(secd, arg->as.atom.as.sym.data);
+    const char *sym = arg->as.atom.as.sym.data;
+    cell_t *val = lookup_env(secd, sym);
     drop_cell(arg);
+    assert(val, "lookup failed for %s", sym);
     return push_stack(secd, val);
 }
 
 static inline cell_t *to_bool(secd_t *secd, bool cond) {
-    return ((cond)? lookup_env(secd, "T") : secd->nil);
+    return ((cond)? lookup_env(secd, "#t") : secd->nil);
 }
 
 bool atom_eq(const cell_t *a1, const cell_t *a2) {
@@ -511,7 +533,7 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
         return false;
     switch (atype1) {
       case ATOM_INT: return (a1->as.atom.as.num == a2->as.atom.as.num);
-      case ATOM_SYM: return (!strcmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
+      case ATOM_SYM: return (!strcasecmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
       case ATOM_FUNC: return (a1->as.atom.as.ptr == a2->as.atom.as.ptr);
       default: errorf("atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
                        cell_index(a1), cell_index(a2), atype1);
@@ -669,7 +691,7 @@ static bool tail_recursive(cell_t *control) {
     if (is_nil(control)) return false;
     cell_t *nextop = get_car(control);
     if (atom_type(nextop) != ATOM_SYM) return false;
-    return !strcmp("RTN", nextop->as.atom.as.sym.data);
+    return str_eq("RTN", nextop->as.atom.as.sym.data);
 }
 
 cell_t *secd_ap(secd_t *secd) {
@@ -678,8 +700,20 @@ cell_t *secd_ap(secd_t *secd) {
     cell_t *closure = pop_stack(secd);
     cell_t *argvals = pop_stack(secd);
 
-    cell_t *newenv = get_cdr(closure);
     cell_t *func = get_car(closure);
+    cell_t *newenv = get_cdr(closure);
+
+    if (atom_type(func) == ATOM_FUNC) {
+        assert(argvals, "secd_ap: native(NULL)");
+        assert(is_cons(argvals), "secdf_copy: a list expected");
+
+        secd_nativefunc_t native = (secd_nativefunc_t)func->as.atom.as.ptr;
+        cell_t *result = push_stack(secd, native(secd, argvals));
+
+        drop_cell(func); drop_cell(argvals);
+        return result;
+    }
+
     cell_t *argnames = get_car(func);
     cell_t *control = get_car(list_next(func));
 
@@ -810,8 +844,6 @@ cell_t *secd_apt(secd_t *secd) {
 
 
 
-cell_t *sexp_read(secd_t *secd, FILE *f);
-
 cell_t *secd_read(secd_t *secd) {
     cell_t *inp = sexp_read(secd, NULL);
     assert(inp, "secd_read: failed to read");
@@ -827,6 +859,87 @@ cell_t *secd_print(secd_t *secd) {
     sexp_print(top);
     printf("\n");
     return top;
+}
+
+
+/*
+ * Some native functions
+ */
+
+cell_t *secdf_list(secd_t *secd, cell_t *args) {
+    return args;
+}
+
+cell_t *secdf_null(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, is_nil(list_head(args)));
+}
+
+cell_t *secdf_nump(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, atom_type(list_head(args)) == ATOM_INT);
+}
+
+cell_t *secdf_symp(secd_t *secd, cell_t *args) {
+    assert(not_nil(args), "secdf_copy: one argument expected");
+    return to_bool(secd, atom_type(list_head(args)) == ATOM_SYM);
+}
+
+static cell_t *list_end(cell_t *list) {
+    if (is_nil(list))
+        return NULL;
+
+    while (not_nil(list_next(list)))
+        list = list_next(list);
+    return list;
+}
+
+static cell_t *list_copy(secd_t *secd, cell_t *list, cell_t **out_tail) {
+    if (is_nil(list))
+        return secd->nil;
+
+    cell_t *new_head, *new_tail;
+    new_head = new_tail = new_cons(secd, list_head(list), secd->nil);
+
+    while (not_nil(list = list_next(list))) {
+        cell_t *new_cell = new_cons(secd, get_car(list), secd->nil);
+        new_tail->as.cons.cdr = share_cell(new_cell);
+        new_tail = list_next(new_tail);
+    }
+    if (out_tail)
+        *out_tail = new_tail;
+    return new_head;
+}
+
+cell_t *secdf_copy(secd_t *secd, cell_t *args) {
+    return list_copy(secd, list_head(args), NULL);
+}
+
+cell_t *secdf_append(secd_t *secd, cell_t *args) {
+    assert(args, "secdf_append: args is NULL");
+
+    cell_t *xs = list_head(args);
+    assert(is_cons(list_next(args)), "secdf_append: expected two arguments");
+
+    cell_t *ys = list_head(list_next(args));
+
+    if (is_nil(xs))
+        return ys;
+
+    cell_t *sum;
+    if (xs->nref < 2) {
+        ctrldebugf("secdf_append: destructive append\n");
+        cell_t *c = list_end(xs);
+        c->as.cons.cdr = share_cell(ys);
+        sum = xs;
+    } else {
+        ctrldebugf("secdf_append: copying append\n");
+        cell_t *sum_tail;
+        sum = list_copy(secd, xs, &sum_tail);
+        sum_tail->as.cons.cdr = share_cell(ys);
+    }
+
+    return sum;
 }
 
 #define INIT_SYM(name) {    \
@@ -895,13 +1008,14 @@ const cell_t read_sym   = INIT_SYM("READ");
 const cell_t print_sym  = INIT_SYM("PRINT");
 const cell_t apt_sym    = INIT_SYM("APT");
 
-const cell_t t_sym      = INIT_SYM("T");
+const cell_t t_sym      = INIT_SYM("#t");
 const cell_t nil_sym    = INIT_SYM("NIL");
 
 const struct {
     const cell_t *sym;
     const cell_t *val;
 } global_binding[] = {
+    // opcodes: for information, not to be called
     { &atom_sym,    &atom_func },
     { &cons_sym,    &cons_func },
     { &car_sym,     &car_func },
@@ -928,14 +1042,47 @@ const struct {
     { &print_sym,   &print_func },
     { &apt_sym,     &apt_func },
 
+    // symbols
     { &t_sym,       &t_sym    },
     { NULL,         NULL  } // must be last
+};
+
+
+const cell_t list_sym   = INIT_SYM("list");
+const cell_t append_sym = INIT_SYM("append");
+const cell_t copy_sym   = INIT_SYM("copy");
+const cell_t nullp_sym  = INIT_SYM("null?");
+const cell_t nump_sym   = INIT_SYM("number?");
+const cell_t symp_sym   = INIT_SYM("symbol?");
+
+const cell_t list_func  = INIT_FUNC(secdf_list);
+const cell_t append_func = INIT_FUNC(secdf_append);
+const cell_t copy_func  = INIT_FUNC(secdf_copy);
+const cell_t nullp_func = INIT_FUNC(secdf_null);
+const cell_t nump_func  = INIT_FUNC(secdf_nump);
+const cell_t symp_func  = INIT_FUNC(secdf_symp);
+
+const struct {
+    const cell_t *sym;
+    const cell_t *val;
+} native_functions[] = {
+    // native functions
+    { &list_sym,    &list_func },
+    { &append_sym,  &append_func },
+    { &nullp_sym,   &nullp_func },
+    { &nump_sym,    &nump_func },
+    { &symp_sym,    &symp_func },
+    { &copy_sym,    &copy_func  },
+
+    { NULL,         NULL } // must be last
 };
 
 void fill_global_env(secd_t *secd) {
     int i;
     cell_t *symlist = secd->nil;
     cell_t *vallist = secd->nil;
+
+    cell_t *env = new_cons(secd, secd->nil, secd->nil);
 
     for (i = 0; global_binding[i].sym; ++i) {
         cell_t *sym = new_clone(secd, global_binding[i].sym);
@@ -944,13 +1091,21 @@ void fill_global_env(secd_t *secd) {
         vallist = new_cons(secd, val, vallist);
     }
 
+    for (i = 0; native_functions[i].sym; ++i) {
+        cell_t *sym = new_clone(secd, native_functions[i].sym);
+        cell_t *val = new_clone(secd, native_functions[i].val);
+        cell_t *closure = new_cons(secd, val, env);
+        symlist = new_cons(secd, sym, symlist);
+        vallist = new_cons(secd, closure, vallist);
+    }
+
     cell_t *sym = new_clone(secd, &nil_sym);
     cell_t *val = secd->nil;
     symlist = new_cons(secd, sym, symlist);
     vallist = new_cons(secd, val, vallist);
 
     cell_t *frame = new_cons(secd, symlist, vallist);
-    cell_t *env = new_cons(secd, frame, secd->nil);
+    env->as.cons.car = share_cell(frame);
 
     secd->env = share_cell(env);
 }
@@ -978,7 +1133,7 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
                 continue;
             }
 
-            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
+            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
                 return get_car(vallist);
             }
             symlist = list_next(symlist);
@@ -1004,7 +1159,7 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
             assert(atom_type(symbol) != ATOM_SYM,
                     "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(symbol));
 
-            if (!strcmp(symname, symbol->as.atom.as.sym.data)) {
+            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
                 return symbol;
             }
             symlist = list_next(symlist);
@@ -1196,11 +1351,6 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
         } else {
             head = tail = newtail;
         }
-
-        if (p->nested == 0 && p->token == TOK_STR && !strcmp(p->strtok, "STOP")) {
-            p->token = TOK_EOF;
-            return head;
-        }
     }
 }
 
@@ -1284,14 +1434,14 @@ void run_secd(secd_t *secd) {
     cell_t *op;
     while (true)  {
         op = pop_control(secd);
-        assertv(op, "run_secd: no command");
+        assertv(op, "run: no command");
 
         //print_cell(op);
         assert_or_continue(atom_type(op) == ATOM_SYM,
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
         const char *symname = op->as.atom.as.sym.data;
-        if (!strcmp("STOP", symname)) return;
+        if (str_eq("STOP", symname)) return;
 
         cell_t *val = lookup_env(secd, symname);
         assert_or_continue(val, "run: lookup_env() failed for %s\n", symname);
@@ -1300,7 +1450,7 @@ void run_secd(secd_t *secd) {
 
         secd_opfunc_t callee = (secd_opfunc_t) val->as.atom.as.ptr;
         cell_t *ret = callee(secd);
-        assertv(ret, "Instruction failed\n");
+        assertv(ret, "run: Instruction failed\n");
 
         //ctrldebugf("Stack:\n"); print_list(secd->stack);
     }
@@ -1312,9 +1462,9 @@ int main() {
     init_secd(&secd);
 
     fill_global_env(&secd);
-    print_env(&secd);
+    if (ENVDEBUG) print_env(&secd);
 
-    printf(">>>>>\n");
+    envdebugf(">>>>>\n");
     cell_t *inp = read_secd(&secd, NULL);
     asserti(inp, "read_secd failed");
     if (is_nil(inp)) {
@@ -1323,17 +1473,20 @@ int main() {
     }
 
     set_control(&secd, inp);
-    printf("Control path:\n");
-    print_list(secd.control);
+    if (ENVDEBUG) {
+        envdebugf("Control path:\n");
+        print_list(secd.control);
+    }
 
-    printf("<<<<<\n");
+    envdebugf("<<<<<\n");
     run_secd(&secd);
 
-    printf("-----\n");
+    envdebugf("-----\n");
     if (not_nil(secd.stack)) {
-        printf("Stack head:\n");
+        envdebugf("Stack head:\n");
         printc(get_car(secd.stack));
-    } else
-        printf("Stack is empty\n");
+    } else {
+        envdebugf("Stack is empty\n");
+    }
     return 0;
 }
