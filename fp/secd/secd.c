@@ -18,7 +18,7 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   0
+#define CTRLDEBUG   1
 #define ENVDEBUG    0
 
 #if (MEMDEBUG)
@@ -55,6 +55,8 @@
 
 #define N_CELLS     256 * 1024
 #define SECD_ALIGN  4
+
+#define EOF_OBJ     "#<eof>"
 
 typedef enum { false, true } bool;
 
@@ -140,7 +142,7 @@ cell_t *free_cell(cell_t *c);
 
 void print_env(secd_t *secd);
 cell_t *lookup_env(secd_t *secd, const char *symname);
-cell_t *sexp_read(secd_t *secd, FILE *f);
+cell_t *sexp_parse(secd_t *secd, FILE *f);
 
 
 /*
@@ -705,7 +707,7 @@ cell_t *secd_ap(secd_t *secd) {
 
     if (atom_type(func) == ATOM_FUNC) {
         assert(argvals, "secd_ap: native(NULL)");
-        assert(is_cons(argvals), "secdf_copy: a list expected");
+        assert(is_cons(argvals), "secd_ap: a list expected");
 
         secd_nativefunc_t native = (secd_nativefunc_t)func->as.atom.as.ptr;
         cell_t *result = push_stack(secd, native(secd, argvals));
@@ -845,7 +847,7 @@ cell_t *secd_apt(secd_t *secd) {
 
 
 cell_t *secd_read(secd_t *secd) {
-    cell_t *inp = sexp_read(secd, NULL);
+    cell_t *inp = sexp_parse(secd, NULL);
     assert(inp, "secd_read: failed to read");
 
     push_stack(secd, inp);
@@ -921,7 +923,11 @@ cell_t *secdf_append(secd_t *secd, cell_t *args) {
     cell_t *xs = list_head(args);
     assert(is_cons(list_next(args)), "secdf_append: expected two arguments");
 
-    cell_t *ys = list_head(list_next(args));
+    cell_t *argtail = list_next(args);
+    cell_t *ys = list_head(argtail);
+    if (not_nil(list_next(argtail))) {
+          ys = secdf_append(secd, argtail);
+    }
 
     if (is_nil(xs))
         return ys;
@@ -940,6 +946,13 @@ cell_t *secdf_append(secd_t *secd, cell_t *args) {
     }
 
     return sum;
+}
+
+cell_t *secdf_eofp(secd_t *secd, cell_t *args) {
+    cell_t *arg1 = list_head(args);
+    if (atom_type(arg1) != ATOM_SYM)
+        return secd->nil;
+    return to_bool(secd, str_eq(arg1->as.atom.as.sym.data, EOF_OBJ));
 }
 
 #define INIT_SYM(name) {    \
@@ -1054,6 +1067,7 @@ const cell_t copy_sym   = INIT_SYM("copy");
 const cell_t nullp_sym  = INIT_SYM("null?");
 const cell_t nump_sym   = INIT_SYM("number?");
 const cell_t symp_sym   = INIT_SYM("symbol?");
+const cell_t eofp_sym   = INIT_SYM("eof-object?");
 
 const cell_t list_func  = INIT_FUNC(secdf_list);
 const cell_t append_func = INIT_FUNC(secdf_append);
@@ -1061,6 +1075,7 @@ const cell_t copy_func  = INIT_FUNC(secdf_copy);
 const cell_t nullp_func = INIT_FUNC(secdf_null);
 const cell_t nump_func  = INIT_FUNC(secdf_nump);
 const cell_t symp_func  = INIT_FUNC(secdf_symp);
+const cell_t eofp_func  = INIT_FUNC(secdf_eofp);
 
 const struct {
     const cell_t *sym;
@@ -1073,6 +1088,7 @@ const struct {
     { &nump_sym,    &nump_func },
     { &symp_sym,    &symp_func },
     { &copy_sym,    &copy_func  },
+    { &eofp_sym,    &eofp_func  },
 
     { NULL,         NULL } // must be last
 };
@@ -1225,6 +1241,8 @@ struct secd_parser {
     int nested;
 };
 
+cell_t *sexp_read(secd_t *secd, secd_parser_t *p);
+
 secd_parser_t *init_parser(secd_parser_t *p, FILE *f) {
     p->lc = ' ';
     p->f = (f ? f : stdin);
@@ -1334,9 +1352,14 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
               }
               if (p->token == TOK_EOF) {
                   free_cell(head);
-                  errorf("read_list: TOK_EOF, ')' expected");
+                  errorf("read_list: TOK_EOF, ')' expected\n");
               }
               assert(p->token == ')', "read_list: not a closing bracket");
+              break;
+           case '\'':
+              val = sexp_read(secd, p);
+              val = new_cons(secd, new_symbol(secd, "quote"),
+                                   new_cons(secd, val, secd->nil));
               break;
            default:
               errorf("Unknown token: %1$d ('%1$c')", tok);
@@ -1354,42 +1377,50 @@ cell_t *read_list(secd_t *secd, secd_parser_t *p) {
     }
 }
 
-cell_t *sexp_read(secd_t *secd, FILE *f) {
-    secd_parser_t p;
-    init_parser(&p, f);
-
+cell_t *sexp_read(secd_t *secd, secd_parser_t *p) {
     cell_t *inp = secd->nil;
-
     int tok;
-    switch (tok = lexnext(&p)) {
+    switch (tok = lexnext(p)) {
       case '(':
-        inp = read_list(secd, &p);
-        if (p.token != ')') {
+        inp = read_list(secd, p);
+        if (p->token != ')') {
             errorf("read_secd: failed\n");
             if (inp) drop_cell(inp);
             return NULL;
         }
         break;
       case TOK_NUM:
-        inp = new_number(secd, p.numtok);
+        inp = new_number(secd, p->numtok);
         break;
       case TOK_STR:
-        inp = new_symbol(secd, p.strtok);
+        inp = new_symbol(secd, p->strtok);
         break;
       case TOK_EOF:
-        return NULL;
+        return new_symbol(secd, EOF_OBJ);
+      case '\'':
+        inp = sexp_read(secd, p);
+        inp = new_cons(secd, new_symbol(secd, "quote"), 
+                             new_cons(secd, inp, secd->nil));
+        break;
       default:
         errorf("Unknown token: %1$d ('%1$c')", tok);
         return NULL;
     }
     return inp;
 }
+
+cell_t *sexp_parse(secd_t *secd, FILE *f) {
+    secd_parser_t p;
+    init_parser(&p, f);
+    return sexp_read(secd, &p);
+}
+
 cell_t *read_secd(secd_t *secd, FILE *f) {
     secd_parser_t p;
     init_parser(&p, f);
 
     if (lexnext(&p) != '(') {
-        errorf("read_secd: a list of commands expected");
+        errorf("read_secd: a list of commands expected\n");
         return NULL;
     }
 
