@@ -18,7 +18,7 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   1
+#define CTRLDEBUG   0
 #define ENVDEBUG    0
 
 #if (MEMDEBUG)
@@ -1489,14 +1489,20 @@ void run_secd(secd_t *secd) {
 
 secd_t __attribute__((aligned(1 << SECD_ALIGN))) secd;
 
-int main() {
+int main(int argc, char *argv[]) {
     init_secd(&secd);
 
     fill_global_env(&secd);
     if (ENVDEBUG) print_env(&secd);
 
+    FILE *op_in = NULL;
+    if (argc == 2) {
+        op_in = fopen(argv[1], "r");
+    }
+
     envdebugf(">>>>>\n");
-    cell_t *inp = read_secd(&secd, NULL);
+    cell_t *inp = read_secd(&secd, op_in);
+
     asserti(inp, "read_secd failed");
     if (is_nil(inp)) {
         printf("no commands.");
