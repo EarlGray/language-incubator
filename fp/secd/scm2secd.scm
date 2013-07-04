@@ -115,9 +115,10 @@
 
 (repl (lambda () 
     (let ((inp (read)))
-      (if (null? inp)
+      (if (eof-object? inp)
         (display 'done)
         (begin
+          ;(display inp)
           (display (append (compile inp) '(STOP)))
           (repl))))))
 )
