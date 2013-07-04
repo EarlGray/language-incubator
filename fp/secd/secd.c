@@ -18,8 +18,11 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   0
+#define CTRLDEBUG   1
 #define ENVDEBUG    0
+
+#define TAILRECURSION 0
+// tail recursion does not work properly at the moment
 
 #if (MEMDEBUG)
 # define memdebugf(...) printf(__VA_ARGS__)
@@ -51,12 +54,12 @@
 # define str_eq(s1, s2) !strcasecmp(s1, s2)
 #endif
 
+#define EOF_OBJ     "#<eof>"
+
 #define DONT_FREE_THIS  INTPTR_MAX
 
 #define N_CELLS     256 * 1024
 #define SECD_ALIGN  4
-
-#define EOF_OBJ     "#<eof>"
 
 typedef enum { false, true } bool;
 
@@ -133,7 +136,10 @@ struct secd  {
     cell_t *data;       // array
     cell_t *nil;        // pointer
 
+    cell_t *global_env;  
+#if TAILRECURSION
     bool tlrec;
+#endif
 };
 
 
@@ -257,8 +263,11 @@ void printc(cell_t *c) {
 }
 
 void sexp_print(cell_t *cell) {
+    secd_t *secd = cell_secd(cell);
     switch (cell_type(cell)) {
-      case CELL_ATOM: sexp_print_atom(cell); break;
+      case CELL_ATOM: 
+        sexp_print_atom(cell);
+        break;
       case CELL_CONS:
         printf("(");
         cell_t *iter = cell;
@@ -267,14 +276,22 @@ void sexp_print(cell_t *cell) {
             if (cell_type(iter) != CELL_CONS) {
                 printf(". "); sexp_print(iter); break;
             }
+            
+            // to avoid cycles:
+            if (iter == secd->global_env) {
+                printf("*global_env*");
+                break;
+            }
             cell_t *head = get_car(iter);
             sexp_print(head);
             iter = list_next(iter);
         }
         printf(") ");
         break;
-      case CELL_ERROR: printf("???"); break;
-      default: errorf("sexp_print: unknown cell type %d", (int)cell_type(cell));
+      case CELL_ERROR: 
+        printf("???"); break;
+      default: 
+        errorf("sexp_print: unknown cell type %d", (int)cell_type(cell));
     }
 }
 
@@ -501,20 +518,25 @@ cell_t *secd_cdr(secd_t *secd) {
 }
 
 cell_t *secd_ldc(secd_t *secd) {
-    ctrldebugf("LDC\n");
+    ctrldebugf("LDC ");
+
     cell_t *arg = pop_control(secd);
     assert(arg, "secd_ldc: pop_control failed");
+    if (CTRLDEBUG) printc(arg);
+
     push_stack(secd, arg);
     drop_cell(arg);
     return arg;
 }
 
 cell_t *secd_ld(secd_t *secd) {
-    ctrldebugf("LD\n");
+    ctrldebugf("LD ");
+
     cell_t *arg = pop_control(secd);
     assert(arg, "secd_ld: stack empty");
     assert(atom_type(arg) == ATOM_SYM,
            "secd_ld: not a symbol [%ld]", cell_index(arg));
+    if (CTRLDEBUG) printc(arg);
 
     const char *sym = arg->as.atom.as.sym.data;
     cell_t *val = lookup_env(secd, sym);
@@ -646,12 +668,24 @@ cell_t *secd_rem(secd_t *secd) {
     return arithm_op(secd, irem);
 }
 
+cell_t *secd_leq(secd_t *secd) {
+    ctrldebugf("LEQ\n");
+
+    cell_t *opnd1 = pop_stack(secd);
+    cell_t *opnd2 = pop_stack(secd);
+    
+    assert(atom_type(opnd1) == ATOM_INT, "secd_leq: int expected as opnd1");
+    assert(atom_type(opnd2) == ATOM_INT, "secd_leq: int expected as opnd2");
+
+    cell_t *result = to_bool(secd, opnd1->as.atom.as.num <= opnd2->as.atom.as.num);
+    return push_stack(secd, result);
+}
 
 cell_t *secd_sel(secd_t *secd) {
-    ctrldebugf("SEL\n");
+    ctrldebugf("SEL ");
 
     cell_t *condcell = pop_stack(secd);
-    //print_cell(condcell);
+    if (CTRLDEBUG) printc(condcell);
 
     bool cond = not_nil(condcell) ? true : false;
     drop_cell(condcell);
@@ -662,8 +696,12 @@ cell_t *secd_sel(secd_t *secd) {
 
     cell_t *joinb = secd->control;
     secd->control = share_cell(cond ? thenb : elseb);
+#if TAILRECURSION
     if (!secd->tlrec)
         push_dump(secd, joinb);
+#else
+    push_dump(secd, joinb);
+#endif
 
     drop_cell(thenb); drop_cell(elseb); drop_cell(joinb);
     return secd->control;
@@ -689,12 +727,14 @@ cell_t *secd_ldf(secd_t *secd) {
     return push_stack(secd, closure);
 }
 
+#if TAILRECURSION
 static bool tail_recursive(cell_t *control) {
     if (is_nil(control)) return false;
     cell_t *nextop = get_car(control);
     if (atom_type(nextop) != ATOM_SYM) return false;
     return str_eq("RTN", nextop->as.atom.as.sym.data);
 }
+#endif
 
 cell_t *secd_ap(secd_t *secd) {
     ctrldebugf("AP\n");
@@ -719,18 +759,27 @@ cell_t *secd_ap(secd_t *secd) {
     cell_t *argnames = get_car(func);
     cell_t *control = get_car(list_next(func));
 
+#if TAILRECURSION
     if (!tail_recursive(secd->control)) {
         push_dump(secd, secd->control);
         push_dump(secd, secd->env);
         push_dump(secd, secd->stack);
     }
+#if CTRLDEBUG
+    else ctrldebugf("secd_ap: tail-recursive\n");
+#endif
+#else
+    push_dump(secd, secd->control);
+    push_dump(secd, secd->env);
+    push_dump(secd, secd->stack);
+#endif
 
     cell_t *frame = new_cons(secd, argnames, argvals);
-    /*
+#if CTRLDEBUG
     printf("new frame: \n"); print_cell(frame);
     printf(" argnames: \n"); printc(argnames);
     printf(" argvals : \n"); printc(argvals);
-    */
+#endif
     secd->stack = secd->nil;
     secd->env = share_cell(new_cons(secd, frame, newenv));
     //print_env(secd);
@@ -761,7 +810,9 @@ cell_t *secd_rtn(secd_t *secd) {
     drop_cell(top); drop_cell(prevstack);
     drop_cell(prevenv); drop_cell(prevcontrol);
 
+#if TAILRECURSION
     secd->tlrec = false;
+#endif
     return top;
 }
 
@@ -794,11 +845,11 @@ cell_t *secd_rap(secd_t *secd) {
     push_dump(secd, secd->stack);
 
     cell_t *frame = new_cons(secd, argnames, argvals);
-    /*
+#if CTRLDEBUG
     printf("new frame: \n"); print_cell(frame);
     printf(" argnames: \n"); printc(argnames);
     printf(" argvals : \n"); printc(argvals);
-    */
+#endif
     newenv->as.cons.car = share_cell(frame);
 
     secd->stack = secd->nil;
@@ -812,41 +863,10 @@ cell_t *secd_rap(secd_t *secd) {
     return control;
 }
 
-cell_t *secd_apt(secd_t *secd) {
-    ctrldebugf("APT\n");
-
-    cell_t *closure = pop_stack(secd);
-    cell_t *argvals = pop_stack(secd);
-
-    cell_t *newenv = get_cdr(closure);
-    cell_t *func = get_car(closure);
-    cell_t *argnames = get_car(func);
-    cell_t *control = get_car(list_next(func));
-
-    cell_t *frame = new_cons(secd, argnames, argvals);
-    /*
-    printf("new frame: \n"); print_cell(frame);
-    printf(" argnames: \n"); printc(argnames);
-    printf(" argvals : \n"); printc(argvals);
-    // */
-    drop_cell(secd->stack);
-    secd->stack = secd->nil;
-
-    secd->env = share_cell(new_cons(secd, frame, newenv));
-
-    drop_cell(secd->control);
-    secd->control = share_cell(control);
-    //print_env(secd);
-
-    drop_cell(closure); drop_cell(argvals);
-    secd->tlrec = true;
-
-    return control;
-}
-
-
 
 cell_t *secd_read(secd_t *secd) {
+    ctrldebugf("READ\n");
+
     cell_t *inp = sexp_parse(secd, NULL);
     assert(inp, "secd_read: failed to read");
 
@@ -855,6 +875,8 @@ cell_t *secd_read(secd_t *secd) {
 }
 
 cell_t *secd_print(secd_t *secd) {
+    ctrldebugf("PRINT\n");
+
     cell_t *top = get_car(secd->stack);
     assert(top, "secd_print: no stack");
 
@@ -869,20 +891,24 @@ cell_t *secd_print(secd_t *secd) {
  */
 
 cell_t *secdf_list(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_list\n");
     return args;
 }
 
 cell_t *secdf_null(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_nullp\n");
     assert(not_nil(args), "secdf_copy: one argument expected");
     return to_bool(secd, is_nil(list_head(args)));
 }
 
 cell_t *secdf_nump(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_nump\n");
     assert(not_nil(args), "secdf_copy: one argument expected");
     return to_bool(secd, atom_type(list_head(args)) == ATOM_INT);
 }
 
 cell_t *secdf_symp(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_symp\n");
     assert(not_nil(args), "secdf_copy: one argument expected");
     return to_bool(secd, atom_type(list_head(args)) == ATOM_SYM);
 }
@@ -914,10 +940,12 @@ static cell_t *list_copy(secd_t *secd, cell_t *list, cell_t **out_tail) {
 }
 
 cell_t *secdf_copy(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_copy\n");
     return list_copy(secd, list_head(args), NULL);
 }
 
 cell_t *secdf_append(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_append\n");
     assert(args, "secdf_append: args is NULL");
 
     cell_t *xs = list_head(args);
@@ -949,6 +977,7 @@ cell_t *secdf_append(secd_t *secd, cell_t *args) {
 }
 
 cell_t *secdf_eofp(secd_t *secd, cell_t *args) {
+    ctrldebugf("secdf_eofp\n");
     cell_t *arg1 = list_head(args);
     if (atom_type(arg1) != ATOM_SYM)
         return secd->nil;
@@ -983,6 +1012,7 @@ const cell_t sub_func   = INIT_FUNC(secd_sub);
 const cell_t mul_func   = INIT_FUNC(secd_mul);
 const cell_t div_func   = INIT_FUNC(secd_div);
 const cell_t rem_func   = INIT_FUNC(secd_rem);
+const cell_t leq_func   = INIT_FUNC(secd_leq);
 const cell_t ldc_func   = INIT_FUNC(secd_ldc);
 const cell_t ld_func    = INIT_FUNC(secd_ld);
 const cell_t eq_func    = INIT_FUNC(secd_eq);
@@ -996,7 +1026,6 @@ const cell_t dum_func   = INIT_FUNC(secd_dum);
 const cell_t rap_func   = INIT_FUNC(secd_rap);
 const cell_t read_func  = INIT_FUNC(secd_read);
 const cell_t print_func = INIT_FUNC(secd_print);
-const cell_t apt_func   = INIT_FUNC(secd_apt);
 
 const cell_t cons_sym   = INIT_SYM("CONS");
 const cell_t car_sym    = INIT_SYM("CAR");
@@ -1006,6 +1035,7 @@ const cell_t sub_sym    = INIT_SYM("SUB");
 const cell_t mul_sym    = INIT_SYM("MUL");
 const cell_t div_sym    = INIT_SYM("DIV");
 const cell_t rem_sym    = INIT_SYM("REM");
+const cell_t leq_sym    = INIT_SYM("LEQ");
 const cell_t ldc_sym    = INIT_SYM("LDC");
 const cell_t ld_sym     = INIT_SYM("LD");
 const cell_t eq_sym     = INIT_SYM("EQ");
@@ -1019,7 +1049,6 @@ const cell_t dum_sym    = INIT_SYM("DUM");
 const cell_t rap_sym    = INIT_SYM("RAP");
 const cell_t read_sym   = INIT_SYM("READ");
 const cell_t print_sym  = INIT_SYM("PRINT");
-const cell_t apt_sym    = INIT_SYM("APT");
 
 const cell_t t_sym      = INIT_SYM("#t");
 const cell_t nil_sym    = INIT_SYM("NIL");
@@ -1039,6 +1068,7 @@ const struct {
     { &mul_sym,     &mul_func },
     { &div_sym,     &div_func },
     { &rem_sym,     &rem_func },
+    { &leq_sym,     &leq_func },
 
     { &eq_sym,      &eq_func  },
     { &ldc_sym,     &ldc_func },
@@ -1053,7 +1083,6 @@ const struct {
     { &rap_sym,     &rap_func },
     { &read_sym,    &read_func},
     { &print_sym,   &print_func },
-    { &apt_sym,     &apt_func },
 
     // symbols
     { &t_sym,       &t_sym    },
@@ -1124,6 +1153,7 @@ void fill_global_env(secd_t *secd) {
     env->as.cons.car = share_cell(frame);
 
     secd->env = share_cell(env);
+    secd->global_env = secd->env;
 }
 
 cell_t *lookup_env(secd_t *secd, const char *symname) {
@@ -1457,7 +1487,9 @@ secd_t * init_secd(secd_t *secd) {
     secd->stack = secd->dump =  secd->nil;
     secd->control = secd->env =  secd->nil;
 
+#if TAILRECURSION
     secd->tlrec = false;
+#endif
     return secd;
 }
 
