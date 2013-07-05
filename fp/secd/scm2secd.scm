@@ -51,7 +51,7 @@
       ((eq? hd '+)
         (append (compile (car tl)) (compile (cadr tl)) '(ADD)))
       ((eq? hd '-)
-        (append (compile (car tl)) (compile (cadr tl)) '(SUB)))
+        (append (compile (cadr tl)) (compile (car tl)) '(SUB)))
       ((eq? hd '*)
         (append (compile (car tl)) (compile (cadr tl)) '(MUL)))
       ((eq? hd 'atom?)

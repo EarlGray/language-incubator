@@ -18,7 +18,7 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   1
+#define CTRLDEBUG   0
 #define ENVDEBUG    0
 
 #define TAILRECURSION 0
@@ -990,19 +990,19 @@ cell_t *secdf_eofp(secd_t *secd, cell_t *args) {
         .type = ATOM_SYM,   \
         .as.sym = { .size = DONT_FREE_THIS, \
                     .data = (name) } }, \
-    .nref = INTPTR_MAX }
+    .nref = INTPTR_MAX/2 }
 
 #define INIT_NUM(num) {     \
     .type = CELL_ATOM,      \
     .as.atom = { .type = ATOM_INT,  \
                  .as.num = (num) }, \
-    .nref = INTPTR_MAX }
+    .nref = INTPTR_MAX/2 }
 
 #define INIT_FUNC(func) {   \
     .type = CELL_ATOM,      \
     .as.atom = { .type = ATOM_FUNC,  \
                  .as.ptr = (void *)(func) }, \
-    .nref = INTPTR_MAX }
+    .nref = INTPTR_MAX/2 }
 
 const cell_t cons_func  = INIT_FUNC(secd_cons);
 const cell_t car_func   = INIT_FUNC(secd_car);
@@ -1132,6 +1132,7 @@ void fill_global_env(secd_t *secd) {
     for (i = 0; global_binding[i].sym; ++i) {
         cell_t *sym = new_clone(secd, global_binding[i].sym);
         cell_t *val = new_clone(secd, global_binding[i].val);
+        sym->nref = INTMAX_MAX/2;  val->nref = INTPTR_MAX/2;
         symlist = new_cons(secd, sym, symlist);
         vallist = new_cons(secd, val, vallist);
     }
@@ -1139,6 +1140,7 @@ void fill_global_env(secd_t *secd) {
     for (i = 0; native_functions[i].sym; ++i) {
         cell_t *sym = new_clone(secd, native_functions[i].sym);
         cell_t *val = new_clone(secd, native_functions[i].val);
+        sym->nref = INTMAX_MAX/2;  val->nref = INTPTR_MAX/2;
         cell_t *closure = new_cons(secd, val, env);
         symlist = new_cons(secd, sym, symlist);
         vallist = new_cons(secd, closure, vallist);
