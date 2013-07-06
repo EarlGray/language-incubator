@@ -18,8 +18,8 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   0
-#define ENVDEBUG    0
+#define CTRLDEBUG   1
+#define ENVDEBUG    1
 
 #define TAILRECURSION 0
 // tail recursion does not work properly at the moment
@@ -56,7 +56,7 @@
 
 #define EOF_OBJ     "#<eof>"
 
-#define DONT_FREE_THIS  INTPTR_MAX
+#define DONT_FREE_THIS  INTPTR_MAX/2
 
 #define N_CELLS     256 * 1024
 #define SECD_ALIGN  4
@@ -179,6 +179,14 @@ inline static bool not_nil(const cell_t *cell) {
 inline static long cell_index(const cell_t *cons) {
     if (is_nil(cons)) return -1;
     return cons - cell_secd(cons)->data;
+}
+
+inline static const char * symname(const cell_t *c) {
+    return c->as.atom.as.sym.data;
+}
+
+inline static int numval(const cell_t *c) {
+    return c->as.atom.as.num;
 }
 
 inline static cell_t *list_next(const cell_t *cons) {
@@ -538,7 +546,7 @@ cell_t *secd_ld(secd_t *secd) {
            "secd_ld: not a symbol [%ld]", cell_index(arg));
     if (CTRLDEBUG) printc(arg);
 
-    const char *sym = arg->as.atom.as.sym.data;
+    const char *sym = symname(arg);
     cell_t *val = lookup_env(secd, sym);
     drop_cell(arg);
     assert(val, "lookup failed for %s", sym);
@@ -557,7 +565,7 @@ bool atom_eq(const cell_t *a1, const cell_t *a2) {
         return false;
     switch (atype1) {
       case ATOM_INT: return (a1->as.atom.as.num == a2->as.atom.as.num);
-      case ATOM_SYM: return (!strcasecmp(a1->as.atom.as.sym.data, a2->as.atom.as.sym.data));
+      case ATOM_SYM: return (!strcasecmp(symname(a1), symname(a2)));
       case ATOM_FUNC: return (a1->as.atom.as.ptr == a2->as.atom.as.ptr);
       default: errorf("atom_eq([%ld], [%ld]): don't know how to handle type %d\n",
                        cell_index(a1), cell_index(a2), atype1);
@@ -981,7 +989,7 @@ cell_t *secdf_eofp(secd_t *secd, cell_t *args) {
     cell_t *arg1 = list_head(args);
     if (atom_type(arg1) != ATOM_SYM)
         return secd->nil;
-    return to_bool(secd, str_eq(arg1->as.atom.as.sym.data, EOF_OBJ));
+    return to_bool(secd, str_eq(symname(arg1), EOF_OBJ));
 }
 
 #define INIT_SYM(name) {    \
@@ -990,19 +998,19 @@ cell_t *secdf_eofp(secd_t *secd, cell_t *args) {
         .type = ATOM_SYM,   \
         .as.sym = { .size = DONT_FREE_THIS, \
                     .data = (name) } }, \
-    .nref = INTPTR_MAX/2 }
+    .nref = DONT_FREE_THIS }
 
 #define INIT_NUM(num) {     \
     .type = CELL_ATOM,      \
     .as.atom = { .type = ATOM_INT,  \
                  .as.num = (num) }, \
-    .nref = INTPTR_MAX/2 }
+    .nref = DONT_FREE_THIS }
 
 #define INIT_FUNC(func) {   \
     .type = CELL_ATOM,      \
     .as.atom = { .type = ATOM_FUNC,  \
                  .as.ptr = (void *)(func) }, \
-    .nref = INTPTR_MAX/2 }
+    .nref = DONT_FREE_THIS }
 
 const cell_t cons_func  = INIT_FUNC(secd_cons);
 const cell_t car_func   = INIT_FUNC(secd_car);
@@ -1132,7 +1140,7 @@ void fill_global_env(secd_t *secd) {
     for (i = 0; global_binding[i].sym; ++i) {
         cell_t *sym = new_clone(secd, global_binding[i].sym);
         cell_t *val = new_clone(secd, global_binding[i].val);
-        sym->nref = INTMAX_MAX/2;  val->nref = INTPTR_MAX/2;
+        sym->nref = val->nref = DONT_FREE_THIS;
         symlist = new_cons(secd, sym, symlist);
         vallist = new_cons(secd, val, vallist);
     }
@@ -1140,7 +1148,7 @@ void fill_global_env(secd_t *secd) {
     for (i = 0; native_functions[i].sym; ++i) {
         cell_t *sym = new_clone(secd, native_functions[i].sym);
         cell_t *val = new_clone(secd, native_functions[i].val);
-        sym->nref = INTMAX_MAX/2;  val->nref = INTPTR_MAX/2;
+        sym->nref = val->nref = DONT_FREE_THIS;
         cell_t *closure = new_cons(secd, val, env);
         symlist = new_cons(secd, sym, symlist);
         vallist = new_cons(secd, closure, vallist);
@@ -1158,7 +1166,7 @@ void fill_global_env(secd_t *secd) {
     secd->global_env = secd->env;
 }
 
-cell_t *lookup_env(secd_t *secd, const char *symname) {
+cell_t *lookup_env(secd_t *secd, const char *symbol) {
     cell_t *env = secd->env;
     assert(cell_type(env) == CELL_CONS, "lookup_env: environment is not a list\n");
 
@@ -1173,15 +1181,15 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
         cell_t *vallist = get_cdr(frame);
 
         while (not_nil(symlist)) {   // walk through symbols
-            cell_t *symbol = get_car(symlist);
-            if (atom_type(symbol) != ATOM_SYM) {
+            cell_t *cur_sym = get_car(symlist);
+            if (atom_type(cur_sym) != ATOM_SYM) {
                 errorf("lookup_env: variable at [%ld] is not a symbol\n",
-                        cell_index(symbol));
+                        cell_index(cur_sym));
                 symlist = list_next(symlist); vallist = list_next(vallist);
                 continue;
             }
 
-            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
+            if (str_eq(symbol, symname(cur_sym))) {
                 return get_car(vallist);
             }
             symlist = list_next(symlist);
@@ -1190,11 +1198,11 @@ cell_t *lookup_env(secd_t *secd, const char *symname) {
 
         env = list_next(env);
     }
-    printf("lookup_env: %s not found\n", symname);
+    printf("lookup_env: %s not found\n", symbol);
     return NULL;
 }
 
-cell_t *lookup_symbol(secd_t *secd, const char *symname) {
+cell_t *lookup_symbol(secd_t *secd, const char *symbol) {
     cell_t *env = secd->env;
     assert(cell_type(env) == CELL_CONS, "lookup_symbol: environment is not a list\n");
 
@@ -1203,12 +1211,12 @@ cell_t *lookup_symbol(secd_t *secd, const char *symname) {
         cell_t *symlist = get_car(frame);
 
         while (not_nil(symlist)) {   // walk through symbols
-            cell_t *symbol = get_car(symlist);
-            assert(atom_type(symbol) != ATOM_SYM,
-                    "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(symbol));
+            cell_t *cur_sym = get_car(symlist);
+            assert(atom_type(cur_sym) != ATOM_SYM,
+                    "lookup_symbol: variable at [%ld] is not a symbol\n", cell_index(cur_sym));
 
-            if (str_eq(symname, symbol->as.atom.as.sym.data)) {
-                return symbol;
+            if (str_eq(symbol, symname(cur_sym))) {
+                return cur_sym;
             }
             symlist = list_next(symlist);
         }
@@ -1233,7 +1241,7 @@ void print_env(secd_t *secd) {
             cell_t *val = get_car(vallist);
             if (atom_type(sym) != ATOM_SYM)
                 fprintf(stderr, "print_env: not a symbol at *%p in vallist\n", sym);
-            printf("  %s\t=>\t", sym->as.atom.as.sym.data);
+            printf("  %s\t=>\t", symname(sym));
             print_cell(val);
 
             symlist = list_next(symlist);
@@ -1505,11 +1513,11 @@ void run_secd(secd_t *secd) {
         assert_or_continue(atom_type(op) == ATOM_SYM,
                 "run: not a symbol at [%ld]\n", cell_index(op));
 
-        const char *symname = op->as.atom.as.sym.data;
-        if (str_eq("STOP", symname)) return;
+        const char *sym = symname(op);
+        if (str_eq("STOP", sym)) return;
 
-        cell_t *val = lookup_env(secd, symname);
-        assert_or_continue(val, "run: lookup_env() failed for %s\n", symname);
+        cell_t *val = lookup_env(secd, sym);
+        assert_or_continue(val, "run: lookup_env() failed for %s\n", sym);
         assert_or_continue(atom_type(val) == ATOM_FUNC, "run: not a ATOM_FUNC\n");
         drop_cell(op);
 
@@ -1539,7 +1547,7 @@ int main(int argc, char *argv[]) {
 
     asserti(inp, "read_secd failed");
     if (is_nil(inp)) {
-        printf("no commands.");
+        printf("no commands.\n\n");
         return 0;
     }
 
