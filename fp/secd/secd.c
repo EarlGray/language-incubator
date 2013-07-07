@@ -136,7 +136,7 @@ struct secd  {
     cell_t *data;       // array
     cell_t *nil;        // pointer
 
-    cell_t *global_env;  
+    cell_t *global_env;
 #if TAILRECURSION
     bool tlrec;
 #endif
@@ -273,7 +273,7 @@ void printc(cell_t *c) {
 void sexp_print(cell_t *cell) {
     secd_t *secd = cell_secd(cell);
     switch (cell_type(cell)) {
-      case CELL_ATOM: 
+      case CELL_ATOM:
         sexp_print_atom(cell);
         break;
       case CELL_CONS:
@@ -284,7 +284,7 @@ void sexp_print(cell_t *cell) {
             if (cell_type(iter) != CELL_CONS) {
                 printf(". "); sexp_print(iter); break;
             }
-            
+
             // to avoid cycles:
             if (iter == secd->global_env) {
                 printf("*global_env*");
@@ -296,9 +296,9 @@ void sexp_print(cell_t *cell) {
         }
         printf(") ");
         break;
-      case CELL_ERROR: 
+      case CELL_ERROR:
         printf("???"); break;
-      default: 
+      default:
         errorf("sexp_print: unknown cell type %d", (int)cell_type(cell));
     }
 }
@@ -681,7 +681,7 @@ cell_t *secd_leq(secd_t *secd) {
 
     cell_t *opnd1 = pop_stack(secd);
     cell_t *opnd2 = pop_stack(secd);
-    
+
     assert(atom_type(opnd1) == ATOM_INT, "secd_leq: int expected as opnd1");
     assert(atom_type(opnd2) == ATOM_INT, "secd_leq: int expected as opnd2");
 
@@ -961,14 +961,16 @@ cell_t *secdf_append(secd_t *secd, cell_t *args) {
 
     cell_t *sum = xs;
     cell_t *sum_tail = xs;
-    while (not_nil(list_next(sum_tail))) {
+    while (true) {
         if (sum_tail->nref > 1) {
             sum_tail = NULL; // xs must be copied
             break;
         }
+        if (is_nil(list_next(sum_tail)))
+            break;
         sum_tail = list_next(sum_tail);
     }
-         
+
     if (sum_tail) {
         ctrldebugf("secdf_append: destructive append\n");
         sum_tail->as.cons.cdr = share_cell(ys);
