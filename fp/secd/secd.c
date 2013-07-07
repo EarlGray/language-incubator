@@ -18,8 +18,8 @@
 
 #define MEMDEBUG    0
 #define MEMTRACE    0
-#define CTRLDEBUG   1
-#define ENVDEBUG    1
+#define CTRLDEBUG   0
+#define ENVDEBUG    0
 
 #define TAILRECURSION 0
 // tail recursion does not work properly at the moment
@@ -921,15 +921,6 @@ cell_t *secdf_symp(secd_t *secd, cell_t *args) {
     return to_bool(secd, atom_type(list_head(args)) == ATOM_SYM);
 }
 
-static cell_t *list_end(cell_t *list) {
-    if (is_nil(list))
-        return NULL;
-
-    while (not_nil(list_next(list)))
-        list = list_next(list);
-    return list;
-}
-
 static cell_t *list_copy(secd_t *secd, cell_t *list, cell_t **out_tail) {
     if (is_nil(list))
         return secd->nil;
@@ -968,11 +959,19 @@ cell_t *secdf_append(secd_t *secd, cell_t *args) {
     if (is_nil(xs))
         return ys;
 
-    cell_t *sum;
-    if (xs->nref < 2) {
+    cell_t *sum = xs;
+    cell_t *sum_tail = xs;
+    while (not_nil(list_next(sum_tail))) {
+        if (sum_tail->nref > 1) {
+            sum_tail = NULL; // xs must be copied
+            break;
+        }
+        sum_tail = list_next(sum_tail);
+    }
+         
+    if (sum_tail) {
         ctrldebugf("secdf_append: destructive append\n");
-        cell_t *c = list_end(xs);
-        c->as.cons.cdr = share_cell(ys);
+        sum_tail->as.cons.cdr = share_cell(ys);
         sum = xs;
     } else {
         ctrldebugf("secdf_append: copying append\n");
