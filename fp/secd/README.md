@@ -15,14 +15,18 @@ It's state is representated as a tuple of 4 lists:
 
 Also there is `scm2secd.scm` which is a compiler from Scheme to SECD codes written in Scheme. It is not self-hosted yet, you need some existing interpreter to be installed, I use `mzscheme` from Dr.Racket.
 
+Memory is managed using reference counting at the moment, a simple optional garbage collection is on my TODO-list. 
 
 Opcodes and operational semantics
 ---------------------------------
 
+Boolean values are now `#t` and NIL.
+Only C int types are supported as integers
 The current opcode set and the operational semantics is:
 
     ADD, SUB, MUL, DIV, REM
-            :     ((s1 s2 . s), e, c, d) -> ((s1 _op_ s2 . s), e, c, d)
+            :     ((x y. s), e, c, d) -> ((x _op_ y . s), e, c, d)
+    LEQ     :     ((x y. s), e, c, d) -> ((x < y? #t : nil).s, e, c, d)
 
     CAR     :     ((x._) . s), e, c, d)  -> (x.s, e, c, d)
     CDR     :     ((_.x) . s), e, c, d)  -> (x.s, e, c, d)
@@ -42,7 +46,8 @@ The current opcode set and the operational semantics is:
                                            (nil, (zip argnames argvals).e1, c1, s.e.c.d)`
     RTN    :      (v, e, nil, s0.e0.c0.d) -> (v.s0, e0, c0, d)
     DUM    :      (s, e, c, d)            -> (s, dummy.e, c, d)
-    RAP    :      () # todo
+    RAP    :      ((c'.e').v'.s, e, c, d) -> (nil, frame(v').e', c', (s, # todo
+
     PRINT`:    side-effect of printing the head of S
     READ`:     puts the input s-expression on top of S
 
