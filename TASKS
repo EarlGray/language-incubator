@@ -1,6 +1,5 @@
-1) Kaleidoscope LLVM tutorial:
+- [x] Kaleidoscope LLVM tutorial:
     http://llvm.org/docs/tutorial/LangImpl1.html#language
-
-2) SICP chapter 5
-
-3) Implementing functional programming language by SPJ
+- [ ] SICP chapter 5
+- [ ] Implementing functional programming language by SPJ
+- [ ] Mogensen, Basics of compiler design
