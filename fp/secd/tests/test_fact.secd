@@ -17,4 +17,4 @@
  LDF ((fact)
       (LDC ()  LDC 6  CONS
        LD fact  AP RTN))
-RAP)
+RAP STOP)
