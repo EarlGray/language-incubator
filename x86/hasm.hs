@@ -159,6 +159,7 @@ data Operation
     = OpPush OpOperand
     | OpRet (Maybe Word16)
     | OpLRet (Maybe Word16)
+    | OpInt OpOperand
     | OpAdd OpOperand OpOperand
     | OpMov OpOperand OpOperand
   deriving (Show, Read)
@@ -225,11 +226,12 @@ instance Serializable Int32 where
     bytecode = unpackBytes . runPut . putWord32le . int
 
 instance Serializable Operation where
-    bytecode (OpPush op) = bytesPush op
-    bytecode (OpRet mbClear) = bytesRet mbClear
+    bytecode (OpPush op) =      bytesPush op
+    bytecode (OpRet mbClear) =  bytesRet mbClear
     bytecode (OpLRet mbClear) = bytesLRet mbClear
-    bytecode (OpAdd op1 op2) = bytesAdd op1 op2
-    bytecode (OpMov op1 op2) = bytesMov op1 op2
+    bytecode (OpInt op) =       bytesInt op 
+    bytecode (OpAdd op1 op2) =  bytesAdd op1 op2
+    bytecode (OpMov op1 op2) =  bytesMov op1 op2
 
 -- PUSH
 bytesPush :: OpOperand -> [Word8]
@@ -249,6 +251,12 @@ bytesRet (Just imm16) = (0xc2 : bytecode imm16)
 bytesRet _            = [0xc3]
 bytesLRet (Just imm16) = (0xca : bytecode imm16)
 bytesLRet _            = [0xcb]
+
+-- INT
+bytesInt :: OpOperand -> [Word8]
+bytesInt (OpndImmB imm) | imm == 3  = [0xCC]
+bytesInt (OpndImmB imm) = [0xCD, imm]
+bytesInt _ = error "Invalid operand form for INT"
 
 -- ADD
 bytesAdd :: OpOperand -> OpOperand -> [Word8]
