@@ -1,43 +1,16 @@
-{-
- -  This is strictly 32-bit mode x86 assembler.
- -  this is a draft version, see the new code in src/
- -}
+module X86Opcodes (
+  Operation(..),
+  OpOperand(..),
+  Serializable(..),
+  SIB, Displacement,
+) where
 
-import Data.Word
-import Data.Int
-import Data.Bits
-import Data.Char
-import Data.List
-import Data.Maybe (fromJust)
+import HasmImports
+import X86CPU
+
 import Data.Binary.Put (putWord32le, putWord16le, runPut)
-import Data.ByteString.Lazy.Internal (unpackBytes)
+import Data.ByteString.Lazy (unpack)
 import qualified Data.ByteString as B
-import Text.Printf (printf)
-import System.IO (hFlush, stdout)
-
-int :: (Integral a, Num b) => a -> b
-int = fromIntegral
-
-data GPRegister = RegEAX | RegECX | RegEDX | RegEBX | RegESP | RegEBP | RegESI | RegEDI
-                    deriving (Show, Read, Eq)
-data GPRegisterW = RegAX | RegCX | RegDX | RegBX | RegSP | RegBP | RegSI | RegDI
-                    deriving (Show, Read, Eq)
-data GPRegisterB = RegAL | RegCL | RegDL | RegBL
-                 | RegAH | RegCH | RegDH | RegBH
-                 | RegSPL | RegBPL | RegSIL | RegDIL
-               deriving (Show, Read, Eq)
-data SegRegister = RegCS | RegSS | RegDS | RegES | RegFS | RegGS
-                    deriving (Show, Read, Eq)
-
-allGPRegs = [RegEAX, RegECX, RegEDX, RegEBX, RegESP, RegEBP, RegESI, RegEDI]
-allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
-allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
-allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
-
-data Directive = DrctvText | DrctvData | DrctvAsciz String | DrctvAscii String
-               | DrctvAlign Int | DrctvFile String
-
-data Label = Label String
 
 data OpPrefix
     = PreLock | PreREP | PreREPE | PreREPZ | PreREPNE | PreREPNZ
@@ -165,31 +138,6 @@ data Operation
     | OpMov OpOperand OpOperand
   deriving (Show, Read)
 
-data HAsmStmt = HAsmDirective Directive
-              | HAsmOperation (Maybe OpPrefix) Operation
-              | HAsmLabel Label
-
-type HAsmSource = [HAsmStmt]
-
-
-{-
- - Indexable: enumerations to bit representation
- -}
-class Indexable a where
-    index :: a -> Word8
-
-instance Indexable GPRegister where
-    index reg = fromJust $ lookup reg (zip allGPRegs [0..7])
-instance Indexable GPRegisterW where
-    index reg = fromJust $ lookup reg (zip allGPWRegs [0..7])
-instance Indexable GPRegisterB where
-    index reg = case lookup reg (zip allGPBRegs [0..7]) of
-                    Just ind -> ind
-                    Nothing -> error "SPL/BPL/SIL/DIL registers can't be indexed"
-instance Indexable SegRegister where
-    index reg = fromJust $ lookup reg (zip allSegRegs [0..5])
-
-
 {-
  - Serializable: make bytecode from an assembly expression
  -}
@@ -215,16 +163,16 @@ preLW = head $ bytecode PreAddrOverride
 instance Serializable Word8 where
     bytecode imm8 = [imm8]
 instance Serializable Word16 where
-    bytecode = unpackBytes . runPut . putWord16le
+    bytecode = unpack . runPut . putWord16le
 instance Serializable Word32 where
-    bytecode = unpackBytes . runPut . putWord32le
+    bytecode = unpack . runPut . putWord32le
 
 instance Serializable Int8 where
     bytecode imm8 = [fromIntegral imm8]
 instance Serializable Int16 where
-    bytecode = unpackBytes . runPut . putWord32le . int
+    bytecode = unpack . runPut . putWord32le . int
 instance Serializable Int32 where
-    bytecode = unpackBytes . runPut . putWord32le . int
+    bytecode = unpack . runPut . putWord32le . int
 
 instance Serializable Operation where
     bytecode (OpPush op) =      bytesPush op
@@ -327,11 +275,3 @@ bytesMov opsr@(OpndSegReg _) opr@(OpndRegW _) = (0x8c : makeModRM opsr opr)
 
 bytesMov _ _ = error "Invalid operands"
 
-hexBytecode :: [Word8] -> String
-hexBytecode = concat . map (printf "%02x ")
-
-main = do
-    putStr "**HASM**> " >> hFlush stdout
-    op <- readLn :: IO Operation
-    putStrLn $ hexBytecode $ bytecode op
-    main
