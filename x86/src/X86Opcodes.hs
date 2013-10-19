@@ -12,30 +12,6 @@ import Data.Binary.Put (putWord32le, putWord16le, runPut)
 import Data.ByteString.Lazy (unpack)
 import qualified Data.ByteString as B
 
-data OpPrefix
-    = PreLock | PreREP | PreREPE | PreREPZ | PreREPNE | PreREPNZ
-    | PreCS | PreSS | PreDS | PreES | PreFS | PreGS
-    | PreAddrOverride | PreOffsetOverride
-  deriving (Show, Read, Eq)
-
-data OpOperand
-    = OpndRelB Int8 | OpndRel Int32
-    | OpndPtr Int16 Int32
-    | OpndRegB GPRegisterB | OpndRegW GPRegisterW
-    | OpndReg GPRegister
-    | OpndSegReg SegRegister
-    | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
-    | OpndMemW Int16 | OpndMem Int32 | OpndRM SIB Displacement
- deriving (Show, Read)
-
-
-data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
-                      deriving (Show, Read)
-
--- don't use record syntax here because `deriving Read` requires all
--- fields to be explicitly named, it's burdensome.
-data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
-             deriving (Show, Read, Eq)
 
 -- make ModRM, possible SIB and/or Displacement taken from the second OpOperand
 makeModRM :: OpOperand -> OpOperand -> [Word8]
@@ -128,15 +104,6 @@ scaling factor = case lookup factor (zip [1,2,4,8] [0,1,2,3]) of
                     Just sc -> sc
                     Nothing -> error "scaling must be one of 1,2,4,8"
 sibbyte sc ind base = (scaling sc `shiftL` 6) .|. (index ind `shiftL` 3) .|. index base
-
-data Operation
-    = OpPush OpOperand
-    | OpRet (Maybe Word16)
-    | OpLRet (Maybe Word16)
-    | OpInt OpOperand
-    | OpAdd OpOperand OpOperand
-    | OpMov OpOperand OpOperand
-  deriving (Show, Read)
 
 {-
  - Serializable: make bytecode from an assembly expression

@@ -38,3 +38,39 @@ instance Indexable SegRegister where
     index reg = fromJust $ lookup reg (zip allSegRegs [0..5])
 
 
+{-
+ - Machine operations
+ -}
+data Operation
+    = OpPush OpOperand
+    | OpRet (Maybe Word16)
+    | OpLRet (Maybe Word16)
+    | OpInt OpOperand
+    | OpAdd OpOperand OpOperand
+    | OpMov OpOperand OpOperand
+  deriving (Show, Read)
+
+data OpPrefix
+    = PreLock | PreREP | PreREPE | PreREPZ | PreREPNE | PreREPNZ
+    | PreCS | PreSS | PreDS | PreES | PreFS | PreGS
+    | PreAddrOverride | PreOffsetOverride
+  deriving (Show, Read, Eq)
+
+data OpOperand
+    = OpndRelB Int8 | OpndRel Int32
+    | OpndPtr Int16 Int32
+    | OpndRegB GPRegisterB | OpndRegW GPRegisterW
+    | OpndReg GPRegister
+    | OpndSegReg SegRegister
+    | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
+    | OpndMemW Int16 | OpndMem Int32 | OpndRM SIB Displacement
+ deriving (Show, Read)
+
+data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
+                      deriving (Show, Read)
+
+-- don't use record syntax here because `deriving Read` requires all
+-- fields to be explicitly named, it's burdensome.
+data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
+             deriving (Show, Read, Eq)
+
