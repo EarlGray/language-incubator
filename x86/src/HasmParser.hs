@@ -114,7 +114,7 @@ hasmLexer ('%':ss) = TokChar '%' : hasmLexer ss
 hasmLexer ('$':ss) = 
   case hasmReadInt ss of
     [(num, rest)] -> TokImmInt num : hasmLexer rest
-    [] -> TokChar '$' : hasmLexer ss
+    _ -> TokChar '$' : hasmLexer ss
 
 hasmLexer (s:ss) 
   | s `elem` symStart = 
@@ -139,9 +139,8 @@ hasmReadInt ('0':s:ss)
   | s `elem` "bB" = readBin ss
   | s `elem` "xX" = readHex ss
   | isOctDigit s = readOct (s:ss)
-  | otherwise = [(0, s:ss)]
 hasmReadInt (s:ss)
-  | isDigit s = readDec ss
+  | isDigit s = readDec (s:ss)
 hasmReadInt _ = []
 
 readBin :: String -> [(Int, String)]
