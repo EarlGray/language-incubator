@@ -242,3 +242,11 @@ bytesMov opsr@(OpndSegReg _) opr@(OpndRegW _) = (0x8c : makeModRM opsr opr)
 
 bytesMov _ _ = error "Invalid operands"
 
+
+-- JMP
+bytesJmp :: OpOperand -> [Word8]
+bytesJmp (OpndOffset jump) =
+    case jump of
+      JDispl8 d8 -> [0xeb, int d8]
+      JDispl32 d32 -> (0xe9 : bytecode d32)
+bytesJmp _ = error "Invalid operands"

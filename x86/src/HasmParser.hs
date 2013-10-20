@@ -2,10 +2,10 @@ module HasmParser where
 
 import Data.Char
 import Data.List
-import Data.Word
 import Numeric (readHex, readOct, readDec)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust)
 
+import HasmImports
 import X86CPU
 
 safeHead [] = Nothing
@@ -65,11 +65,13 @@ data Directive
   | DirError String
   | DirEnd  -- marks end of the assembly file, does not process anything from this point
   | DirEject  -- generate page break on assembly listings
+  deriving (Show)
 
 data HasmStatement
   = HasmStLabel String
   | HasmStDirective Directive
   | HasmStInstr [Maybe OpPrefix] Operation 
+  deriving (Show)
 
 {-
 hasmParse :: String -> [HasmStatement]
@@ -171,8 +173,74 @@ hasmReadString str (s:ss) = hasmReadString (s:str) ss
 {-
  -  Parse tokens
  -}
---parseTokens :: [Tokens] -> [HasmStatement]
---parseTokens = 
+parseTokens :: [Token] -> [HasmStatement]
+
+parseTokens [] = []
+parseTokens (TokSep : ts) = parseTokens ts
+parseTokens (TokSymbol sym : ts) =
+  case sym of
+    ('.':dir) -> let (stmt, ts') = readDirective dir ts
+                 in stmt : parseTokens ts'
+    _ -> let (stmt, ts') = readCommand (TokSymbol sym : ts)
+         in stmt : parseTokens ts'
+parseTokens (TokLabel label : ts) =
+  HasmStLabel label : parseTokens ts    -- TODO: check if there are such labels
+parseTokens (t:ts) = error $ "Error: unexpected '" ++ show t ++ "' in the program"
+
+
+readDirective :: String -> [Token] -> (HasmStatement, [Token])
+readDirective dir ts = 
+  case dir of
+    d | d `elem` ["data", "text"] -> 
+            case safeHead ts of
+              Just (TokInt n) -> (HasmStDirective (DirSection ('.':d) n ""), drop 2 ts)
+              Just TokSep -> (HasmStDirective (DirSection ('.':d) 0 ""), tail ts)
+              _ -> let unexptd = maybe "end-of-stream" show $ safeHead ts
+                   in error $ d ++ " directive must be followed by optional subsection num and separator, unexpected " ++ unexptd
+    "section" ->
+       case safeHead ts of
+         Just (TokSymbol name) -> 
+            case safeHead (tail ts) of
+              Just TokSep -> (HasmStDirective (DirSection name 0 ""), drop 2 ts)
+              Just tok -> error $ "unexpected .section argument: " ++ show tok
+              _ -> error $ "Unexpected end-of-stream"
+         Nothing -> error $ "unexpected end-of-stream"
+    d | d `elem` ["globl", "global"] ->
+        case readListOfSymbols ts of
+          [(syms, ts')] -> (HasmStDirective (DirGlobal syms), ts')
+          _ -> error ".global: a list of symbols expected"
+    _ -> error $ "Unknown directive: ." ++ dir   
+
+readCommand :: [Token] -> (HasmStatement, [Token])
+readCommand (t:ts) =
+  case t of
+    --mov | "mov" `isPrefixOf` mov ->
+    TokSymbol "int" ->
+        case safeHead ts of
+          Just (TokImmInt imm) ->
+            if imm < 0 || imm > 0xFF 
+            then error "interrupt number must be less than 0x100"
+            else case safeHead (tail ts) of
+                   Just TokSep -> (HasmStInstr [] (OpInt (OpndImmB $ int imm)), drop 2 ts)
+                   Just tok -> error $ "command is not delimited: " ++ show tok
+                   Nothing -> (HasmStInstr [] (OpInt (OpndImmB $ int imm)), [])
+                   -- TODO: handle prefixes
+          _ -> error $ "int must take an intr number, found " ++ show (safeHead ts)
+    TokSymbol op -> error $ "unexpected opcode: " ++ op
+    tok -> error $ "unexpected token " ++ show tok
+    {-"jmp" ->
+        case safeHead ts of
+          Just (TokSymbol label) -> 
+    -}
+               
+readListOfSymbols :: [Token] -> [([Symbol], [Token])]
+readListOfSymbols ts = readlst [] ts
+  where
+    readlst lst (TokSymbol sym : ts) =
+      case safeHead ts of
+        Just TokSep -> [(reverse lst, tail ts)]
+        Just TokComma -> readlst (sym : lst) (tail ts)
+        _ -> error "readListOfSymbols: unexpected end-of-stream"
 
 {-
  - Call Frame Info directives
@@ -197,3 +265,4 @@ data CFIInfo
   | CFIRetColumn Int
   | CFISignalFrame
   | CFIEscape 
+  deriving (Show, Eq)

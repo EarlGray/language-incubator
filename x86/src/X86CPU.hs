@@ -48,6 +48,7 @@ data Operation
     | OpInt OpOperand
     | OpAdd OpOperand OpOperand
     | OpMov OpOperand OpOperand
+    | OpJmp 
   deriving (Show, Read)
 
 data OpPrefix
@@ -57,14 +58,17 @@ data OpPrefix
   deriving (Show, Read, Eq)
 
 data OpOperand
-    = OpndRelB Int8 | OpndRel Int32
-    | OpndPtr Int16 Int32
-    | OpndRegB GPRegisterB | OpndRegW GPRegisterW
-    | OpndReg GPRegister
+    = OpndOffset Jump
     | OpndSegReg SegRegister
+    | OpndRegB GPRegisterB | OpndRegW GPRegisterW | OpndReg GPRegister
     | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
-    | OpndMemW Int16 | OpndMem Int32 | OpndRM SIB Displacement
+    | OpndRM SIB Displacement
  deriving (Show, Read)
+
+data Jump 
+    = JDispl8 Int8 | JDispl32 Int32 | JFar Word16 Word32 
+    | JIndex Int | JLabel String
+  deriving (Show, Read)
 
 data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
                       deriving (Show, Read)
