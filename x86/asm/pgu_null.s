@@ -16,4 +16,7 @@ _start:
   movl $0, %ebx
   int $0x80
 
+trash:
+  movl $trash, %edx
+  jmp *%edx
   movl b(%eax), %ecx
