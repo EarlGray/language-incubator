@@ -20,6 +20,19 @@ allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
 allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
 allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
 
+class NamedRegister a where
+  regByName :: String -> Maybe a
+instance NamedRegister GPRegister where
+  regByName name = lookup name lt
+      where lt = zip ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"] allGPRegs
+instance NamedRegister GPRegisterW where
+  regByName name = lookup name lt
+      where lt =  zip ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"] allGPWRegs
+instance NamedRegister GPRegisterB where
+  regByName name = lookup name lt
+      where lt = zip ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"] allGPBRegs
+instance NamedRegister SegRegister where
+  regByName name = lookup name $ zip ["es", "cs", "ss", "ds", "fs", "gs"] allSegRegs
 {-
  - Indexable: enumerations to bit representation
  -}
@@ -58,23 +71,21 @@ data OpPrefix
   deriving (Show, Read, Eq)
 
 data OpOperand
-    = OpndOffset Jump
-    | OpndSegReg SegRegister
+    = OpndSegReg SegRegister
     | OpndRegB GPRegisterB | OpndRegW GPRegisterW | OpndReg GPRegister
     | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
     | OpndRM SIB Displacement
  deriving (Show, Read)
 
-data Jump 
-    = JDispl8 Int8 | JDispl32 Int32 | JFar Word16 Word32 
-    | JIndex Int | JLabel String
+data Displacement 
+    = NoDispl 
+    | Displ8 Word8 
+    | Displ32 Word32 
+    | DisplAddr Word32 
+    | DisplLabel Symbol
   deriving (Show, Read)
-
-data Displacement = NoDispl | Displ8 Int8 | Displ32 Int32
-                      deriving (Show, Read)
 
 -- don't use record syntax here because `deriving Read` requires all
 -- fields to be explicitly named, it's burdensome.
-data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
+data SIB = NoSIB | SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
              deriving (Show, Read, Eq)
-
