@@ -3,7 +3,6 @@ module HasmTypes where
 import HasmImports
 import X86CPU
 
-type Symbol = String
 type Label = String
 
 data Directive

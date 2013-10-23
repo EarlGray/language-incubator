@@ -54,14 +54,12 @@ instance Indexable SegRegister where
 {-
  - Machine operations
  -}
-data Operation
-    = OpPush OpOperand
-    | OpRet (Maybe Word16)
-    | OpLRet (Maybe Word16)
-    | OpInt OpOperand
-    | OpAdd OpOperand OpOperand
-    | OpMov OpOperand OpOperand
-    | OpJmp 
+type Symbol = String
+
+data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp 
+  deriving (Show, Read, Eq)
+
+data Operation = Operation Instr [OpOperand]
   deriving (Show, Read)
 
 data OpPrefix

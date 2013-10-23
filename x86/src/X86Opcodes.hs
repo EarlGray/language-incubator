@@ -8,6 +8,7 @@ module X86Opcodes (
 import HasmImports
 import X86CPU
 
+import Data.Maybe (fromJust)
 import Data.Binary.Put (putWord32le, putWord16le, runPut)
 import Data.ByteString.Lazy (unpack)
 import qualified Data.ByteString as B
@@ -35,15 +36,15 @@ makeModRM (OpndReg src) (OpndRM sib displ) = [modRM .|. (index src `shiftL` 3) ]
 
                -- (%reg), NoDisplacement:
                  -- (%ebp): an exception from registers, do a special street magic:
-                 ((SIB _ Nothing (Just reg)), NoDispl) | reg == RegEBP ->
+                 ((SIB _ Nothing (Just RegEBP)), NoDispl) ->
                      (useSIB, [0x65, 0x00])
                  -- (%reg):
                  ((SIB _ Nothing (Just reg)), NoDispl) ->
-                     (useSIB, [0x20 .|. index reg])
+                     (index reg, [])
 
                -- the same with Displ8:
                  -- $displ8(%esp) : it's a kind of magic again:
-                 ((SIB _ Nothing (Just reg)), Displ8 dspl8) | reg == RegESP ->
+                 ((SIB _ Nothing (Just RegESP)), Displ8 dspl8) ->
                      (useSIB .|. useDisplB, [0x24, int dspl8])
                  -- $displ8(%reg)
                  ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
@@ -51,14 +52,14 @@ makeModRM (OpndReg src) (OpndRM sib displ) = [modRM .|. (index src `shiftL` 3) ]
 
                -- $displ32(%reg)
                  -- $displ32(%esp)
-                 ((SIB _ Nothing (Just reg)), Displ32 dspl32) | reg == RegESP ->
+                 ((SIB _ Nothing (Just RegESP)), Displ32 dspl32) ->
                      (useSIB .|. useDisplL, (0x24 : bytecode dspl32))
                  -- $displ32(%reg)
                  ((SIB _ Nothing (Just reg)), Displ32 dspl32) ->
                      (index reg .|. useDisplL, bytecode dspl32)
 
                -- %esp cannot be index, never:
-                 ((SIB _ (Just ind) (Just base)), _) | ind == RegESP ->
+                 ((SIB _ (Just RegESP) (Just base)), _) ->
                      error "%esp cannot be index"
                -- (%ebp,%ind,sc)
                  ((SIB sc (Just ind) (Just base)), NoDispl) | base == RegEBP ->
@@ -90,6 +91,7 @@ makeModRM0 = makeModRM zeroReg
 -- these are stubs for embedding numerical value into modRM
 --  as required by /0 or /6 commands
 zeroReg = OpndReg RegEAX    -- sometimes: use immediate value
+fourReg = OpndReg RegESP
 sixReg = OpndReg RegEBP     -- use bare displacement
 
 -- modRM flags:
@@ -135,118 +137,136 @@ instance Serializable Word32 where
     bytecode = unpack . runPut . putWord32le
 
 instance Serializable Int8 where
-    bytecode imm8 = [fromIntegral imm8]
+    bytecode imm8 = [int imm8]
 instance Serializable Int16 where
     bytecode = unpack . runPut . putWord32le . int
 instance Serializable Int32 where
     bytecode = unpack . runPut . putWord32le . int
 
 instance Serializable Operation where
-    bytecode (OpPush op) =      bytesPush op
-    bytecode (OpRet mbClear) =  bytesRet mbClear
-    bytecode (OpLRet mbClear) = bytesLRet mbClear
-    bytecode (OpInt op) =       bytesInt op 
-    bytecode (OpAdd op1 op2) =  bytesAdd op1 op2
-    bytecode (OpMov op1 op2) =  bytesMov op1 op2
+  bytecode (Operation op opnds) =
+    case lookup op encoders of
+      Just encode -> encode opnds
+      Nothing -> error $ "No encoder for operation " ++ show op
+
+encoders = [
+  (OpAdd, bytesAdd), (OpMov, bytesMov), (OpPush, bytesPush), 
+  (OpRet, bytesRet), (OpLRet, bytesLRet), (OpInt, bytesInt),
+  (OpJmp, bytesJmp) ]
 
 -- PUSH
-bytesPush :: OpOperand -> [Word8]
-bytesPush (OpndSegReg sReg) =
-    case lookup sReg opcodes of
-      Just bytes -> bytes
-    where opcodes = [(RegES, [0x06]), (RegCS, [0x0e]), (RegSS, [0x16]),
-                     (RegDS, [0x1e]), (RegFS, [0x0f, 0xa0]), (RegGS, [0x0f, 0xa8])]
-bytesPush (OpndImmB imm8) = (0x6a : bytecode imm8)
-bytesPush (OpndImmL imm) = (0x68 : bytecode imm)
-bytesPush (OpndReg reg) = [0x50 + index reg]
-bytesPush oprm@(OpndRM _ _) = (0xff : makeModRM sixReg oprm)
+bytesPush :: [OpOperand] -> [Word8]
+bytesPush [opnd] = 
+  case opnd of 
+    OpndImmB immB -> (0x6a : bytecode immB)
+    OpndImmW immW -> (preLW : 0x68 : bytecode immW)
+    OpndImmL imm  -> (0x68 : bytecode imm)
+    OpndReg reg   -> [0x50 + index reg]
+    OpndSegReg sReg -> fromJust $ lookup sReg opcodes
+      where opcodes = [(RegES, [0x06]), (RegCS, [0x0e]), (RegSS, [0x16]),
+                       (RegDS, [0x1e]), (RegFS, [0x0f, 0xa0]), (RegGS, [0x0f, 0xa8])]
+    OpndRM _ _    -> (0xff : makeModRM sixReg opnd)
+bytesPush _ = []
 
 -- RET, LRET
-bytesRet, bytesLRet :: (Maybe Word16) -> [Word8]
-bytesRet (Just imm16) = (0xc2 : bytecode imm16)
-bytesRet _            = [0xc3]
-bytesLRet (Just imm16) = (0xca : bytecode imm16)
-bytesLRet _            = [0xcb]
+bytesRet, bytesLRet :: [OpOperand] -> [Word8]
+bytesRet [] = [0xc3]
+bytesRet [OpndImmW imm] = (0xc2 : bytecode imm)
+bytesRet _ = []
+
+bytesLRet [] = [0xcb]
+bytesLRet [OpndImmW imm] = (0xca : bytecode imm)
+bytesLRet _ = []
 
 -- INT
-bytesInt :: OpOperand -> [Word8]
-bytesInt (OpndImmB imm) | imm == 3  = [0xCC]
-bytesInt (OpndImmB imm) = [0xCD, imm]
-bytesInt _ = error "Invalid operand form for INT"
+bytesInt :: [OpOperand] -> [Word8]
+bytesInt [OpndImmB imm] 
+  | imm == 3    = [0xCC]
+  | otherwise   = [0xCD, imm]
+bytesInt _ = []
 
 -- ADD
-bytesAdd :: OpOperand -> OpOperand -> [Word8]
-bytesAdd (OpndImmB imm) (OpndRegB reg) | reg == RegAL  = (0x04 : bytecode imm)
-bytesAdd (OpndImmW imm) (OpndRegW reg) | reg == RegAX  = (preLW : 0x05 : bytecode imm)
-bytesAdd (OpndImmL imm) (OpndReg reg) | reg == RegEAX  = (0x05 : bytecode imm)
+bytesAdd :: [OpOperand] -> [Word8]
+bytesAdd [op1, op2] = 
+  case (op1, op2) of
+    (OpndImmB imm, OpndRegB reg) | reg == RegAL  -> (0x04 : bytecode imm)
+    (OpndImmW imm, OpndRegW reg) | reg == RegAX  -> (preLW : 0x05 : bytecode imm)
+    (OpndImmL imm, OpndReg reg)  | reg == RegEAX -> (0x05 : bytecode imm)
 
-bytesAdd (OpndImmB imm)   op2@(OpndRM _ _) = [0x80] ++ makeModRM0 op2 ++ bytecode imm
-bytesAdd (OpndImmW imm)   op2@(OpndRM _ _) = [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
-bytesAdd (OpndImmL imm)   op2@(OpndRM _ _) = [0x81] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmB imm, OpndRM _ _) -> [0x80] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmW imm, OpndRM _ _) -> [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmL imm, OpndRM _ _) -> [0x81] ++ makeModRM0 op2 ++ bytecode imm
+    
+    (OpndImmB imm, OpndRegB _) -> [0x80] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmW imm, OpndRegW _) -> [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmL imm, OpndReg _)  -> [0x81] ++ makeModRM0 op2 ++ bytecode imm
+    
+    (OpndImmB imm, OpndReg _)  -> [0x83] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmB imm, OpndRegW _) -> [preLW, 0x83] ++ makeModRM0 op2 ++ bytecode imm
+    
+    (OpndReg _,    OpndReg _)  -> (0x01 : makeModRM op1 op2)
+    (OpndRegW _,   OpndRegW _) -> (preLW : 0x01 : makeModRM op1 op2)
+    (OpndRegB _,   OpndRegB _) -> (0x00 : makeModRM op1 op2)
+    
+    (OpndReg _,    OpndRM _ _) -> (0x01 : makeModRM op1 op2)
+    (OpndRegW _,   OpndRM _ _) -> (preLW : 0x01 : makeModRM op1 op2)
+    (OpndRegB _,   OpndRM _ _) -> (0x00 : makeModRM op1 op2)
+    
+    (OpndRM _ _,   OpndRegB _) -> (0x02 : makeModRM op2 op1)
+    (OpndRM _ _,   OpndRegW _) -> (preLW : 0x03 : makeModRM op2 op1)
+    (OpndRM _ _,   OpndReg _)  -> (0x03 : makeModRM op2 op1)
 
-bytesAdd (OpndImmB imm) opreg@(OpndRegB _) = [0x80] ++ makeModRM0 opreg ++ bytecode imm
-bytesAdd (OpndImmW imm) opreg@(OpndRegW _) = [preLW, 0x81] ++ makeModRM0 opreg ++ bytecode imm
-bytesAdd (OpndImmL imm) opreg@(OpndReg _) = [0x81] ++ makeModRM0 opreg ++ bytecode imm
-
-bytesAdd (OpndImmB imm) opreg@(OpndReg _) = [0x83] ++ makeModRM0 opreg ++ bytecode imm
-bytesAdd (OpndImmB imm) opreg@(OpndRegW _) = [preLW, 0x83] ++ makeModRM0 opreg ++ bytecode imm
-
-bytesAdd op1@(OpndReg _)    op2@(OpndReg _) = (0x01 : makeModRM op1 op2)
-bytesAdd op1@(OpndRegW _)   op2@(OpndRegW _) = (preLW : 0x01 : makeModRM op1 op2)
-bytesAdd op1@(OpndRegB _)   op2@(OpndRegB _) = (0x00 : makeModRM op1 op2)
-
-bytesAdd op1@(OpndReg _)    op2@(OpndRM _ _) = (0x01 : makeModRM op1 op2)
-bytesAdd op1@(OpndRegW _)   op2@(OpndRM _ _) = (preLW : 0x01 : makeModRM op1 op2)
-bytesAdd op1@(OpndRegB _)   op2@(OpndRM _ _) = (0x00 : makeModRM op1 op2)
-
-bytesAdd op1@(OpndRM _ _)   op2@(OpndRegB _) = (0x02 : makeModRM op2 op1)
-bytesAdd op1@(OpndRM _ _)   op2@(OpndRegW _) = (preLW : 0x03 : makeModRM op2 op1)
-bytesAdd op1@(OpndRM _ _)   op2@(OpndReg _)  = (0x03 : makeModRM op2 op1)
-
-bytesAdd _ _ = error "ADD: invalid operands"
+bytesAdd _ = []
 
 
 -- MOV
-bytesMov :: OpOperand -> OpOperand -> [Word8]
+bytesMov :: [OpOperand] -> [Word8]
 
-bytesMov (OpndMem moffs) (OpndReg reg) | reg == RegEAX = (0xa1 : bytecode moffs)
-bytesMov (OpndMem moffs) (OpndRegW reg) | reg == RegAX = (preLW : 0xa1 : bytecode moffs)
-bytesMov (OpndMem moffs) (OpndRegB reg) | reg == RegAL = (0xa0 : bytecode moffs)
+bytesMov [op1, op2] = 
+  case (op1, op2) of
+    (OpndRM NoSIB (DisplAddr moffs), OpndReg RegEAX) -> (0xa1 : bytecode moffs)
+    (OpndRM NoSIB (DisplAddr moffs), OpndRegW RegAX) -> (preLW : 0xa1 : bytecode moffs)
+    (OpndRM NoSIB (DisplAddr moffs), OpndRegB RegAL) -> (0xa0 : bytecode moffs)
 
-bytesMov (OpndReg reg) (OpndMem moffs) | reg == RegEAX = (0xa3 : bytecode moffs)
-bytesMov (OpndRegW reg) (OpndMem moffs) | reg == RegAX = (preLW : 0xa3 : bytecode moffs)
-bytesMov (OpndRegB reg) (OpndMem moffs) | reg == RegAL = (0xa2 : bytecode moffs)
+    (OpndReg RegEAX, OpndRM NoSIB (DisplAddr moffs)) -> (0xa3 : bytecode moffs)
+    (OpndRegW RegAX, OpndRM NoSIB (DisplAddr moffs)) -> (preLW : 0xa3 : bytecode moffs)
+    (OpndRegB RegAL, OpndRM NoSIB (DisplAddr moffs)) -> (0xa2 : bytecode moffs)
+    
+    (OpndReg _,    OpndReg _)  -> (0x89 : makeModRM op1 op2)
+    (OpndRegW _,   OpndRegW _) -> (preLW : 0x89 : makeModRM op1 op2)
+    (OpndRegB _,   OpndRegB _) -> (0x88 : makeModRM op1 op2)
+    
+    (OpndReg _,    OpndRM _ _) -> (0x89 : makeModRM op1 op2)
+    (OpndRegW _,   OpndRM _ _) -> (preLW : 0x89 : makeModRM op1 op2)
+    (OpndRegB _,   OpndRM _ _) -> (0x88 : makeModRM op1 op2)
+    
+    (OpndRM _ _,   OpndReg _)  -> (0x8b : makeModRM op2 op1)
+    (OpndRM _ _,   OpndRegW _) -> (preLW : 0x8b : makeModRM op2 op1)
+    (OpndRM _ _,   OpndRegB _) -> (0x8a : makeModRM op2 op1)
+    
+    (OpndImmL imm, OpndReg reg)  -> (0xb8 + index reg : bytecode imm)
+    (OpndImmW imm, OpndRegW reg) -> (preLW : 0xb8 + index reg : bytecode imm)
+    (OpndImmB imm, OpndRegB reg) -> (0xb0 + index reg : bytecode imm)
+    
+    (OpndImmL imm, OpndRM _ _) -> [0xc6] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmW imm, OpndRM _ _) -> [preLW, 0xc7] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImmB imm, OpndRM _ _) -> [0xc7] ++ makeModRM0 op2 ++ bytecode imm
 
-bytesMov op1@(OpndReg _)    op2@(OpndReg _) = (0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegW _)   op2@(OpndRegW _) = (preLW : 0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegB _)   op2@(OpndRegB _) = (0x88 : makeModRM op1 op2)
+    (OpndRegW _,   OpndSegReg _) -> (0x8e : makeModRM op2 op1)
+    (OpndSegReg _, OpndRegW _)   -> (0x8c : makeModRM op1 op2)
 
-bytesMov op1@(OpndReg _)    op2@(OpndRM _ _) = (0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegW _)   op2@(OpndRM _ _) = (preLW : 0x89 : makeModRM op1 op2)
-bytesMov op1@(OpndRegB _)   op2@(OpndRM _ _) = (0x88 : makeModRM op1 op2)
-
-bytesMov op2@(OpndRM _ _)   op1@(OpndReg _)    = (0x8b : makeModRM op1 op2)
-bytesMov op2@(OpndRM _ _)   op1@(OpndRegW _)   = (preLW : 0x8b : makeModRM op1 op2)
-bytesMov op2@(OpndRM _ _)   op1@(OpndRegB _)   = (0x8a : makeModRM op1 op2)
-
-bytesMov (OpndImmL imm) (OpndReg reg) = (0xb8 + index reg : bytecode imm)
-bytesMov (OpndImmW imm) (OpndRegW reg) = (preLW : 0xb8 + index reg : bytecode imm)
-bytesMov (OpndImmB imm) (OpndRegB reg) = (0xb0 + index reg : bytecode imm)
-
-bytesMov (OpndImmL imm) oprm@(OpndRM _ _) = [0xc6] ++ makeModRM0 oprm ++ bytecode imm
-bytesMov (OpndImmW imm) oprm@(OpndRM _ _) = [preLW, 0xc7] ++ makeModRM0 oprm ++ bytecode imm
-bytesMov (OpndImmB imm) oprm@(OpndRM _ _) = [0xc7] ++ makeModRM0 oprm ++ bytecode imm
-
-bytesMov opr@(OpndRegW _) opsr@(OpndSegReg _) = (0x8e : makeModRM opsr opr)
-bytesMov opsr@(OpndSegReg _) opr@(OpndRegW _) = (0x8c : makeModRM opsr opr)
-
-bytesMov _ _ = error "Invalid operands"
+bytesMov _ = []
 
 
 -- JMP
-bytesJmp :: OpOperand -> [Word8]
-bytesJmp (OpndOffset jump) =
-    case jump of
-      JDispl8 d8 -> [0xeb, int d8]
-      JDispl32 d32 -> (0xe9 : bytecode d32)
-bytesJmp _ = error "Invalid operands"
+bytesJmp :: [OpOperand] -> [Word8]
+bytesJmp [op] =
+    case op of
+      -- treat displacement as offset from EIP
+      OpndRM NoSIB (Displ8 moffs8) -> [0xeb, int moffs8]
+      OpndRM NoSIB (Displ32 moffs) -> (0xe9 : bytecode (int moffs :: Word16))
+      -- treat ModRM/register value as absolute indirect offset
+      --  e,g, jmp *0x100000, jmp *%eax, etc
+      OpndReg _ -> (0xff : makeModRM fourReg op)
+      OpndRM _ _ -> (0xff : makeModRM fourReg op)
+bytesJmp _ = []

@@ -20,3 +20,7 @@ trash:
   movl $trash, %edx
   jmp *%edx
   movl b(%eax), %ecx
+  movb 0xFF, %ah
+  pushw $0x1020
+  jmp *0x100000
+  mov %al,0xfecd
