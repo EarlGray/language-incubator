@@ -2,11 +2,16 @@ module X86Opcodes (
   Operation(..),
   OpOperand(..),
   Serializable(..),
+  Symbol,
   SIB, Displacement,
 ) where
 
-import HasmImports
 import X86CPU
+import HasmTypes
+
+import Data.Word
+import Data.Int
+import Data.Bits
 
 import Data.Maybe (fromJust)
 import Data.Binary.Put (putWord32le, putWord16le, runPut)

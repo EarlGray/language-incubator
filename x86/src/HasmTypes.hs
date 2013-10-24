@@ -1,9 +1,40 @@
-module HasmTypes where
+module HasmTypes (
+  module Data.Word,
+  module Data.Int,
+  module X86CPU,
+  -- routines:
+  safeHead, int,
 
-import HasmImports
+  HasmStatement(..), Directive(..), 
+  ParseResult, HasmStmtWithPos, SourcePos(..)
+) where
+
 import X86CPU
 
-type Label = String
+import Data.Word
+import Data.Int
+
+int :: (Integral a, Num b) => a -> b
+int = fromIntegral
+
+safeHead :: [a] -> Maybe a
+safeHead [] = Nothing
+safeHead (s:_) = Just s
+
+data HasmStatement
+  = HasmStLabel String
+  | HasmStDirective Directive
+  | HasmStInstr [Maybe OpPrefix] Operation 
+  deriving (Show)
+
+data SourcePos = SourcePos String !Int !Int deriving (Eq, Ord)
+            
+instance Show SourcePos where
+  show (SourcePos src line col) = src ++ ":" ++ show line ++ ":" ++ show col
+
+type HasmStmtWithPos = (HasmStatement, SourcePos)
+
+type ParseResult = [(HasmStatement, SourcePos)]
 
 data Directive
   -- location control directives:
@@ -56,12 +87,6 @@ data Directive
   | DirError String
   | DirEnd  -- marks end of the assembly file, does not process anything from this point
   | DirEject  -- generate page break on assembly listings
-  deriving (Show)
-
-data HasmStatement
-  = HasmStLabel String
-  | HasmStDirective Directive
-  | HasmStInstr [Maybe OpPrefix] Operation 
   deriving (Show)
 
 {-

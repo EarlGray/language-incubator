@@ -5,14 +5,12 @@ import Data.List (intercalate)
 import Control.Applicative ((<$>), (<*), liftA2)
 import Control.Monad (when)
 
-import Text.Parsec
+import Text.Parsec hiding (SourcePos)
 import Text.Parsec.String (Parser)
 
 import HasmImports
 import HasmTypes
 import X86CPU
-
-type ParseResult = [(HasmStatement, SourcePos)]
 
 hasmParseFile :: FilePath -> IO (Either ParseError ParseResult)
 hasmParseFile fname = hasmParseWithSource fname <$> readFile fname
