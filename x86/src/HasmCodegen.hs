@@ -76,12 +76,14 @@ assembleOperations (_, lbldb) [] = Right (lbldb, [])
 assembleOperations (addr, lbldb) ((stmt, pos):rest) =
   case stmt of
     HasmStLabel label -> 
-      assembleOperations (addr, M.insert label addr lbldb) rest
+      case M.lookup label lbldb of
+        Nothing -> assembleOperations (addr, M.insert label addr lbldb) rest
+        Just _ -> Left $ show pos ++ ": label redefinition for `" ++ label ++ "'"
     HasmStDirective dir ->
       case dir of
         _ -> Left $ show pos ++ ": failed to assemble directive: " ++ show dir
     HasmStInstr prefs oper@(Operation op opnds) ->
-      case bytecode oper of
+      case bytecode oper of     -- TODO: `bytecode` may raise errors, make it safe
         [] -> Left $ show pos ++ ": failed to assemble instruction: " ++ show oper
         bs -> Arr.right (\(l, hbops) -> (l, hbop : hbops)) assembled
                 where assembled = assembleOperations (addr + oplen hbop, lbldb) rest
