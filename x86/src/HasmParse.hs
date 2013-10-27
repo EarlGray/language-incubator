@@ -91,4 +91,25 @@ readOperation :: String -> [OpOperand] -> Either String Operation
 readOperation opname args =
   case opname of
     "mov" -> Right $ Operation OpMov args
+    "ret" -> 
+      case args of
+        [] ->            Right $ Operation OpRet []
+        [OpndImm imm] -> (immw -> Operation OpRet [OpndImm immw]) `Arr.right` immToW imm
+        _ -> Left "ret may take only an optional 16-bit value"
+    "int" -> 
+      case args of
+        [OpndImm imm] -> (immb -> Operation OpInt [OpndImm immb]) `Arr.right` immToB imm
+        _ -> Left $ "int must take a 8-bit interrupt number"
     _ -> Left $ "Unknown operation: " ++ opname
+
+immToW :: ImmValue -> Either String ImmValue
+immToW (ImmW imm) = Right (ImmW imm)
+immToW (ImmB imm) = Right (ImmW (int imm))
+immToW (ImmL imm) | imm < 0x10000 = Right (ImmW (int imm))
+immToW imm = Left $ "Value " ++ show imm ++ " is too large for a word"
+
+immToB :: ImmValue -> Either String ImmValue
+immToB (ImmB imm) = Right (ImmB imm)
+immToB (ImmW imm) | imm < 0x100 = Right (ImmB (int imm))
+immToB (ImmL imm) | imm < 0x100 = Right (ImmB (int imm))
+immToW imm = Left $ "Value " ++ show imm ++ " is too large for a word"

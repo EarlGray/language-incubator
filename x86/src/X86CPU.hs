@@ -4,35 +4,56 @@ import Data.Word
 import Data.Int
 import Data.Maybe (fromJust)
 
-data GPRegister = RegEAX | RegECX | RegEDX | RegEBX | RegESP | RegEBP | RegESI | RegEDI
-                    deriving (Show, Read, Eq)
-data GPRegisterW = RegAX | RegCX | RegDX | RegBX | RegSP | RegBP | RegSI | RegDI
-                    deriving (Show, Read, Eq)
-data GPRegisterB = RegAL | RegCL | RegDL | RegBL
-                 | RegAH | RegCH | RegDH | RegBH
-                 | RegSPL | RegBPL | RegSIL | RegDIL
-               deriving (Show, Read, Eq)
-data SegRegister = RegCS | RegSS | RegDS | RegES | RegFS | RegGS
-                    deriving (Show, Read, Eq)
+data Register 
+    = RegL GPRegister | RegW GPRegisterW
+    | RegB GPRegisterB | SReg SegRegister
+  deriving (Show, Read, Eq)
+
+data GPRegister 
+    = RegEAX | RegECX | RegEDX | RegEBX 
+    | RegESP | RegEBP | RegESI | RegEDI
+  deriving (Show, Read, Eq)
+data GPRegisterW 
+    = RegAX | RegCX | RegDX | RegBX 
+    | RegSP | RegBP | RegSI | RegDI
+  deriving (Show, Read, Eq)
+data GPRegisterB 
+    = RegAL | RegCL | RegDL | RegBL
+    | RegAH | RegCH | RegDH | RegBH
+    | RegSPL | RegBPL | RegSIL | RegDIL
+  deriving (Show, Read, Eq)
+data SegRegister 
+    = RegCS | RegSS 
+    | RegDS | RegES | RegFS | RegGS
+  deriving (Show, Read, Eq)
+
+data ImmValue = ImmL Word32 | ImmW Word16 | ImmB Word8 deriving (Show, Read, Eq)
 
 allGPRegs = [RegEAX, RegECX, RegEDX, RegEBX, RegESP, RegEBP, RegESI, RegEDI]
 allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
 allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
 allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
 
-class NamedRegister a where
-  regByName :: String -> Maybe a
-instance NamedRegister GPRegister where
-  regByName name = lookup name lt
-      where lt = zip ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"] allGPRegs
-instance NamedRegister GPRegisterW where
-  regByName name = lookup name lt
-      where lt =  zip ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"] allGPWRegs
-instance NamedRegister GPRegisterB where
-  regByName name = lookup name lt
-      where lt = zip ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"] allGPBRegs
-instance NamedRegister SegRegister where
-  regByName name = lookup name $ zip ["es", "cs", "ss", "ds", "fs", "gs"] allSegRegs
+lkupRegL = zip ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"] allGPRegs
+lkupRegW = zip ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"] allGPWRegs
+lkupRegB = zip ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"] allGPBRegs
+lkupSReg = zip ["es", "cs", "ss", "ds", "fs", "gs"] allSegRegs
+
+mbRegByName :: String -> Maybe Register
+mbRegByName rname =
+  case lookup rname lkupRegL of
+    Just reg -> Just $ RegL reg
+    Nothing ->
+      case lookup rname lkupRegW of
+        Just reg -> Just $ RegW reg
+        Nothing ->
+          case lookup rname lkupRegB of
+            Just reg -> Just $ RegB reg
+            Nothing -> 
+              case lookup rname lkupSReg of
+                Just reg -> Just $ SReg reg
+                Nothing -> Nothing
+
 {-
  - Indexable: enumerations to bit representation
  -}
@@ -50,6 +71,11 @@ instance Indexable GPRegisterB where
 instance Indexable SegRegister where
     index reg = fromJust $ lookup reg (zip allSegRegs [0..5])
 
+indexOfReg :: Register -> Word8
+indexOfReg (RegL reg) = index reg
+indexOfReg (RegW reg) = index reg
+indexOfReg (RegB reg) = index reg
+indexOfReg (SReg sr) = index sr
 
 {-
  - Machine operations
@@ -60,7 +86,7 @@ data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp
   deriving (Show, Read, Eq)
 
 data Operation = Operation Instr [OpOperand]
-  deriving (Show, Read)
+  deriving (Show, Read, Eq)
 
 data OpPrefix
     = PreLock | PreREP | PreREPE | PreREPZ | PreREPNE | PreREPNZ
@@ -69,21 +95,21 @@ data OpPrefix
   deriving (Show, Read, Eq)
 
 data OpOperand
-    = OpndSegReg SegRegister
-    | OpndRegB GPRegisterB | OpndRegW GPRegisterW | OpndReg GPRegister
-    | OpndImmB Word8 | OpndImmW Word16 | OpndImmL Word32
+    = OpndReg Register
+    | OpndImm ImmValue
     | OpndRM SIB Displacement
- deriving (Show, Read)
+ deriving (Show, Read, Eq)
 
 data Displacement 
-    = NoDispl 
-    | Displ8 Word8 
-    | Displ32 Word32 
-    | DisplAddr Word32 
+    = NoDispl
+    | Displ8 Word8
+    | Displ32 Word32
     | DisplLabel Symbol
-  deriving (Show, Read)
+  deriving (Show, Read, Eq)
 
 -- don't use record syntax here because `deriving Read` requires all
 -- fields to be explicitly named, it's burdensome.
-data SIB = NoSIB | SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
+data SIB = SIB Word8 (Maybe GPRegister) (Maybe GPRegister)
              deriving (Show, Read, Eq)
+
+noSIB = SIB 1 Nothing Nothing

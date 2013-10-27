@@ -25,7 +25,7 @@ data HasmStatement
   = HasmStLabel String
   | HasmStDirective Directive
   | HasmStInstr [Maybe OpPrefix] Operation 
-  deriving (Show)
+  deriving (Show, Read, Eq)
 
 data SourcePos = SourcePos String !Int !Int deriving (Eq, Ord)
             
@@ -87,7 +87,7 @@ data Directive
   | DirError String
   | DirEnd  -- marks end of the assembly file, does not process anything from this point
   | DirEject  -- generate page break on assembly listings
-  deriving (Show)
+  deriving (Show, Read, Eq)
 
 {-
  - Call Frame Info directives
@@ -112,4 +112,4 @@ data CFIInfo
   | CFIRetColumn Int
   | CFISignalFrame
   | CFIEscape 
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq)
