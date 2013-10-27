@@ -262,6 +262,8 @@ bytesMov [op1, op2] =
     (OpndReg (SReg _), OpndReg (RegW _)) -> (0x8c : makeModRM op1 op2)
     (OpndReg (SReg _), OpndRM _ _)       -> (0x8c : makeModRM op1 op2)
 
+    _ -> error $ "failed to assemble operands: " ++ show op1 ++ ", " ++ show op2
+
 bytesMov _ = []
 
 

@@ -24,7 +24,8 @@ mainParseAssemble = do
     ln <- getLine
     case hasmParseWithSource "stdin" (ln ++ "\n") of
       Left e -> putStrLn $ "Syntax ERROR\n" ++ show e
-      Right pstmts ->
+      Right pstmts -> do
+        --print pstmts
         case assembleFromZero pstmts of
           Left e -> putStrLn $ "Codegen ERROR\n" ++ e
           Right (lbldb, hbops) -> do

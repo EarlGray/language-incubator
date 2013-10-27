@@ -97,8 +97,8 @@ firstPass (addr, lbldb) ((stmt, pos):pstmsts) =
                   Left e -> Left e
                   Right (lbldb', hbops') ->
                     case mbLbl of
-                      Nothing -> Right $ (lbldb, WholeOp bs : hbops')
-                      Just label -> Right $ (lbldb, HoleOp stmt label : hbops')
+                      Nothing -> Right $ (lbldb', WholeOp bs : hbops')
+                      Just label -> Right $ (lbldb', HoleOp stmt label : hbops')
           Left e -> Left $ show e
 
 -- if there is a label in the argument, returns (fakeOperation, Just lbl)
