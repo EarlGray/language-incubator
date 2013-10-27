@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module HasmTypes (
   module Data.Word,
   module Data.Int,
@@ -6,7 +7,7 @@ module HasmTypes (
   safeHead, int,
 
   HasmStatement(..), Directive(..), 
-  ParseResult, HasmStmtWithPos, SourcePos(..)
+  ParseResult, HasmStmtWithPos, SrcPos(..)
 ) where
 
 import X86CPU
@@ -27,14 +28,14 @@ data HasmStatement
   | HasmStInstr [Maybe OpPrefix] Operation 
   deriving (Show, Read, Eq)
 
-data SourcePos = SourcePos String !Int !Int deriving (Eq, Ord)
+data SrcPos = SrcPos String !Int !Int deriving (Eq, Ord)
             
-instance Show SourcePos where
-  show (SourcePos src line col) = src ++ ":" ++ show line ++ ":" ++ show col
+instance Show SrcPos where
+  show (SrcPos src line col) = src ++ ":" ++ show line ++ ":" ++ show col
 
-type HasmStmtWithPos = (HasmStatement, SourcePos)
+type HasmStmtWithPos = (HasmStatement, SrcPos)
 
-type ParseResult = [(HasmStatement, SourcePos)]
+type ParseResult = [(HasmStatement, SrcPos)]
 
 data Directive
   -- location control directives:

@@ -13,10 +13,16 @@ import Numeric (showHex)
 import HasmTypes
 import X86Opcodes
 
-data HalfBakedOp 
-    = WholeOp [Word8]          
-    | HoleOp HasmStatement Symbol 
-  deriving (Show, Read, Eq)     
+import Control.Exception
+import System.IO.Unsafe (unsafePerformIO)
+
+unsafeCatchError :: a -> Either ErrorCall a
+unsafeCatchError = unsafePerformIO . try . evaluate 
+
+data HalfBakedOp
+    = WholeOp [Word8]
+    | HoleOp HasmStatement Symbol
+  deriving (Show, Read, Eq)
 
 type Addr = Word32
 type Offset = Word32
@@ -85,14 +91,15 @@ firstPass (addr, lbldb) ((stmt, pos):pstmsts) =
         _ -> Left $ show pos ++ ": failed to assemble directive: " ++ show dir
     HasmStInstr prefs oper@(Operation op opnds) ->
       let (oper', mbLbl) = fakeOperation oper
-      in case bytecode oper' of
-          [] -> Left $ show pos ++ ": failed to assemle instruction: " ++ show oper
-          bs -> case firstPass (addr + (int $ length bs), lbldb) pstmsts of
+      in case unsafeCatchError (bytecode oper') of
+          Right [] -> Left $ show pos ++ ": failed to assemle instruction: " ++ show oper
+          Right bs -> case firstPass (addr + (int $ length bs), lbldb) pstmsts of
                   Left e -> Left e
                   Right (lbldb', hbops') ->
                     case mbLbl of
                       Nothing -> Right $ (lbldb, WholeOp bs : hbops')
                       Just label -> Right $ (lbldb, HoleOp stmt label : hbops')
+          Left e -> Left $ show e
 
 -- if there is a label in the argument, returns (fakeOperation, Just lbl)
 -- if the operation is label-free, returns (the_same_operation, Nothing)
@@ -114,7 +121,7 @@ secondPass addr lbldb
 
 --- temporary test values ----
 assembleFromZero = firstPass (0, M.empty)
-withTestSrc = map (\s -> (s, SourcePos "test.s" 0 0))
+withTestSrc = map (\s -> (s, SrcPos "test.s" 0 0))
 
 -- > assembleFromZero $ withTestSrc linux_null_s
 movinstr = HasmStInstr [] . Operation OpMov 

@@ -3,13 +3,15 @@
 # $ gcc -m32 pgu_null.s -o pgu_null.o
 # $ ld -melf_i386 pgu_null.o -o pgu_null
 #
-.section .data
+#.section .data
+.data
 a:
-.long 0xdeadbeef
+#.long 0xdeadbeef
 b:
-.long 0xfaceb001
+#.long 0xfaceb001
 
-.section .text
+#.section .text
+.text
 .globl _start
 _start:
   movl $1, %eax
