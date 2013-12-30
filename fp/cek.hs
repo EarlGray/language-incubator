@@ -52,11 +52,11 @@ lookupEnv v e =
  - CEK machine
  -}
 step :: State -> State
-step (MRef x,         e,  k)                  = (MVal (lookupEnv x e),    e, k)
-step (MAp m1 m2,      e,  k)                  = (m1,                      e, KHoleFun (m2, e) k)
-step (MVal (VLam lam), e,  k)                 = (MVal (VClo (Clo lam e)), e, k)
+step (MRef x,         e,  k)           = (MVal (lookupEnv x e),    e, k)
+step (MAp m1 m2,      e,  k)           = (m1,                      e, KHoleFun (m2, e) k)
+step (MVal (VLam lam), e,  k)          = (MVal (VClo (Clo lam e)), e, k)
 step (MVal w,      e1, KHoleFun (m, e2) k)    = (m, e2, KHoleArg w k)
-step (MVal w,      e1, KHoleArg (VClo (Clo (x :=> m) e2)) k) 
+step (MVal w,      e1, KHoleArg (VClo (Clo (x :=> m) e2)) k)
     = (m, extendEnv (x, w) e2, k)
 --step (w,     e, k) = (w, e, KEmpty)
 
@@ -77,10 +77,42 @@ evaluate exp =
 lam = MVal . VLam
 int = MVal . VInt
 ref = MRef
-test_id = lam ("x" :=> ref "x")
+
+test_id = lam ("x":=>ref "x")
 test_int = int 42
 test1 = MAp test_id test_int
 test2 = MAp (MAp (lam ("x" :=> (lam ("y" :=> (ref "x"))))) (int 1)) (int 2)
+
+p0 = lam("f":=>lam("x":=>ref "x"))
+p1 = lam("f":=>lam("x":=>(MAp (ref "f") (ref "x"))))
+psucc = lam("n":=>(
+          lam ("f" :=>(
+            lam ("x" :=>(
+              MAp (ref "f")
+                  (MAp (MAp (ref "n") (ref "f")) (ref "x"))))))))
+p2 = MAp psucc p1
+
+
+pretty :: Exp -> String
+pretty (MRef x) = x
+pretty (MAp m1 m2) = pm1 ++ " " ++ pm2
+    where pm1 = bracify1 m1 $ m1
+          pm2 = bracify2 m2 $ m2
+          bracify1 (MRef _) m = pretty m
+          bracify1 (MAp _ _) m = pretty m
+          bracify1 _ m = "(" ++ pretty m ++ ")"
+
+          bracify2 (MRef _) m = pretty m
+          bracify2 (MVal (VInt _)) m = pretty m
+          bracify2 _ m = "(" ++ pretty m ++ ")"
+pretty (MVal v) =
+    case v of
+      VInt n -> show n
+      VLam (x :=> m) -> "λ" ++ x ++ "." ++ pretty m ++ ""
+      VClo (Clo (x :=> m) _) -> "(Λ" ++ x ++ "." ++ pretty m ++ ")"
+
+putPretty :: Exp -> IO ()
+putPretty = putStrLn . pretty
 
 main = do
     exp <- readLn :: IO Program
