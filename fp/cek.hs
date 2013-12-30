@@ -1,66 +1,81 @@
 {-
 -   See: http://matt.might.net/articles/cek-machines/
 -}
+import Data.Maybe (fromJust)
+import qualified Data.Map as M
 
 type Var = String
-
-data Lambda = Var :=> Exp deriving (Read, Show)
+data Val 
+    = VInt Int
+    | VClo Closure
+    | VLam Lam
+  deriving (Show, Read, Eq)
+data Lam = Var :=> Exp deriving (Read, Show, Eq)
 
 data Exp
-    = Ref Var
-    | Lam Lambda
-    | Exp :@ Exp
-  deriving (Read, Show)
+    = MRef Var
+    | MVal Val
+    | MLam Lam
+    | MAp Exp Exp
+  deriving (Read, Show, Eq)
 
 type Program = Exp
-type State  = (Exp, Env, Kont)
-data D      = Clo (Lambda, Env)
-type Env    = Var -> D
+type State   = (Exp, Env, Kont)
+data Closure = Clo Lam Env 
+  deriving (Show, Read, Eq)
 data Kont
-    = Mt
-    | Ar (Exp, Env, Kont)
-    | Fn (Lambda, Env, Kont)
+    = KStart
+    | KEmpty
+    | KHoleFun (Exp, Env) Kont
+    | KHoleArg Val Kont
   deriving (Read, Show)
 
+type Env = M.Map Var Val
 
+{-
+ - Environment
+ -}
+emptyEnv :: Env
+emptyEnv = M.empty
 
-(==>) :: a -> b -> (a, b)
-(==>) = (,)
+extendEnv :: (Var, Val) -> Env -> Env
+extendEnv (var, val) e = M.insert var val e
 
-(//) :: Eq a => (a -> b) -> [(a, b)] -> (a -> b)
-(//) f [(x, y)] = \x' -> if x == x' then y else f x'
+lookupEnv :: Var -> Env -> Val
+lookupEnv v e = 
+    case M.lookup v e of
+      Just r -> r
+      Nothing -> error $ "Lookup of '" ++ v ++ "' failed in E{" ++ show e ++ "}"
 
+{-
+ - CEK machine
+ -}
 step :: State -> State
-step (Ref x, e, k)
-    = (Lam lam, e', k) where Clo (lam, e') = e x
+step (MRef x,         e,  k)                              = (MVal (lookupEnv x e),    e,                   k)
+step (MAp m1 m2,      e,  k)                              = (m1,                      e,                   KHoleFun (m2, e) k)
+step (MLam (x :=> m), e,  k)                              = (MVal (VClo (Clo (x :=> m) e)), e,                   k)
+step (MVal w,              e1, KHoleFun (m, e2) k)             = (m,                       e2,                  KHoleArg w k)
+step (MVal w,              e1, KHoleArg (VClo (Clo (x :=> m) e2)) k) = (m,                       extendEnv (x, w) e2, k)
+step (w,     e, k) = (w, e, KEmpty)
 
-step (f :@ x, e, k)
-    = (f, e, Ar(x, e, k))
+run :: State -> State
+run (exp, env, KEmpty) = (exp, env, KEmpty)
+run (exp, env, KStart) = step (exp, env, KEmpty)
+run (exp, env, k) = step (exp, env, k)
 
-step (Lam lam, e, Ar(x, e', k))
-    = (x, e', Fn (lam, e, k))
+evaluate :: Program -> Exp
+evaluate exp = 
+    case run (exp, emptyEnv, KStart) of
+      (result, _, KEmpty) -> result
+      st -> error $ "Program exited with invalid state " ++ show st
 
-step (Lam lam, e, Fn(x :=> m, e', k))
-    = (m, e' // [(x, Clo (lam, e))], k)
-    
-
-terminal :: (State -> State) -> (State -> Bool) -> State -> State
-terminal step isFinal s 
-    | isFinal s = s
-    | otherwise = terminal step isFinal (step s)
-
-inject :: Program -> State
-inject m = (m, e0, Mt)
-  where e0 = \x -> error $ "no binding for " ++ x 
-
-isFinal :: State -> Bool
-isFinal (Lam _, e, Mt)  = True
-isFinal _               = False
-
-evaluate :: Program -> State
-evaluate = terminal step isFinal . inject
+{-
+ - for GHCi
+ -}
+test_id = MLam ("x" :=> MRef "x")
+test_int = MVal (VInt 42)
+test1 = MAp test_id test_int
 
 main = do
-    exp <- read
+    exp <- readLn :: IO Program
     print . evaluate $ exp
-    
