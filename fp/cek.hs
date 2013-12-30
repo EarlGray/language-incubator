@@ -10,12 +10,13 @@ data Val
     | VClo Closure
     | VLam Lam
   deriving (Show, Read, Eq)
-data Lam = Var :=> Exp deriving (Read, Show, Eq)
+
+data Lam = Var :=> Exp 
+  deriving (Read, Show, Eq)
 
 data Exp
     = MRef Var
     | MVal Val
-    | MLam Lam
     | MAp Exp Exp
   deriving (Read, Show, Eq)
 
@@ -51,17 +52,18 @@ lookupEnv v e =
  - CEK machine
  -}
 step :: State -> State
-step (MRef x,         e,  k)                              = (MVal (lookupEnv x e),    e,                   k)
-step (MAp m1 m2,      e,  k)                              = (m1,                      e,                   KHoleFun (m2, e) k)
-step (MLam (x :=> m), e,  k)                              = (MVal (VClo (Clo (x :=> m) e)), e,                   k)
-step (MVal w,              e1, KHoleFun (m, e2) k)             = (m,                       e2,                  KHoleArg w k)
-step (MVal w,              e1, KHoleArg (VClo (Clo (x :=> m) e2)) k) = (m,                       extendEnv (x, w) e2, k)
-step (w,     e, k) = (w, e, KEmpty)
+step (MRef x,         e,  k)                  = (MVal (lookupEnv x e),    e, k)
+step (MAp m1 m2,      e,  k)                  = (m1,                      e, KHoleFun (m2, e) k)
+step (MVal (VLam lam), e,  k)                 = (MVal (VClo (Clo lam e)), e, k)
+step (MVal w,      e1, KHoleFun (m, e2) k)    = (m, e2, KHoleArg w k)
+step (MVal w,      e1, KHoleArg (VClo (Clo (x :=> m) e2)) k) 
+    = (m, extendEnv (x, w) e2, k)
+--step (w,     e, k) = (w, e, KEmpty)
 
 run :: State -> State
 run (exp, env, KEmpty) = (exp, env, KEmpty)
-run (exp, env, KStart) = step (exp, env, KEmpty)
-run (exp, env, k) = step (exp, env, k)
+run (exp, env, KStart) = run $ step (exp, env, KEmpty)
+run (exp, env, k)      = run $ step (exp, env, k)
 
 evaluate :: Program -> Exp
 evaluate exp = 
@@ -72,7 +74,7 @@ evaluate exp =
 {-
  - for GHCi
  -}
-test_id = MLam ("x" :=> MRef "x")
+test_id = MVal $ VLam ("x" :=> MRef "x")
 test_int = MVal (VInt 42)
 test1 = MAp test_id test_int
 
