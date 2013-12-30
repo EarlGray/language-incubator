@@ -74,9 +74,13 @@ evaluate exp =
 {-
  - for GHCi
  -}
-test_id = MVal $ VLam ("x" :=> MRef "x")
-test_int = MVal (VInt 42)
+lam = MVal . VLam
+int = MVal . VInt
+ref = MRef
+test_id = lam ("x" :=> ref "x")
+test_int = int 42
 test1 = MAp test_id test_int
+test2 = MAp (MAp (lam ("x" :=> (lam ("y" :=> (ref "x"))))) (int 1)) (int 2)
 
 main = do
     exp <- readLn :: IO Program
