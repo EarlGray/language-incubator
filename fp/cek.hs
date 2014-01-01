@@ -1,13 +1,12 @@
 {-
 -   See: http://matt.might.net/articles/cek-machines/
 -}
-import Data.Maybe (fromJust)
 import qualified Data.Map as M
 
 type Var = String
 data Val 
     = VInt Int
-    | VClo Closure
+    | VClo Lam Env
     | VLam Lam
   deriving (Show, Read, Eq)
 
@@ -22,14 +21,12 @@ data Exp
 
 type Program = Exp
 type State   = (Exp, Env, Kont)
-data Closure = Clo Lam Env 
-  deriving (Show, Read, Eq)
 data Kont
     = KStart
     | KEmpty
-    | KEnd
     | KHoleFun (Exp, Env) Kont
     | KHoleArg Val Kont
+    | KEnd
   deriving (Read, Show)
 
 type Env = M.Map Var Val
@@ -53,13 +50,15 @@ lookupEnv v e =
  - CEK machine
  -}
 step :: State -> State
-step (MRef x,         e,  k)           = (MVal (lookupEnv x e),    e, k)
-step (MAp m1 m2,      e,  k)           = (m1,                      e, KHoleFun (m2, e) k)
-step (MVal (VLam lam), e,  k)          = (MVal (VClo (Clo lam e)), e, k)
-step (MVal w,      e1, KHoleFun (m, e2) k)    = (m, e2, KHoleArg w k)
-step (MVal w,      e1, KHoleArg (VClo (Clo (x :=> m) e2)) k)
-    = (m, extendEnv (x, w) e2, k)
-step (w,     e, k) = (w, e, KEnd)
+step (MRef x,         e,  k) = (MVal v, e, k)
+    where v = lookupEnv x e
+step (MAp m1 m2,      e,  k) = (m1, e, k')
+    where k' = KHoleFun (m2, e) k
+step (MVal (VLam lam), e, k) = (MVal clo, e, k)
+    where clo = VClo lam e
+step (MVal w, _, KHoleFun (m, e) k) = (m, e, KHoleArg w k)
+step (MVal w, _, KHoleArg (VClo (x :=> m) e) k) = (m, extendEnv (x, w) e, k)
+step (w, e, _) = (w, e, KEnd)
 
 run :: State -> State
 run (exp, env, KEnd) = (exp, env, KEnd)
@@ -92,7 +91,7 @@ psucc = lam("n":=>(
           lam ("f" :=>(
             lam ("x" :=>(
               ref "f" <.> (ref "n" <.> ref "f" <.> ref "x")))))))
-p2 = MAp psucc p1
+p2 = psucc <.> p1
 
 
 pretty :: Exp -> String
@@ -107,18 +106,19 @@ pretty (MAp m1 m2) = pm1 ++ " " ++ pm2
           bracify2 (MRef _) m = pretty m
           bracify2 (MVal (VInt _)) m = pretty m
           bracify2 _ m = "(" ++ pretty m ++ ")"
+
 pretty (MVal v) =
     case v of
       VInt n -> show n
       VLam (x :=> m) -> "λ" ++ x ++ "." ++ pretty m ++ ""
-      VClo (Clo (x :=> m) env) -> "(Λ" ++ x ++ "." ++ pretty m ++ ") {" ++ prettyEnv env ++ "}"
+      VClo (x :=> m) env -> "(Λ" ++ x ++ "." ++ pretty m ++ ") {" ++ prettyEnv env ++ "}"
 
-putPretty = putStrLn . pretty
+printExp = putStrLn . pretty
 
 prettyEnv :: Env -> String
-prettyEnv = concat . map prettyBinding . M.toList
+prettyEnv = (>>= prettyBinding) . M.toList
     where prettyBinding (var, val) = var ++ " -> " ++ pretty (MVal val) ++ "\n"
-putEnv = putStrLn . prettyEnv
+printEnv = putStrLn . prettyEnv
 
 main = do
     exp <- readLn :: IO Program
