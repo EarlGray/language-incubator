@@ -28,15 +28,6 @@ variable bfmem 30000 chars allot \ the machine memory
     drop
 ;
 
-: bfinc ( -- )  headaddr dup c@ 1+ swap c! ;
-: bfdec ( -- )  headaddr dup c@ 1- swap c! ;
-: bfin ( -- )   key headaddr c! ;
-: bfout ( -- )  headaddr c@ emit ;
-: bfback ( -- ) head @ 1- head ! ;
-: bffwd ( -- )  head @ 1+ head ! ;
-: bfjb  ( -- )  headaddr c@ 0= if begin-loop then ;
-: bfje  ( -- )  headaddr c@ if    end-loop   then ;
-
 : bfdebug ( -- ) ( cmdptr @ c@ emit  space head ?  space headaddr c@ .  space cmdptr ?  cr ) ;
 
 : bfrun ( prog_addr -- )
@@ -45,14 +36,14 @@ variable bfmem 30000 chars allot \ the machine memory
 
     begin 
       bfdebug
-      [CHAR] + =cmd if bfinc  then
-      [CHAR] - =cmd if bfdec  then
-      [CHAR] > =cmd if bffwd  then
-      [CHAR] < =cmd if bfback then
-      [CHAR] , =cmd if bfin   then
-      [CHAR] . =cmd if bfout  then
-      [CHAR] [ =cmd if bfjb   then
-      [CHAR] ] =cmd if bfje   then
+      [CHAR] + =cmd if headaddr dup c@ 1+ swap c! then
+      [CHAR] - =cmd if headaddr dup c@ 1- swap c! then
+      [CHAR] > =cmd if head @ 1- head ! then
+      [CHAR] < =cmd if head @ 1+ head ! then
+      [CHAR] , =cmd if key headaddr c! then
+      [CHAR] . =cmd if headaddr c@ emit then
+      [CHAR] [ =cmd if headaddr c@ 0= if begin-loop then then
+      [CHAR] ] =cmd if headaddr c@ if    end-loop   then then
     0 =cmd 0= while
       cmdnext
     repeat   
