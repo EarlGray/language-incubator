@@ -44,20 +44,19 @@ makeModRM0 (OpndRM sib displ) =
             [index reg]
 
         -- the same with Displ8:
-          -- $displ8(%esp) : it's a kind of magic again:
-        ((SIB _ Nothing (Just RegESP)), Displ8 dspl8) ->
-            [useSIB .|. useDisplB, 0x24, int dspl8]
         -- $displ8(%reg)
         ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
-            [index reg .|. useDisplB, int dspl8]
+            if reg == RegESP
+            -- $displ8(%esp) : it's a kind of magic again:
+            then [useSIB .|. useDisplB, 0x24, int dspl8]
+            else [index reg .|. useDisplB, int dspl8]
 
         -- $displ32(%reg)
         -- $displ32(%esp)
-        ((SIB _ Nothing (Just RegESP)), Displ32 dspl32) ->
-            ((useSIB .|. useDisplL) : 0x24 : bytecode dspl32)
-        -- $displ32(%reg)
         ((SIB _ Nothing (Just reg)), Displ32 dspl32) ->
-            ((index reg .|. useDisplL) : bytecode dspl32)
+            if reg == RegESP
+            then ((useSIB .|. useDisplL) : 0x24 : bytecode dspl32)
+            else ((index reg .|. useDisplL) : bytecode dspl32)
 
         -- %esp cannot be index, never:
         ((SIB _ (Just RegESP) (Just base)), _) ->

@@ -1,5 +1,5 @@
 .text
-.global asm_add
+.globl asm_add
 asm_add:
     movl 8(%esp), %eax
     movl 4(%esp), %ecx
