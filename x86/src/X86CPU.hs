@@ -34,10 +34,15 @@ allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
 allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
 allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
 
-lkupRegL = zip ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"] allGPRegs
-lkupRegW = zip ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"] allGPWRegs
-lkupRegB = zip ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"] allGPBRegs
-lkupSReg = zip ["es", "cs", "ss", "ds", "fs", "gs"] allSegRegs
+gpRegNames = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
+gpWRegNames = ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"]
+gpBRegNames = ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"]
+segRegNames = ["es", "cs", "ss", "ds", "fs", "gs"]
+
+lkupRegL = zip gpRegNames allGPRegs
+lkupRegW = zip gpWRegNames allGPWRegs
+lkupRegB = zip gpBRegNames allGPBRegs
+lkupSReg = zip segRegNames allSegRegs
 
 mbRegByName :: String -> Maybe Register
 mbRegByName rname =

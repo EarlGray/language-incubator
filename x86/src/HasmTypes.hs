@@ -25,7 +25,7 @@ safeHead (s:_) = Just s
 data HasmStatement
   = HasmStLabel String
   | HasmStDirective Directive
-  | HasmStInstr [Maybe OpPrefix] Operation 
+  | HasmStInstr [OpPrefix] Operation 
   deriving (Show, Read, Eq)
 
 data SrcPos = SrcPos String !Int !Int deriving (Eq, Ord)
@@ -35,7 +35,7 @@ instance Show SrcPos where
 
 type HasmStmtWithPos = (HasmStatement, SrcPos)
 
-type ParseResult = [(HasmStatement, SrcPos)]
+type ParseResult = [HasmStmtWithPos]
 
 data Directive
   -- location control directives:

@@ -19,10 +19,7 @@ import System.IO.Unsafe (unsafePerformIO)
 unsafeCatchError :: a -> Either ErrorCall a
 unsafeCatchError = unsafePerformIO . try . evaluate 
 
-data HalfBakedOp
-    = WholeOp [Word8]
-    | HoleOp HasmStatement Symbol
-  deriving (Show, Read, Eq)
+type MbOpCode = Maybe [Word8]
 
 type Addr = Word32
 type Offset = Word32
@@ -73,12 +70,12 @@ instance Show Label where
 
 type LabelDB = M.Map Symbol Addr
 
-
 {-
  - First pass: 
  -}
+
 firstPass :: (Addr, LabelDB) -> [HasmStmtWithPos] ->
-             Either CodegenError (LabelDB, [HalfBakedOp])
+             Either CodegenError (LabelDB, [(HasmStatement, SrcPos, MbOpCode)])
 firstPass (addr, lbldb) [] = Right (lbldb, [])
 firstPass (addr, lbldb) ((stmt, pos):pstmsts) =
   case stmt of
@@ -88,6 +85,8 @@ firstPass (addr, lbldb) ((stmt, pos):pstmsts) =
         Just _ -> Left $ show pos ++ ": label redefinition for `" ++ label ++ "'"
     HasmStDirective dir ->
       case dir of
+        DirGlobal _ -> firstPass (addr, lbldb) pstmsts
+        DirSection _ _ _ -> firstPass (addr, lbldb) pstmsts
         _ -> Left $ show pos ++ ": failed to assemble directive: " ++ show dir
     HasmStInstr prefs oper@(Operation op opnds) ->
       let (oper', mbLbl) = fakeOperation oper
@@ -97,8 +96,8 @@ firstPass (addr, lbldb) ((stmt, pos):pstmsts) =
                   Left e -> Left e
                   Right (lbldb', hbops') ->
                     case mbLbl of
-                      Nothing -> Right $ (lbldb', WholeOp bs : hbops')
-                      Just label -> Right $ (lbldb', HoleOp stmt label : hbops')
+                      Nothing -> Right $ (lbldb', (stmt, pos, Just bs) : hbops')
+                      Just _  -> Right $ (lbldb', (stmt, pos, Nothing) : hbops')
           Left e -> Left $ show e
 
 -- if there is a label in the argument, returns (fakeOperation, Just lbl)
@@ -113,30 +112,38 @@ fakeOperation (Operation op (opnd:opnds)) =
       let (Operation _ opnds', mblbl) = fakeOperation (Operation op opnds)
       in (Operation op (opnd:opnds'), mblbl)
 
-{-
-secondPass :: Addr -> LabelDB -> [(HalfBakedOp, HasmStatement)] ->
-              [HalfBakedOp]
-secondPass addr lbldb 
--}
+secondPass :: Addr -> (LabelDB, [(HasmStatement, SrcPos, MbOpCode)]) ->
+              Either CodegenError [(HasmStatement, SrcPos, [Word8])]
+secondPass addr (lbldb, mbops) = mapM go mbops -- in Either monad
+  where
+    go (stmt, pos, Just bs) = Right (stmt, pos, bs)
+    go (stmt, pos, Nothing) =
+      case stmt of
+        HasmStInstr prefs oper -> do
+          oper' <- operationLblToAddr lbldb oper
+          case unsafeCatchError (bytecode oper') of
+              Left e ->   Left $ show e
+              Right [] -> Left $ show pos ++ ": failed to assemble instruction: " ++ show oper
+              Right bs -> Right$ (stmt, pos, bs)
+        _ -> Right $ (stmt, pos, [])
+
+operationLblToAddr :: LabelDB -> Operation -> Either CodegenError Operation
+operationLblToAddr lbldb (Operation op opnds) = do
+    opnds' <- mapM fixaddr opnds
+    return $ Operation op opnds'
+  where
+    fixaddr opnd@(OpndRM sib displ) = 
+      case displ of
+        DisplLabel sym -> 
+          case M.lookup sym lbldb of
+            Just addr -> Right $ OpndRM sib (Displ32 addr)
+            Nothing -> Left $ ": failed to resolve label: " ++ sym
+        _ -> Right $ opnd
+    fixaddr opnd = Right $ opnd
 
 --- temporary test values ----
-assembleFromZero = firstPass (0, M.empty)
+assembleWithBase addr pstmts = firstPass (addr, M.empty) pstmts >>= secondPass addr
+assembleFromZero = assembleWithBase 0
+
 withTestSrc = map (\s -> (s, SrcPos "test.s" 0 0))
 
--- > assembleFromZero $ withTestSrc linux_null_s
-movinstr = HasmStInstr [] . Operation OpMov 
-intinstr = HasmStInstr [] . Operation OpInt
-linux_null_s = [
-  HasmStLabel "_start",                           -- _start:
-  movinstr [OpndImm (ImmL 0x0), OpndReg (RegL RegEAX)],  --    movl $1, %eax
-  movinstr [OpndImm (ImmL 0x1), OpndReg (RegL RegEBX)],  --    movl $0, %ebx
-  intinstr [OpndImm (ImmB 0x80)]               ]  --    int 0x80
-
-label_mov_s = [
-  movinstr [OpndRM (SIB 1 Nothing Nothing) (DisplLabel "x"),
-                                   OpndReg (RegL RegEAX)]] 
-
-loop_jmp_s = [
-  HasmStLabel "_start",
-  HasmStLabel "loop_start",
-  HasmStInstr [] $ Operation OpJmp [OpndRM noSIB (DisplLabel "loop_start")] ]

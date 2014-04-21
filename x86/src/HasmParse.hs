@@ -41,8 +41,9 @@ idchar = idschar <|> digit <|> oneOf ".$"
 
 symbol = cons idschar (many idchar)
 
-endstmt = oneOf ";\n"
+endstmt = (oneOf ";\n" >> return ()) <|> eof
 asmspaces = many1 (oneOf " \t")
+mbasmspaces = many (oneOf " \t")
 
 cons a b = liftA2 (:) a b
 opchar = letter <|> digit
@@ -52,43 +53,85 @@ regname = cons letter (many1 opchar)
 asmdir = do
   char '.'
   dir <- many1 dirchar
-  asmspaces
-  dirargs <- sepBy (many1 $ noneOf "\n,") (char ',')
+  optional asmspaces
+  dirargs <- sepBy (many1 $ noneOf "\n,") (char ',' >> optional asmspaces)
   endstmt
   case readDirective dir dirargs of
     Right d -> return $ HasmStDirective d
     Left e -> parserFail e
 
-asmlabel = HasmStLabel <$> (cons idschar (many idchar) <* char ':' <* optional newline) <?> "label"
+asmlabel = HasmStLabel <$> (symbol <* char ':' <* optional newline) <?> "label"
 
 asmop = do
   op <- opcode
-  asmspaces
-  opnds <- sepBy asmopnd (char ',' >> optional (oneOf " \t"))
-  --optional asmcomment
+  optional asmspaces
+  opnds <- sepBy asmopnd (char ',' >> mbasmspaces)
+  mbasmspaces
   endstmt
   case readOperation op opnds of
     Left e -> parserFail e
     Right o -> return $ HasmStInstr [] o
 
 asmopnd :: Parser OpOperand
-asmopnd = try (OpndImm <$> asmimm) <|> try (OpndReg <$> asmregister) {-<|> try asmmem-} <?> "opcode operand"
+asmopnd = try (OpndImm <$> asmimm) <|>
+          try (OpndReg <$> asmregister) <|>
+          try asmmem <?> "opcode operand"
 
-{-
+immToDispl (ImmL imm) = Displ32 imm
+
+asmdispl = try (immToDispl <$> readIntegerLit) 
+           <|> (DisplLabel <$> symbol)
+           <?> "displacement before ("
+
 asmmem = do
   mbDspl <- optionMaybe asmdispl
-  case mbDspl of
-    Just 
+  mbSIB <- optionMaybe asmsib
+  when (mbDspl == Nothing && mbSIB == Nothing) $ fail "no displacement and no SIB"
+  let dspl = maybe NoDispl id mbDspl
+  let sib = maybe noSIB id mbSIB
+  return $ OpndRM sib dspl
 
-asmdispl = 
 
-asmaddr = 
--}
+data SIBPart = SIBReg GPRegister | SIBScale Word8 | SIBNothing
+immToSIBScale (ImmL imm) = SIBScale $ fromIntegral imm
+
+sibpart = try (SIBReg <$> asmgpregister) <|> 
+          try (immToSIBScale <$> readIntegerLit) <|> 
+          return SIBNothing
+
+sibparts = between (char '(') (char ')') $ sepBy sibpart (char ',' >> mbasmspaces)
+
+asmsib = do
+  sps <- sibparts
+  case sps of
+    -- (%reg)
+    [SIBReg base] -> return $ SIB 1 Nothing (Just base)
+    -- (%reg, %reg)
+    [SIBReg base, SIBReg ind] -> return $ SIB 1 (Just ind) (Just base)
+    -- (%reg, %reg, )
+    [SIBReg base, SIBReg ind, SIBNothing] -> return $ SIB 1 (Just ind) (Just base)
+    -- (, %reg)
+    [SIBNothing, SIBReg ind] -> return $ SIB 1 (Just ind) Nothing
+    -- (%reg, scale)
+    [SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) Nothing
+    -- (, %reg, scale)
+    [SIBNothing, SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) Nothing 
+    -- (%reg, %reg, scale)
+    [SIBReg base, SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) (Just base)
+    -- everything else:
+    _ -> fail "SIB format is invalid"
+  where
+    makeSIB scale mbInd mbBase = 
+      if scale `elem` [1,2,4]
+      then return $ SIB (fromIntegral scale) mbInd mbBase
+      else fail "Scale is not 1,2,4"
+        
+
+-- asmaddr = 
 
 asmimm = do
   char '$'
-  num <- readIntegerLit
-  return num
+  readIntegerLit
 
 asmregister = do
   char '%'
@@ -96,7 +139,10 @@ asmregister = do
   case mbRegByName reg of
     Just r -> return r
     _ -> parserFail $ "Not a register name: " ++ reg
-  
+
+asmgpregister = do
+  RegL reg <- asmregister
+  return reg
 
 readDirective :: String -> [String] -> Either String Directive
 readDirective dir args =
@@ -109,6 +155,12 @@ readDirective dir args =
                              [(nsubsect, "")] -> Right $ DirSection name nsubsect ""
                              _ -> Left $ "Failed to parse subsection: " ++ show subsect
         _ -> Left $ "invalid .section format"
+    sect | sect `elem` ["text", "data"] ->
+      case args of
+        [] -> Right $ DirSection sect 0 ""
+        [subsect] -> case (reads :: ReadS Int) subsect of
+                        [(nsubsect, "")] -> Right $ DirSection sect nsubsect ""
+                        _ -> Left $ "Failed to parse subsection: " ++ show subsect
     glbl | glbl `elem` ["global", "globl"] ->
       let eiSyms = map (parse (symbol <* eof) "") args
       in case lefts eiSyms of
@@ -117,13 +169,21 @@ readDirective dir args =
     --"long" -> 
     _ -> Left $ "Unknown directive: " ++ dir ++ " " ++ intercalate "," args
 
+checkSuffixes _     opname opstr | opname == opstr = True
+checkSuffixes suffs opname opstr | (init opstr == opname) && (last opstr `elem` suffs) = True
+checkSuffixes _ _ _ = False
+
 readOperation :: String -> [OpOperand] -> Either String Operation
 readOperation opname args =
   case opname of
-    mov | mov `elem` ["mov", "movl", "movw", "movb"] -> 
+    mov | checkSuffixes "lwb" "mov" mov ->
       case args of  -- TODO: check types
         [opnd1, opnd2] -> Right $ Operation OpMov args
         _ -> Left $ "mov takes two arguments"
+    add | checkSuffixes "lwb" "add" add ->
+      case args of
+        [opnd1, opnd2] -> Right $ Operation OpAdd args
+        _ -> Left $ "add takes two arguments"
     "ret" -> 
       case args of
         [] ->            Right $ Operation OpRet []
