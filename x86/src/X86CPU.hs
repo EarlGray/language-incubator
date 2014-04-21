@@ -4,30 +4,30 @@ import Data.Word
 import Data.Int
 import Data.Maybe (fromJust)
 
-data Register 
+data ImmValue = ImmL Word32 | ImmW Word16 | ImmB Word8 deriving (Show, Read, Eq)
+
+data Register
     = RegL GPRegister | RegW GPRegisterW
     | RegB GPRegisterB | SReg SegRegister
   deriving (Show, Read, Eq)
 
-data GPRegister 
-    = RegEAX | RegECX | RegEDX | RegEBX 
+data GPRegister
+    = RegEAX | RegECX | RegEDX | RegEBX
     | RegESP | RegEBP | RegESI | RegEDI
   deriving (Show, Read, Eq)
-data GPRegisterW 
-    = RegAX | RegCX | RegDX | RegBX 
+data GPRegisterW
+    = RegAX | RegCX | RegDX | RegBX
     | RegSP | RegBP | RegSI | RegDI
   deriving (Show, Read, Eq)
-data GPRegisterB 
+data GPRegisterB
     = RegAL | RegCL | RegDL | RegBL
     | RegAH | RegCH | RegDH | RegBH
     | RegSPL | RegBPL | RegSIL | RegDIL
   deriving (Show, Read, Eq)
-data SegRegister 
-    = RegCS | RegSS 
+data SegRegister
+    = RegCS | RegSS
     | RegDS | RegES | RegFS | RegGS
   deriving (Show, Read, Eq)
-
-data ImmValue = ImmL Word32 | ImmW Word16 | ImmB Word8 deriving (Show, Read, Eq)
 
 allGPRegs = [RegEAX, RegECX, RegEDX, RegEBX, RegESP, RegEBP, RegESI, RegEDI]
 allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
@@ -54,7 +54,7 @@ mbRegByName rname =
         Nothing ->
           case lookup rname lkupRegB of
             Just reg -> Just $ RegB reg
-            Nothing -> 
+            Nothing ->
               case lookup rname lkupSReg of
                 Just reg -> Just $ SReg reg
                 Nothing -> Nothing
@@ -87,7 +87,7 @@ indexOfReg (SReg sr) = index sr
  -}
 type Symbol = String
 
-data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp 
+data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp
   deriving (Show, Read, Eq)
 
 data Operation = Operation Instr [OpOperand]
@@ -105,7 +105,7 @@ data OpOperand
     | OpndRM SIB Displacement
  deriving (Show, Read, Eq)
 
-data Displacement 
+data Displacement
     = NoDispl
     | Displ8 Word8
     | Displ32 Word32

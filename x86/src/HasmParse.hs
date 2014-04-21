@@ -1,9 +1,10 @@
 module HasmParse where
 
-import Data.Char
 import Numeric
-import Data.List (intercalate)
+import Data.Char
 import Data.Either (lefts, rights)
+import Data.List (intercalate, nub, sort)
+import qualified Data.Map as M
 
 import qualified Control.Arrow as Arr
 import Control.Applicative ((<$>), (<*), liftA2)
@@ -22,16 +23,17 @@ hasmParseWithSource :: FilePath -> String -> Either ParseError ParseResult
 hasmParseWithSource fname ss = parse (asmfile <* eof) fname ss
 
 asmfile :: Parser ParseResult
-asmfile = many $ do
-  many (linecomment <|> newline)
-  optional asmspaces
-  pos <- getPosition
-  stmt <- asmstmt
-  return (stmt, toHasmPos pos)
+asmfile = do
+  blanklines
+  many $ do
+    pos <- getPosition
+    stmt <- asmstmt
+    return (stmt, toHasmPos pos)
 
 asmstmt :: Parser HasmStatement
 asmstmt = try asmdir <|> try asmlabel <|> asmop <?> "assembly statement"
 
+blanklines = mbasmspaces >> many ((linecomment <|> newline) >> mbasmspaces)
 linecomment = do
   char '#'; many (noneOf "\n"); newline
 
@@ -41,7 +43,7 @@ idchar = idschar <|> digit <|> oneOf ".$"
 
 symbol = cons idschar (many idchar)
 
-endstmt = (oneOf ";\n" >> return ()) <|> eof
+endstmt = (mbasmspaces >> oneOf ";\n" >> blanklines >> return ()) <|> eof
 asmspaces = many1 (oneOf " \t")
 mbasmspaces = many (oneOf " \t")
 
@@ -60,13 +62,12 @@ asmdir = do
     Right d -> return $ HasmStDirective d
     Left e -> parserFail e
 
-asmlabel = HasmStLabel <$> (symbol <* char ':' <* optional newline) <?> "label"
+asmlabel = HasmStLabel <$> (symbol <* char ':' <* optional blanklines) <?> "label"
 
 asmop = do
   op <- opcode
-  optional asmspaces
-  opnds <- sepBy asmopnd (char ',' >> mbasmspaces)
   mbasmspaces
+  opnds <- sepBy asmopnd (char ',' >> mbasmspaces)
   endstmt
   case readOperation op opnds of
     Left e -> parserFail e
@@ -77,9 +78,10 @@ asmopnd = try (OpndImm <$> asmimm) <|>
           try (OpndReg <$> asmregister) <|>
           try asmmem <?> "opcode operand"
 
+immToDispl (ImmL imm) | imm < 0x100 = Displ8 $ fromIntegral imm
 immToDispl (ImmL imm) = Displ32 imm
 
-asmdispl = try (immToDispl <$> readIntegerLit) 
+asmdispl = try (immToDispl <$> readIntegerLit)
            <|> (DisplLabel <$> symbol)
            <?> "displacement before ("
 
@@ -92,11 +94,12 @@ asmmem = do
   return $ OpndRM sib dspl
 
 
+{-- SIBs and memory refs --}
 data SIBPart = SIBReg GPRegister | SIBScale Word8 | SIBNothing
 immToSIBScale (ImmL imm) = SIBScale $ fromIntegral imm
 
-sibpart = try (SIBReg <$> asmgpregister) <|> 
-          try (immToSIBScale <$> readIntegerLit) <|> 
+sibpart = try (SIBReg <$> asmgpregister) <|>
+          try (immToSIBScale <$> readIntegerLit) <|>
           return SIBNothing
 
 sibparts = between (char '(') (char ')') $ sepBy sibpart (char ',' >> mbasmspaces)
@@ -115,23 +118,17 @@ asmsib = do
     -- (%reg, scale)
     [SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) Nothing
     -- (, %reg, scale)
-    [SIBNothing, SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) Nothing 
+    [SIBNothing, SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) Nothing
     -- (%reg, %reg, scale)
     [SIBReg base, SIBReg ind, SIBScale scale ] -> makeSIB scale (Just ind) (Just base)
     -- everything else:
     _ -> fail "SIB format is invalid"
   where
-    makeSIB scale mbInd mbBase = 
+    makeSIB scale mbInd mbBase =
       if scale `elem` [1,2,4]
       then return $ SIB (fromIntegral scale) mbInd mbBase
       else fail "Scale is not 1,2,4"
-        
 
--- asmaddr = 
-
-asmimm = do
-  char '$'
-  readIntegerLit
 
 asmregister = do
   char '%'
@@ -144,6 +141,42 @@ asmgpregister = do
   RegL reg <- asmregister
   return reg
 
+{-- Number literals --}
+asmimm = do
+  char '$'
+  readIntegerLit
+
+readIntegerLit = (ImmL . fromIntegral) <$> (intneg <|> intparse <?> "number")
+
+intneg = do
+    char '-'
+    num <- intparse
+    return $ negate num
+
+hexint = do
+  ds <- many1 (oneOf "0123456789abcdefABCDEF")
+  case readHex ds of
+    [(num, "")] -> return num
+    _ -> parserFail "failed to parse hexadecimal number"
+
+octint = do
+  ds <- many1 (oneOf "01234567")
+  case readOct ds of
+    [(num, "")] -> return num
+    _ -> parserFail "failed to parse octal number"
+
+intparse = do
+  d <- digit
+  if d == '0'
+  then do
+    try (char 'x' >> hexint) <|> try octint <|> return 0
+  else do
+    ds <- many digit
+    case readDec (d:ds) of
+      [(num, "")] -> return num
+      _ -> parserFail "failed to parse a number"
+
+{-- Directives --}
 readDirective :: String -> [String] -> Either String Directive
 readDirective dir args =
   case dir of
@@ -166,50 +199,67 @@ readDirective dir args =
       in case lefts eiSyms of
           [] -> Right $ DirGlobal (rights eiSyms)
           (err:_) -> Left $ "failed to parse symbol " ++ show err
-    --"long" -> 
     _ -> Left $ "Unknown directive: " ++ dir ++ " " ++ intercalate "," args
 
-checkSuffixes _     opname opstr | opname == opstr = True
-checkSuffixes suffs opname opstr | (init opstr == opname) && (last opstr `elem` suffs) = True
-checkSuffixes _ _ _ = False
+
+type OpSuffix = Char
+type OpInfo = (Instr, [Int], [OpSuffix])
+
+opsyntax :: [(String, OpInfo)]
+opsyntax = [
+  ("mov",   (OpMov,  [2],   "lwb")),
+  ("add",   (OpAdd,  [2],   "lwb")),
+  ("ret",   (OpRet,  [0,1], "w"  )),
+  ("push",  (OpPush, [1],   "lwb")),
+  ("jmp",   (OpJmp,  [1],   "lwb")),
+  ("int",   (OpInt,  [1],   "b"  )) ]
+
+opmap = M.fromList opsyntax
+
+oplookup :: String -> Either String (OpInfo, OpSuffix)
+oplookup opname =
+  case M.lookup opname opmap of
+    Just opinfo ->
+      Right (opinfo, '?')
+    Nothing ->
+      -- search without possible suffixes:
+      let suf = last opname
+          opname' = init opname
+      in case M.lookup opname' opmap of
+        Just opinfo@(_, _, suffs) ->
+          if suf `elem` suffs
+          then Right (opinfo, suf)
+          else Left $ "Invalid suffix for command " ++ opname'
+        Nothing -> Left $ "Unknown instruction: " ++ opname
 
 readOperation :: String -> [OpOperand] -> Either String Operation
-readOperation opname args =
-  case opname of
-    mov | checkSuffixes "lwb" "mov" mov ->
-      case args of  -- TODO: check types
-        [opnd1, opnd2] -> Right $ Operation OpMov args
-        _ -> Left $ "mov takes two arguments"
-    add | checkSuffixes "lwb" "add" add ->
-      case args of
-        [opnd1, opnd2] -> Right $ Operation OpAdd args
-        _ -> Left $ "add takes two arguments"
-    "ret" -> 
-      case args of
-        [] ->            Right $ Operation OpRet []
-        [OpndImm imm] -> (\immw -> Operation OpRet [OpndImm immw]) `Arr.right` immToW imm
-        _ -> Left "ret may take only an optional 16-bit value"
-    "int" -> 
-      case args of
-        [OpndImm imm] -> (\immb -> Operation OpInt [OpndImm immb]) `Arr.right` immToB imm
-        _ -> Left $ "int must take a 8-bit interrupt number"
-    _ -> Left $ "Unknown operation: " ++ opname
+readOperation opname opnds =
+  case oplookup opname of
+    Left e -> Left e
+    Right (opinfo@(op, arglens, suffs), suf) ->
+      if length opnds `elem` arglens
+      then case unifyOperandTypes opinfo suf opnds of
+             Right opnds' -> Right $ Operation op opnds'
+             Left e -> Left $ "Operand type mismatch: " ++ e
+      else Left $ "Opcode '" ++ opname ++ "' does not take " ++ show (length opnds) ++ " parameter(s)"
 
-readIntegerLit = do
-  firstdig <- digit
-  case firstdig of
-    d | isDigit d -> do
-        ds <- many digit
-        case readDec (d:ds) of
-          [(num, "")] -> return $ ImmL num
-          _ -> parserFail "failed to parse a number"
+getOpndType :: OpOperand -> OpSuffix
+getOpndType opnd =
+  case opnd of
+    OpndImm _        -> '?'    -- any, needs adjusting to OpndReg size
+    OpndRM _ _       -> '?'    -- memory can be read by 1,2,4 bytes
+    OpndReg (SReg _) -> 's'    -- compatible with w and l at the same time
+    OpndReg (RegL _) -> 'l'    -- these registers are rigid
+    OpndReg (RegW _) -> 'w'
+    OpndReg (RegB _) -> 'b'
 
-opndType :: OpOperand -> Maybe ImmValue
-opndType (OpndReg (RegL _)) = Just (ImmL 0)
-opndType (OpndReg (RegW _)) = Just (ImmW 0)
-opndType (OpndReg (SReg _)) = Just (ImmW 0)
-opndType (OpndReg (RegB _)) = Just (ImmB 0)
-opndType _ = Nothing
+unifyOperandTypes :: OpInfo -> OpSuffix -> [OpOperand] -> Either String [OpOperand]
+unifyOperandTypes (opname, lens, sufs) opsuf opnds =
+  let ts' = nub $ sort $ map getOpndType opnds   -- what types are present in opnds?
+      ts = filter (not . flip elem "s?") ts'
+  in  if length ts < 2
+      then Right opnds  -- TODO: adjust type of OpndImm to OpndReg
+      else Left $ "Operand type mismatch"  -- TODO: e.g. movsx with different types
 
 immToW :: ImmValue -> Either String ImmValue
 immToW (ImmW imm) = Right (ImmW imm)
