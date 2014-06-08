@@ -186,6 +186,8 @@ bytesInt [OpndImm imm] =
   case imm of
     ImmB 3    -> [0xCC]
     ImmB immb -> [0xCD, immb]
+    ImmL imm  -> [0xCD, int imm]
+    _ -> error $ "Failed to assemble `int " ++ show imm
 bytesInt _ = []
 
 -- ADD

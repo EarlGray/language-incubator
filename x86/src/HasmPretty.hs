@@ -47,7 +47,7 @@ instance PrettyPrintable Instr where
                      (OpRet, "ret"), (OpLRet, "lret") ] 
 
 instance PrettyPrintable OpOperand where
-    pretty (OpndImm imm) = "$" ++ show imm
+    pretty (OpndImm imm) = "$" ++ pretty imm
     pretty (OpndRM sib displ) = pretty displ ++ pretty sib
     pretty (OpndReg reg) = pretty reg
 
@@ -82,6 +82,11 @@ instance PrettyPrintable SegRegister where
       case lookup sreg (zip allSegRegs segRegNames) of
         Just s -> "%" ++ s
         Nothing -> error "No pretty name for " ++ show sreg
+
+instance PrettyPrintable ImmValue where
+  pretty (ImmL imm) = show ((fromIntegral imm) :: Int32)
+  pretty (ImmW imm) = show ((fromIntegral imm) :: Int32)
+  pretty (ImmB imm) = show ((fromIntegral imm) :: Int32)
 
 instance PrettyPrintable SIB where
   pretty (SIB _ Nothing  Nothing) = ""
