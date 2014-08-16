@@ -44,7 +44,7 @@ instance PrettyPrintable Instr where
         Just s -> s
         Nothing -> error "No pretty representation for " ++ show op
       where dict = [ (OpMov, "mov"), (OpInt, "int"), (OpAdd, "add"), (OpPush, "push"),
-                     (OpRet, "ret"), (OpLRet, "lret") ] 
+                     (OpRet, "ret"), (OpLRet, "lret"), (OpCmp, "cmp"), (OpJmp, "jmp") ] 
 
 instance PrettyPrintable OpOperand where
     pretty (OpndImm imm) = "$" ++ pretty imm

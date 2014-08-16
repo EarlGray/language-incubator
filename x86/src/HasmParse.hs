@@ -255,7 +255,7 @@ getOpndType opnd =
     OpndReg (RegB _) -> 'b'
 
 getOperandsTypes :: OpSuffix -> [OpOperand] -> [OpSuffix]
-getOperandsTypes opsuf opnds = 
+getOperandsTypes opsuf opnds =
   nub $ sort $ (opsuf : map getOpndType opnds)  -- what types are present?
 
 unifyOperandTypes :: OpInfo -> OpSuffix -> [OpOperand] -> Either String [OpOperand]
@@ -268,7 +268,7 @@ unifyOperandTypes (opname, lens, sufs) opsuf opnds =
       "b"   -> adjustImmediatesWith immToB opnds
       _     -> Left $ "Operand type mismatch"  -- TODO: e.g. movsx with different types
 
-adjustImmediatesWith :: (ImmValue -> Either String ImmValue) -> 
+adjustImmediatesWith :: (ImmValue -> Either String ImmValue) ->
                         [OpOperand] -> Either String [OpOperand]
 adjustImmediatesWith adjimm = mapM adj
   where

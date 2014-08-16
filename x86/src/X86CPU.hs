@@ -88,6 +88,7 @@ indexOfReg (SReg sr) = index sr
 type Symbol = String
 
 data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp
+           | OpCmp
   deriving (Show, Read, Eq)
 
 data Operation = Operation Instr [OpOperand]

@@ -88,6 +88,7 @@ makeModRM0 (OpndRM sib displ) =
 --  as required by /0 or /6 commands
 fourReg = OpndReg (RegL RegESP)
 sixReg  = OpndReg (RegL RegEBP)     -- use bare displacement
+sevenReg = OpndReg (RegL RegEDI)    -- modRM /7
 
 -- modRM flags:
 useSIB = 0x04
@@ -147,7 +148,7 @@ instance Serializable Operation where
 encoders = [
   (OpAdd, bytesAdd), (OpMov, bytesMov), (OpPush, bytesPush),
   (OpRet, bytesRet), (OpLRet, bytesLRet), (OpInt, bytesInt),
-  (OpJmp, bytesJmp) ]
+  (OpJmp, bytesJmp), (OpCmp, bytesCmp) ]
 
 -- PUSH
 bytesPush :: [OpOperand] -> [Word8]
@@ -269,6 +270,18 @@ bytesMov [op1, op2] =
 
 bytesMov _ = []
 
+-- CMP
+bytesCmp :: [OpOperand] -> [Word8]
+bytesCmp [op1, op2] =
+  case (op1, op2) of
+    (OpndImm (ImmB imm), OpndReg (RegB RegAL))      -> (0x3c : bytecode imm)
+    (OpndImm (ImmW imm), OpndReg (RegW RegAX))      -> [preLW, 0x3d] ++ bytecode imm
+    (OpndImm (ImmL imm), OpndReg (RegL RegEAX))     -> (0x3d : bytecode imm)
+
+    (OpndImm (ImmB imm), OpndRM _ _)    -> (0x80 : makeModRM sevenReg op2) ++ bytecode imm
+
+    _ -> error $ "failed to assemble operands: " ++ show op1 ++ ", " ++ show op2
+bytesCmp _ = []
 
 -- JMP
 bytesJmp :: [OpOperand] -> [Word8]
