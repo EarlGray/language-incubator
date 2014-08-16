@@ -36,19 +36,21 @@ makeModRM0 (OpndRM sib displ) =
             (useAbsDispl : bytecode dspl)
 
         -- (%reg), NoDisplacement:
-        -- (%ebp): an exception from registers, do a special street magic:
-        ((SIB _ Nothing (Just RegEBP)), NoDispl) ->
-            makeModRM0 (OpndRM (SIB 1 Nothing (Just RegEBP)) (Displ8 0))
         -- (%reg):
         ((SIB _ Nothing (Just reg)), NoDispl) ->
-            [index reg]
+          case reg of
+            -- (%ebp): an exception from registers, do a special street magic:
+            RegEBP -> makeModRM0 (OpndRM (SIB 1 Nothing (Just RegEBP)) (Displ8 0))
+            -- (%esp): must be encoded with SIB
+            RegESP -> [useSIB, sibNoIndex .|. index RegESP]
+            _ -> [index reg]
 
         -- the same with Displ8:
         -- $displ8(%reg)
         ((SIB _ Nothing (Just reg)), Displ8 dspl8) ->
             if reg == RegESP
             -- $displ8(%esp) : it's a kind of magic again:
-            then [useSIB .|. useDisplB, 0x24, int dspl8]
+            then [useSIB .|. useDisplB, sibNoIndex .|. index RegESP, int dspl8]
             else [index reg .|. useDisplB, int dspl8]
 
         -- $displ32(%reg)
@@ -96,6 +98,9 @@ useAbsDispl = 0x05
 useDisplB = 0x40
 useDisplL = 0x80
 useRegisters = 0xC0
+
+-- sib
+sibNoIndex = 0x20
 
 scaling :: Word8 -> Word8
 scaling factor = case lookup factor (zip [1,2,4,8] [0,1,2,3]) of
@@ -275,10 +280,12 @@ bytesCmp :: [OpOperand] -> [Word8]
 bytesCmp [op1, op2] =
   case (op1, op2) of
     (OpndImm (ImmB imm), OpndReg (RegB RegAL))      -> (0x3c : bytecode imm)
-    (OpndImm (ImmW imm), OpndReg (RegW RegAX))      -> [preLW, 0x3d] ++ bytecode imm
+    (OpndImm (ImmW imm), OpndReg (RegW RegAX))      -> (preLW : 0x3d : bytecode imm)
     (OpndImm (ImmL imm), OpndReg (RegL RegEAX))     -> (0x3d : bytecode imm)
 
-    (OpndImm (ImmB imm), OpndRM _ _)    -> (0x80 : makeModRM sevenReg op2) ++ bytecode imm
+    (OpndImm (ImmB imm), OpndRM _ _) -> (0x80 : makeModRM sevenReg op2) ++ bytecode imm
+    (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM sevenReg op2) ++ bytecode imm
+    (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM sevenReg op2) ++ bytecode imm
 
     _ -> error $ "failed to assemble operands: " ++ show op1 ++ ", " ++ show op2
 bytesCmp _ = []
