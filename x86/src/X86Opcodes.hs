@@ -287,6 +287,15 @@ bytesCmp [op1, op2] =
     (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM sevenReg op2) ++ bytecode imm
     (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM sevenReg op2) ++ bytecode imm
 
+    (OpndReg (RegB _),  OpndRM _ _)  -> (0x38 : makeModRM op1 op2)
+    (OpndReg (RegW _),  OpndRM _ _)  -> (preLW : 0x39 : makeModRM op1 op2)
+    (OpndReg (RegL _),  OpndRM _ _)  -> (0x39 : makeModRM op1 op2)
+
+    (OpndRM _ _,  OpndReg (RegB _))  -> (0x3a : makeModRM op2 op1)
+    (OpndRM _ _,  OpndReg (RegW _))  -> (preLW : 0x3b : makeModRM op2 op1)
+    (OpndRM _ _,  OpndReg (RegL _))  -> (0x3b : makeModRM op2 op1)
+
+    -- 0x81, 0x83 handles cmp imm8, r/m8, cmp imm8, r/m32: no way to indicate imm8
     _ -> error $ "failed to assemble operands: " ++ show op1 ++ ", " ++ show op2
 bytesCmp _ = []
 

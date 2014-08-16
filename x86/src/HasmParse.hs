@@ -78,8 +78,9 @@ asmopnd = try (OpndImm <$> asmimm) <|>
           try (OpndReg <$> asmregister) <|>
           try asmmem <?> "opcode operand"
 
-immToDispl (ImmL imm) | imm < 0x100 = Displ8 $ fromIntegral imm
-immToDispl (ImmL imm) = Displ32 imm
+immToDispl (ImmL imm)
+    | (-128 <= imm) && (imm < 128) = Displ8 $ fromIntegral imm
+    | otherwise = Displ32 imm
 
 asmdispl = try (immToDispl <$> readIntegerLit)
            <|> (DisplLabel <$> symbol)
