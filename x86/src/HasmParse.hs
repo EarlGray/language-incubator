@@ -212,9 +212,43 @@ opsyntax = [
   ("add",   (OpAdd,  [2],   "lwb")),
   ("ret",   (OpRet,  [0,1], "w"  )),
   ("push",  (OpPush, [1],   "lwb")),
-  ("jmp",   (OpJmp,  [1],   "lwb")),
   ("cmp",   (OpCmp,  [2],   "lwb")),
-  ("int",   (OpInt,  [1],   "b"  )) ]
+  ("int",   (OpInt,  [1],   "b"  )),
+  ("jmp",   (OpJmp,  [1],   "lwb")),
+
+  ("je",    (OpJe,   [1],   ""   )),  -- ZF=1
+  ("jz",    (OpJe,   [1],   ""   )),
+  ("jne",   (OpJne,  [1],   ""   )),  -- ZF=0
+  ("jnz",   (OpJne,  [1],   ""   )),
+  ("jge",   (OpJge,  [1],   ""   )),  -- SF=OF
+  ("jnl",   (OpJge,  [1],   ""   )),
+  ("jl",    (OpJl,   [1],   ""   )),  -- SF<>OF
+  ("jnge",  (OpJl,   [1],   ""   )),
+  ("jle",   (OpJle,  [1],   ""   )),  -- ZF=1, SF<>OF
+  ("jng",   (OpJle,  [1],   ""   )),
+  ("jg",    (OpJg,   [1],   ""   )),  -- ZF=0, SF=OF
+  ("jnle",  (OpJg,   [1],   ""   )),
+  ("jnp",   (OpJnp,  [1],   ""   )),  -- PF=0
+  ("jpo",   (OpJnp,  [1],   ""   )),
+  ("jp",    (OpJp,   [1],   ""   )),  -- PF=1
+  ("jpe",   (OpJp,   [1],   ""   )),
+  ("jno",   (OpJno,  [1],   ""   )),  -- OF=0
+  ("jo",    (OpJo,   [1],   ""   )),  -- OF=1
+  ("jns",   (OpJns,  [1],   ""   )),  -- SF=0
+  ("js",    (OpJs,   [1],   ""   )),  -- SF=1
+  
+  ("jae",   (OpJnc,  [1],   ""   )),  -- CF=0
+  ("jnb",   (OpJnc,  [1],   ""   )),
+  ("jnc",   (OpJnc,  [1],   ""   )),
+  ("jc",    (OpJc,   [1],   ""   )),  -- CF=1
+  ("jb",    (OpJc,   [1],   ""   )),
+  ("jnae",  (OpJc,   [1],   ""   )),
+  ("ja",    (OpJa,   [1],   ""   )),  -- CF=0, ZF=0
+  ("jnbe",  (OpJa,   [1],   ""   )),
+  ("jbe",   (OpJbe,  [1],   ""   )),  -- CF=1, ZF=1
+  ("jna",   (OpJbe,  [1],   ""   )),
+
+  ("jecxz", (OpJecxz,[1],   ""   ))  ]
 
 opmap = M.fromList opsyntax
 

@@ -153,7 +153,23 @@ instance Serializable Operation where
 encoders = [
   (OpAdd, bytesAdd), (OpMov, bytesMov), (OpPush, bytesPush),
   (OpRet, bytesRet), (OpLRet, bytesLRet), (OpInt, bytesInt),
-  (OpJmp, bytesJmp), (OpCmp, bytesCmp) ]
+  (OpCmp, bytesCmp), (OpJmp, bytesJmp), 
+  (OpJa,  bytesJc [0x77] [0x0f, 0x87]), (OpJna,  bytesJc [0x76] [0x0f, 0x86]),
+  (OpJc,  bytesJc [0x72] [0x0f, 0x82]), (OpJnc,  bytesJc [0x73] [0x0f, 0x83]),
+  (OpJe,  bytesJc [0x74] [0x0f, 0x84]), (OpJne,  bytesJc [0x75] [0x0f, 0x85]),
+  (OpJl,  bytesJc [0x7c] [0x0f, 0x8c]), (OpJle,  bytesJc [0x7e] [0x0f, 0x8e]),
+  (OpJg,  bytesJc [0x7f] [0x0f, 0x8f]), (OpJge,  bytesJc [0x7d] [0x0f, 0x8d]),
+  (OpJo,  bytesJc [0x70] [0x0f, 0x80]), (OpJno,  bytesJc [0x71] [0x0f, 0x81]),
+  (OpJp,  bytesJc [0x7a] [0x0f, 0x8a]), (OpJnp,  bytesJc [0x7b] [0x0f, 0x8b]),
+  (OpJs,  bytesJc [0x78] [0x0f, 0x88]), (OpJns,  bytesJc [0x79] [0x0f, 0x89]),
+  (OpJbe, bytesJc [0x76] [0x0f, 0x86]), (OpJecxz, bytesJc [0xe3] []) ]
+
+-- JE, JA, JAE, JC, J
+bytesJc rel8 rel32 op =
+  case op of
+    [OpndRM noSIB (Displ8 moff)]  -> rel8 ++ bytecode moff
+    [OpndRM noSIB (Displ32 moff)] -> rel32 ++ bytecode moff
+    _ -> []
 
 -- PUSH
 bytesPush :: [OpOperand] -> [Word8]
@@ -304,7 +320,7 @@ bytesJmp :: [OpOperand] -> [Word8]
 bytesJmp [op] =
     case op of
       -- treat displacement as offset from EIP
-      OpndRM noSIB (Displ8 moffs8) -> [0xeb, int moffs8]
+      OpndRM noSIB (Displ8 moffs8) -> (0xeb : bytecode moffs8)
       OpndRM noSIB (Displ32 moffs) -> (0xe9 : bytecode moffs)
       -- treat ModRM/register value as absolute indirect offset
       --  e,g, jmp *0x100000, jmp *%eax, etc
