@@ -212,6 +212,7 @@ opsyntax = [
   ("ret",   (OpRet,  [0,1], "w"  )),
   ("push",  (OpPush, [1],   "lwb")),
   ("jmp",   (OpJmp,  [1],   "lwb")),
+  ("cmp",   (OpCmp,  [2],   "lwb")),
   ("int",   (OpInt,  [1],   "b"  )) ]
 
 opmap = M.fromList opsyntax
@@ -253,13 +254,26 @@ getOpndType opnd =
     OpndReg (RegW _) -> 'w'
     OpndReg (RegB _) -> 'b'
 
+getOperandsTypes :: OpSuffix -> [OpOperand] -> [OpSuffix]
+getOperandsTypes opsuf opnds = 
+  nub $ sort $ (opsuf : map getOpndType opnds)  -- what types are present?
+
 unifyOperandTypes :: OpInfo -> OpSuffix -> [OpOperand] -> Either String [OpOperand]
 unifyOperandTypes (opname, lens, sufs) opsuf opnds =
-  let ts' = nub $ sort $ map getOpndType opnds   -- what types are present in opnds?
-      ts = filter (not . flip elem "s?") ts'
-  in  if length ts < 2
-      then Right opnds  -- TODO: adjust type of OpndImm to OpndReg
-      else Left $ "Operand type mismatch"  -- TODO: e.g. movsx with different types
+  let ts = filter (not . flip elem "s?") $ getOperandsTypes opsuf opnds
+  in case ts of
+      ""    -> Right opnds
+      "l"   -> Right opnds  -- parser defaults to ImmL
+      "w"   -> adjustImmediatesWith immToW opnds
+      "b"   -> adjustImmediatesWith immToB opnds
+      _     -> Left $ "Operand type mismatch"  -- TODO: e.g. movsx with different types
+
+adjustImmediatesWith :: (ImmValue -> Either String ImmValue) -> 
+                        [OpOperand] -> Either String [OpOperand]
+adjustImmediatesWith adjimm = mapM adj
+  where
+    adj (OpndImm imm) = OpndImm <$> adjimm imm
+    adj op = Right op
 
 immToW :: ImmValue -> Either String ImmValue
 immToW (ImmW imm) = Right (ImmW imm)
