@@ -215,6 +215,7 @@ opsyntax = [
   ("cmp",   (OpCmp,  [2],   "lwb")),
   ("int",   (OpInt,  [1],   "b"  )),
   ("jmp",   (OpJmp,  [1],   "lwb")),
+  ("imul",  (OpIMul, [1,2,3],"lwb")),
 
   ("je",    (OpJe,   [1],   ""   )),  -- ZF=1
   ("jz",    (OpJe,   [1],   ""   )),

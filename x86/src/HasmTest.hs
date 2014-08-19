@@ -31,11 +31,10 @@ loop_jmp_s = [
   HasmStLabel "loop_start",
   instr OpJmp [label "loop_start"] ]
 
-{-
 factorial_s = [
   instr OpMov [regdspl RegESP (Displ8 4), regl RegECX],
   instr OpCmp [imml 1, regl RegECX],
-  instr OpJE  [label "lbl1"],
+  instr OpJe  [label "lbl1"],
   instr OpMov [imml 1, regl RegEAX],
   instr OpMov [imml 1, regl RegEDX],
   HasmStLabel "lbl2",
@@ -47,10 +46,21 @@ factorial_s = [
   HasmStLabel "lbl1",
   instr OpMov [imml 1, regl RegEAX],
   instr OpRet [] ]
--}
 
 fromRight = either (error "fromRight $ Left ...") id
 
 assembleStmts :: [HasmStatement] -> [(HasmStatement, SrcPos, [Word8])]
 assembleStmts = fromRight . assembleFromZero . withTestSrc
 
+testParse s =
+  case hasmParseWithSource "~" s of
+    Right stmts -> stmts
+    Left e -> error $ show e
+
+testAssemble stmts =
+  case assembleFromZero stmts of
+    Right res -> res
+    Left e -> error $ show e
+
+test = testAssemble . testParse
+-- e.g. ghci> putPretty $ test "imull (%edi)"

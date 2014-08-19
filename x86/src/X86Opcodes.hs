@@ -19,7 +19,7 @@ import Data.ByteString.Lazy (unpack)
 import qualified Data.ByteString as B
 
 srcModRM :: Register -> [Word8] -> [Word8]
-srcModRM reg (modrm : rest) = (((indexOfReg reg `shiftL` 3) .|. modrm) : rest)
+srcModRM reg (modrm : rest) = (((index reg `shiftL` 3) .|. modrm) : rest)
 
 -- make ModRM, possible SIB and/or Displacement taken from the second OpOperand
 makeModRM :: OpOperand -> OpOperand -> [Word8]
@@ -28,7 +28,7 @@ makeModRM (OpndReg src) dst = srcModRM src $ makeModRM0 dst
 -- makeModRM just for dst
 makeModRM0 :: OpOperand -> [Word8]
 
-makeModRM0 (OpndReg reg) = [ 0xC0 .|. indexOfReg reg ]
+makeModRM0 (OpndReg reg) = [ 0xC0 .|. index reg ]
 makeModRM0 (OpndRM sib displ) =
       case (sib, displ) of
         -- 32-bit memory offset
@@ -87,10 +87,8 @@ makeModRM0 (OpndRM sib displ) =
 
 
 -- these are stubs for embedding numerical value into modRM
---  as required by /0 or /6 commands
-fourReg = OpndReg (RegL RegESP)
-sixReg  = OpndReg (RegL RegEBP)     -- use bare displacement
-sevenReg = OpndReg (RegL RegEDI)    -- modRM /7
+--  as required by, e.g. /0 or /6 commands
+stubRM n = OpndReg (RegL (toEnum n :: GPRegister))
 
 -- modRM flags:
 useSIB = 0x04
@@ -153,7 +151,7 @@ instance Serializable Operation where
 encoders = [
   (OpAdd, bytesAdd), (OpMov, bytesMov), (OpPush, bytesPush),
   (OpRet, bytesRet), (OpLRet, bytesLRet), (OpInt, bytesInt),
-  (OpCmp, bytesCmp), (OpJmp, bytesJmp), 
+  (OpCmp, bytesCmp), (OpIMul, bytesIMul), (OpJmp, bytesJmp),
   (OpJa,  bytesJc [0x77] [0x0f, 0x87]), (OpJna,  bytesJc [0x76] [0x0f, 0x86]),
   (OpJc,  bytesJc [0x72] [0x0f, 0x82]), (OpJnc,  bytesJc [0x73] [0x0f, 0x83]),
   (OpJe,  bytesJc [0x74] [0x0f, 0x84]), (OpJne,  bytesJc [0x75] [0x0f, 0x85]),
@@ -189,7 +187,7 @@ bytesPush [opnd] =
             where opcodes =
                     [(RegES, [0x06]), (RegCS, [0x0e]), (RegSS, [0x16]),
                      (RegDS, [0x1e]), (RegFS, [0x0f, 0xa0]), (RegGS, [0x0f, 0xa8])]
-    OpndRM _ _    -> (0xff : makeModRM sixReg opnd)
+    OpndRM _ _    -> (0xff : makeModRM (stubRM 6) opnd)
 bytesPush _ = []
 
 -- RET, LRET
@@ -249,6 +247,38 @@ bytesAdd [op1, op2] =
 bytesAdd _ = []
 
 
+-- IMUL, signed multiplication
+bytesIMul :: [OpOperand] -> [Word8]
+bytesIMul ops =
+  case ops of
+    [op1] ->
+      case op1 of
+        --OpndRM _ _ -> (0xf6 : makeModRM (stubRM 5) op1)   -- if r/m8
+        --OpndRM _ _ -> (preLW : 0xf7 : makeModRM (stubRM 5) op1)
+        OpndRM _ _ -> (0xf7 : makeModRM (stubRM 5) op1)
+        _ -> []
+
+    [op1, op2] ->
+      case (op1, op2) of
+        (OpndRM _ _,    OpndReg (RegW _)) ->
+            (preLW : 0x0f : 0xaf : makeModRM op2 op1)
+        (OpndRM _ _,    OpndReg (RegL _)) ->
+            (0x0f : 0xaf : makeModRM op2 op1)
+        _ -> []
+
+    [op1, op2, op3] ->
+      case (op1, op2, op3) of
+        (OpndImm (ImmB imm),  OpndRM _ _, OpndReg (RegW _)) ->
+            (preLW : 0x6b : makeModRM op3 op2) ++ bytecode imm
+        (OpndImm (ImmB imm),  OpndRM _ _, OpndReg (RegL _)) ->
+            (0x6b : makeModRM op3 op2) ++ bytecode imm
+        (OpndImm (ImmW imm), OpndRM _ _, OpndReg (RegW _)) ->
+            (preLW : 0x69 : makeModRM op3 op2) ++ bytecode imm
+        (OpndImm (ImmL imm), OpndRM _ _, OpndReg (RegL _)) ->
+            (0x69 : makeModRM op3 op2) ++ bytecode imm
+        _ -> []
+    _ -> error $ "failed to assemble operands: " ++ show ops
+
 -- MOV
 bytesMov :: [OpOperand] -> [Word8]
 
@@ -299,9 +329,9 @@ bytesCmp [op1, op2] =
     (OpndImm (ImmW imm), OpndReg (RegW RegAX))      -> (preLW : 0x3d : bytecode imm)
     (OpndImm (ImmL imm), OpndReg (RegL RegEAX))     -> (0x3d : bytecode imm)
 
-    (OpndImm (ImmB imm), OpndRM _ _) -> (0x80 : makeModRM sevenReg op2) ++ bytecode imm
-    (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM sevenReg op2) ++ bytecode imm
-    (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM sevenReg op2) ++ bytecode imm
+    (OpndImm (ImmB imm), OpndRM _ _) -> (0x80 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
 
     (OpndReg (RegB _),  OpndRM _ _)  -> (0x38 : makeModRM op1 op2)
     (OpndReg (RegW _),  OpndRM _ _)  -> (preLW : 0x39 : makeModRM op1 op2)
@@ -324,7 +354,7 @@ bytesJmp [op] =
       OpndRM noSIB (Displ32 moffs) -> (0xe9 : bytecode moffs)
       -- treat ModRM/register value as absolute indirect offset
       --  e,g, jmp *0x100000, jmp *%eax, etc
-      OpndRM _ _ -> (0xff : makeModRM fourReg op)
-      OpndReg _ -> (0xff : makeModRM fourReg op)
+      OpndRM _ _ -> (0xff : makeModRM (stubRM 4) op)
+      OpndReg _ -> (0xff : makeModRM (stubRM 4) op)
 bytesJmp _ = []
 

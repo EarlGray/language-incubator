@@ -43,8 +43,10 @@ instance PrettyPrintable Instr where
       case lookup op dict of
         Just s -> s
         Nothing -> error "No pretty representation for " ++ show op
-      where dict = [ (OpMov, "mov"), (OpInt, "int"), (OpAdd, "add"), (OpPush, "push"),
-                     (OpRet, "ret"), (OpLRet, "lret"), (OpCmp, "cmp"), (OpJmp, "jmp") ] 
+      where dict = [
+             (OpMov, "mov"), (OpInt, "int"), (OpAdd, "add"), (OpPush, "push"),
+             (OpRet, "ret"), (OpLRet, "lret"), (OpCmp, "cmp"), (OpJmp, "jmp" ),
+             (OpIMul, "imul") ]
 
 instance PrettyPrintable OpOperand where
     pretty (OpndImm imm) = "$" ++ pretty imm
@@ -61,25 +63,25 @@ instance PrettyPrintable Register where
 
 instance PrettyPrintable GPRegister where
     pretty reg = 
-      case lookup reg (zip allGPRegs gpRegNames) of
+      case lookup reg (zip (enumAll :: [GPRegister]) gpRegNames) of
         Just s -> "%" ++ s
         Nothing -> error "No pretty name for " ++ show reg
 
 instance PrettyPrintable GPRegisterW where
     pretty reg =
-     case lookup reg (zip allGPWRegs gpWRegNames) of
+     case lookup reg (zip (enumAll :: [GPRegisterW]) gpWRegNames) of
        Just s -> "%" ++ s
        Nothing -> error "No pretty name for " ++ show reg
 
 instance PrettyPrintable GPRegisterB where
     pretty reg =
-      case lookup reg (zip allGPBRegs gpBRegNames) of
+      case lookup reg (zip (enumAll :: [GPRegisterB]) gpBRegNames) of
         Just s -> "%" ++ s
         Nothing -> error "No pretty name for " ++ show reg
 
 instance PrettyPrintable SegRegister where
     pretty sreg =
-      case lookup sreg (zip allSegRegs segRegNames) of
+      case lookup sreg (zip (enumAll :: [SegRegister]) segRegNames) of
         Just s -> "%" ++ s
         Nothing -> error "No pretty name for " ++ show sreg
 
