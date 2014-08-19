@@ -14,50 +14,42 @@ data Register
 data GPRegister
     = RegEAX | RegECX | RegEDX | RegEBX
     | RegESP | RegEBP | RegESI | RegEDI
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Enum)
 data GPRegisterW
     = RegAX | RegCX | RegDX | RegBX
     | RegSP | RegBP | RegSI | RegDI
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Enum)
 data GPRegisterB
     = RegAL | RegCL | RegDL | RegBL
     | RegAH | RegCH | RegDH | RegBH
     | RegSPL | RegBPL | RegSIL | RegDIL
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Enum)
 data SegRegister
-    = RegCS | RegSS
-    | RegDS | RegES | RegFS | RegGS
-  deriving (Show, Read, Eq)
+    = RegES | RegCS | RegSS | RegDS | RegFS | RegGS
+  deriving (Show, Read, Eq, Enum)
 
-allGPRegs = [RegEAX, RegECX, RegEDX, RegEBX, RegESP, RegEBP, RegESI, RegEDI]
-allGPWRegs = [RegAX, RegCX, RegDX, RegBX, RegSP, RegBP, RegSI, RegDI]
-allGPBRegs = [RegAL, RegCL, RegDL, RegBL, RegAH, RegCH, RegDH, RegBH]
-allSegRegs = [RegES, RegCS, RegSS, RegDS, RegFS, RegGS]
+enumAll :: Enum a => [a]
+enumAll = enumFrom (toEnum 0)
 
 gpRegNames = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
 gpWRegNames = ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"]
 gpBRegNames = ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"]
 segRegNames = ["es", "cs", "ss", "ds", "fs", "gs"]
 
-lkupRegL = zip gpRegNames allGPRegs
-lkupRegW = zip gpWRegNames allGPWRegs
-lkupRegB = zip gpBRegNames allGPBRegs
-lkupSReg = zip segRegNames allSegRegs
+lkupRegL = zip gpRegNames  (enumAll :: [GPRegister])
+lkupRegW = zip gpWRegNames (enumAll :: [GPRegisterW])
+lkupRegB = zip gpBRegNames (enumAll :: [GPRegisterB])
+lkupSReg = zip segRegNames (enumAll :: [SegRegister])
 
 mbRegByName :: String -> Maybe Register
 mbRegByName rname =
-  case lookup rname lkupRegL of
-    Just reg -> Just $ RegL reg
-    Nothing ->
-      case lookup rname lkupRegW of
-        Just reg -> Just $ RegW reg
-        Nothing ->
-          case lookup rname lkupRegB of
-            Just reg -> Just $ RegB reg
-            Nothing ->
-              case lookup rname lkupSReg of
-                Just reg -> Just $ SReg reg
-                Nothing -> Nothing
+  let onSnd f (a,b) = (a, f b)
+      wrap with tbl = map (onSnd with) tbl
+      regls = wrap RegL lkupRegL
+      regws = wrap RegW lkupRegW
+      regbs = wrap RegB lkupRegB
+      sregs = wrap SReg lkupSReg
+  in lookup rname $ concat [regls, regws, regbs, sregs]
 
 {-
  - Indexable: enumerations to bit representation
@@ -66,21 +58,21 @@ class Indexable a where
     index :: a -> Word8
 
 instance Indexable GPRegister where
-    index reg = fromJust $ lookup reg (zip allGPRegs [0..7])
+    index reg = fromIntegral $ fromEnum reg
 instance Indexable GPRegisterW where
-    index reg = fromJust $ lookup reg (zip allGPWRegs [0..7])
+    index reg = fromIntegral $ fromEnum reg
 instance Indexable GPRegisterB where
-    index reg = case lookup reg (zip allGPBRegs [0..7]) of
-                    Just ind -> ind
-                    Nothing -> error "SPL/BPL/SIL/DIL registers can't be indexed"
+    index reg = fromIntegral $ fromEnum reg
 instance Indexable SegRegister where
-    index reg = fromJust $ lookup reg (zip allSegRegs [0..5])
+    index reg = fromIntegral $ fromEnum reg
 
-indexOfReg :: Register -> Word8
-indexOfReg (RegL reg) = index reg
-indexOfReg (RegW reg) = index reg
-indexOfReg (RegB reg) = index reg
-indexOfReg (SReg sr) = index sr
+instance Indexable Register where
+    index r =
+       case r of 
+         RegL reg -> index reg
+         RegW reg -> index reg
+         RegB reg -> index reg
+         SReg sr  -> index sr
 
 {-
  - Machine operations
@@ -91,7 +83,8 @@ data Instr = OpPush | OpRet | OpLRet | OpInt | OpAdd | OpMov | OpJmp
            | OpCmp  | OpJe  | OpJne  | OpJa  | OpJna | OpJnae| OpJge 
            | OpJae  | OpJl  | OpJle  | OpJg  | OpJnp | OpJp  | OpJno  
            | OpJo   | OpJs  | OpJns  | OpJc  | OpJnc | OpJbe | OpJecxz
-  deriving (Show, Read, Eq)
+           | OpIMul
+  deriving (Show, Read, Eq, Enum)
 
 data Operation = Operation Instr [OpOperand]
   deriving (Show, Read, Eq)
