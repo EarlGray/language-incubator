@@ -46,7 +46,12 @@ instance PrettyPrintable Instr where
       where dict = [
              (OpMov, "mov"), (OpInt, "int"), (OpAdd, "add"), (OpPush, "push"),
              (OpRet, "ret"), (OpLRet, "lret"), (OpCmp, "cmp"), (OpJmp, "jmp" ),
-             (OpIMul, "imul") ]
+             (OpIMul, "imul"),
+             (OpJe, "je"), (OpJne, "jne"), (OpJa, "ja"), (OpJna,  "jna"),
+             (OpJc, "jc"), (OpJnc, "jnc"), (OpJl, "jl"), (OpJle, "jle"),
+             (OpJg, "jg"), (OpJge, "jge"), (OpJo, "jo"), (OpJno, "jno"),
+             (OpJp, "jp"),  (OpJnp, "jnp"), (OpJs, "js"), (OpJns, "jns"),
+             (OpJbe,"jbe"), (OpJecxz, "jecxz") ]
 
 instance PrettyPrintable OpOperand where
     pretty (OpndImm imm) = "$" ++ pretty imm

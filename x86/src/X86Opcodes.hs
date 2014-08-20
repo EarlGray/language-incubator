@@ -264,6 +264,10 @@ bytesIMul ops =
             (preLW : 0x0f : 0xaf : makeModRM op2 op1)
         (OpndRM _ _,    OpndReg (RegL _)) ->
             (0x0f : 0xaf : makeModRM op2 op1)
+        (OpndReg (RegW _),    OpndReg (RegW _)) ->
+            (preLW : 0x0f : 0xaf : makeModRM op2 op1)
+        (OpndReg (RegL _),    OpndReg (RegL _)) ->
+            (0x0f : 0xaf : makeModRM op2 op1)
         _ -> []
 
     [op1, op2, op3] ->
@@ -329,9 +333,17 @@ bytesCmp [op1, op2] =
     (OpndImm (ImmW imm), OpndReg (RegW RegAX))      -> (preLW : 0x3d : bytecode imm)
     (OpndImm (ImmL imm), OpndReg (RegL RegEAX))     -> (0x3d : bytecode imm)
 
+    (OpndImm (ImmB imm), OpndReg (RegB _)) -> (0x80 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm (ImmW imm), OpndReg (RegW _)) -> (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm (ImmL imm), OpndReg (RegL _)) -> (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+
     (OpndImm (ImmB imm), OpndRM _ _) -> (0x80 : makeModRM (stubRM 7) op2) ++ bytecode imm
     (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
     (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+
+    (OpndReg (RegB _),  OpndReg (RegB _))  -> (0x38 : makeModRM op1 op2)
+    (OpndReg (RegW _),  OpndReg (RegW _))  -> (preLW : 0x39 : makeModRM op1 op2)
+    (OpndReg (RegL _),  OpndReg (RegL _))  -> (0x39 : makeModRM op1 op2)
 
     (OpndReg (RegB _),  OpndRM _ _)  -> (0x38 : makeModRM op1 op2)
     (OpndReg (RegW _),  OpndRM _ _)  -> (preLW : 0x39 : makeModRM op1 op2)

@@ -3,6 +3,8 @@
   cmpw $0x0fff, %ax      # 66 3D ff 0f
   cmpl $0x10000, %eax    # 3D 00 00 01 00
 
+  cmp %eax, %eax         # 39 c0
+
   cmpb $0x42, (%edi)                    # 80 3f 42
   cmpb $0x42, (%esp)                    # 80 3c 24 42
   cmpb $0x42, (%ebp)                    # 80 7d 00 42
