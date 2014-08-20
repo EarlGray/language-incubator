@@ -47,20 +47,24 @@ factorial_s = [
   instr OpMov [imml 1, regl RegEAX],
   instr OpRet [] ]
 
-fromRight = either (error "fromRight $ Left ...") id
 
+--- test functions for GHCi ----
+fromRight :: Show e => Either e a -> a
+fromRight = either (error . show) id
+
+assembleWithBase addr pstmts = firstPass (addr, emptyLblDb) pstmts >>= secondPass addr
+assembleFromZero = assembleWithBase 0
+
+withTestSrc = map (\s -> (s, SrcPos "test.s" 0 0))
 assembleStmts :: [HasmStatement] -> [(HasmStatement, SrcPos, [Word8])]
 assembleStmts = fromRight . assembleFromZero . withTestSrc
 
-testParse s =
-  case hasmParseWithSource "~" s of
-    Right stmts -> stmts
-    Left e -> error $ show e
-
-testAssemble stmts =
-  case assembleFromZero stmts of
-    Right res -> res
-    Left e -> error $ show e
+testParse s        = fromRight $ hasmParseWithSource "~" s 
+testAssemble stmts = fromRight $ assembleFromZero stmts 
 
 test = testAssemble . testParse
--- e.g. ghci> putPretty $ test "imull (%edi)"
+testcmds = testAssemble . withTestSrc
+
+-- e.g.
+--  ghci> putPretty $ test "imull (%edi)"
+--  ghci> putPretty $ testcmds factorial_s

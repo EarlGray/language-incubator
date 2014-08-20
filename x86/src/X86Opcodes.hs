@@ -2,6 +2,7 @@ module X86Opcodes (
   Operation(..),
   OpOperand(..),
   Serializable(..),
+  bytecodeWithPos,
   Symbol,
   SIB, Displacement,
 ) where
@@ -13,6 +14,7 @@ import Data.Word
 import Data.Int
 import Data.Bits
 
+import Data.List (genericLength)
 import Data.Maybe (fromJust)
 import Data.Binary.Put (putWord32le, putWord16le, runPut)
 import Data.ByteString.Lazy (unpack)
@@ -148,10 +150,19 @@ instance Serializable Operation where
       Just encode -> encode opnds
       Nothing -> error $ "No encoder for operation " ++ show op
 
+bytecodeWithPos :: Operation -> Word32 -> [Word8]
+bytecodeWithPos oper@(Operation op opnds) addr =
+    case lookup op positionAwareEncoders of
+      Just encoder -> encoder addr opnds
+      _ -> bytecode oper
+
 encoders = [
   (OpAdd, bytesAdd), (OpMov, bytesMov), (OpPush, bytesPush),
   (OpRet, bytesRet), (OpLRet, bytesLRet), (OpInt, bytesInt),
-  (OpCmp, bytesCmp), (OpIMul, bytesIMul), (OpJmp, bytesJmp),
+  (OpCmp, bytesCmp), (OpIMul, bytesIMul) ]
+
+positionAwareEncoders = [
+  (OpJmp, bytesJmp),
   (OpJa,  bytesJc [0x77] [0x0f, 0x87]), (OpJna,  bytesJc [0x76] [0x0f, 0x86]),
   (OpJc,  bytesJc [0x72] [0x0f, 0x82]), (OpJnc,  bytesJc [0x73] [0x0f, 0x83]),
   (OpJe,  bytesJc [0x74] [0x0f, 0x84]), (OpJne,  bytesJc [0x75] [0x0f, 0x85]),
@@ -162,11 +173,13 @@ encoders = [
   (OpJs,  bytesJc [0x78] [0x0f, 0x88]), (OpJns,  bytesJc [0x79] [0x0f, 0x89]),
   (OpJbe, bytesJc [0x76] [0x0f, 0x86]), (OpJecxz, bytesJc [0xe3] []) ]
 
--- JE, JA, JAE, JC, J
-bytesJc rel8 rel32 op =
+-- JE, JA, JAE, JC, J..
+bytesJc bs8 bs32 addr op =
   case op of
-    [OpndRM noSIB (Displ8 moff)]  -> rel8 ++ bytecode moff
-    [OpndRM noSIB (Displ32 moff)] -> rel32 ++ bytecode moff
+    [OpndRM noSIB (Displ8 moff)]  -> bs8 ++ bytecode moff
+    [OpndRM noSIB (Displ32 moff)] ->
+        let rel32 = moff - (addr + genericLength bs32 + 4)  -- 4 == length (bytecode displ32)
+        in bs32 ++ bytecode rel32
     _ -> []
 
 -- PUSH
@@ -219,12 +232,24 @@ bytesAdd [op1, op2] =
     (OpndImm (ImmL imm), OpndReg (RegL RegEAX)) -> (0x05 : bytecode imm)
 
     (OpndImm (ImmB imm), OpndRM _ _) -> [0x80] ++ makeModRM0 op2 ++ bytecode imm
-    (OpndImm (ImmW imm), OpndRM _ _) -> [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
-    (OpndImm (ImmL imm), OpndRM _ _) -> [0x81] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImm iv@(ImmW imm), OpndRM _ _) ->
+        if (isWord8 iv)
+        then (preLW : 0x83 : makeModRM0 op2) ++ bytecode (int imm :: Word8)
+        else (preLW : 0x81 : makeModRM0 op2) ++ bytecode imm
+    (OpndImm iv@(ImmL imm), OpndRM _ _) ->
+        if (isWord8 iv)
+        then (0x83 : makeModRM0 op2) ++ bytecode (int imm :: Word8)
+        else (0x81 : makeModRM0 op2) ++ bytecode imm
 
     (OpndImm (ImmB imm), OpndReg (RegB _)) -> [0x80] ++ makeModRM0 op2 ++ bytecode imm
-    (OpndImm (ImmW imm), OpndReg (RegW _)) -> [preLW, 0x81] ++ makeModRM0 op2 ++ bytecode imm
-    (OpndImm (ImmL imm), OpndReg (RegL _)) -> [0x81] ++ makeModRM0 op2 ++ bytecode imm
+    (OpndImm iv@(ImmW imm), OpndReg (RegW _)) ->
+        if (isWord8 iv)
+        then (preLW : 0x83 : makeModRM0 op2) ++ bytecode (int imm :: Word8)
+        else (preLW : 0x81 : makeModRM0 op2) ++ bytecode imm
+    (OpndImm iv@(ImmL imm), OpndReg (RegL _)) ->
+        if (isWord8 iv)
+        then (0x83 : makeModRM0 op2) ++ bytecode (int imm :: Word8)
+        else (0x81 : makeModRM0 op2) ++ bytecode imm
 
     -- sign-extend:
     (OpndImm (ImmB imm), OpndReg (RegL _)) -> [0x83] ++ makeModRM0 op2 ++ bytecode imm
@@ -334,12 +359,24 @@ bytesCmp [op1, op2] =
     (OpndImm (ImmL imm), OpndReg (RegL RegEAX))     -> (0x3d : bytecode imm)
 
     (OpndImm (ImmB imm), OpndReg (RegB _)) -> (0x80 : makeModRM (stubRM 7) op2) ++ bytecode imm
-    (OpndImm (ImmW imm), OpndReg (RegW _)) -> (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
-    (OpndImm (ImmL imm), OpndReg (RegL _)) -> (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm iv@(ImmW imm), OpndReg (RegW _)) ->
+        if (isWord8 iv)
+        then (preLW : 0x83 : makeModRM (stubRM 7) op2) ++ bytecode (int imm :: Word8)
+        else (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm iv@(ImmL imm), OpndReg (RegL _)) ->
+        if (isWord8 iv)
+        then (0x83 : makeModRM (stubRM 7) op2) ++ bytecode (int imm :: Word8)
+        else (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
 
     (OpndImm (ImmB imm), OpndRM _ _) -> (0x80 : makeModRM (stubRM 7) op2) ++ bytecode imm
-    (OpndImm (ImmW imm), OpndRM _ _) -> (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
-    (OpndImm (ImmL imm), OpndRM _ _) -> (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm iv@(ImmW imm), OpndRM _ _) ->
+        if (isWord8 iv)
+        then (preLW : 0x83 : makeModRM (stubRM 7) op2) ++ bytecode (int imm :: Word8)
+        else (preLW : 0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
+    (OpndImm iv@(ImmL imm), OpndRM _ _) ->
+        if (isWord8 iv)
+        then (0x83 : makeModRM (stubRM 7) op2) ++ bytecode (int imm :: Word8)
+        else (0x81 : makeModRM (stubRM 7) op2) ++ bytecode imm
 
     (OpndReg (RegB _),  OpndReg (RegB _))  -> (0x38 : makeModRM op1 op2)
     (OpndReg (RegW _),  OpndReg (RegW _))  -> (preLW : 0x39 : makeModRM op1 op2)
@@ -353,20 +390,21 @@ bytesCmp [op1, op2] =
     (OpndRM _ _,  OpndReg (RegW _))  -> (preLW : 0x3b : makeModRM op2 op1)
     (OpndRM _ _,  OpndReg (RegL _))  -> (0x3b : makeModRM op2 op1)
 
-    -- 0x81, 0x83 handles cmp imm8, r/m8, cmp imm8, r/m32: no way to indicate imm8
     _ -> error $ "failed to assemble operands: " ++ show op1 ++ ", " ++ show op2
 bytesCmp _ = []
 
 -- JMP
-bytesJmp :: [OpOperand] -> [Word8]
-bytesJmp [op] =
+bytesJmp :: Word32 -> [OpOperand] -> [Word8]
+bytesJmp addr [op] =
     case op of
       -- treat displacement as offset from EIP
       OpndRM noSIB (Displ8 moffs8) -> (0xeb : bytecode moffs8)
-      OpndRM noSIB (Displ32 moffs) -> (0xe9 : bytecode moffs)
+      OpndRM noSIB (Displ32 moffs) ->
+        let rel32 = (moffs - (addr + 5))    -- 5 == length (0xe9 : displ32)
+        in (0xe9 : bytecode rel32)
       -- treat ModRM/register value as absolute indirect offset
       --  e,g, jmp *0x100000, jmp *%eax, etc
       OpndRM _ _ -> (0xff : makeModRM (stubRM 4) op)
       OpndReg _ -> (0xff : makeModRM (stubRM 4) op)
-bytesJmp _ = []
+bytesJmp _ _ = []
 

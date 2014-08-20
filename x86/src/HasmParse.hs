@@ -78,8 +78,8 @@ asmopnd = try (OpndImm <$> asmimm) <|>
           try (OpndReg <$> asmregister) <|>
           try asmmem <?> "opcode operand"
 
-immToDispl (ImmL imm)
-    | (-128 <= imm) && (imm < 128) = Displ8 $ fromIntegral imm
+immToDispl iv@(ImmL imm)
+    | isWord8 iv = Displ8 $ fromIntegral imm
     | otherwise = Displ32 imm
 
 asmdispl = try (immToDispl <$> readIntegerLit)
@@ -310,18 +310,6 @@ adjustImmediatesWith adjimm = mapM adj
   where
     adj (OpndImm imm) = OpndImm <$> adjimm imm
     adj op = Right op
-
-immToW :: ImmValue -> Either String ImmValue
-immToW (ImmW imm) = Right (ImmW imm)
-immToW (ImmB imm) = Right (ImmW (int imm))
-immToW (ImmL imm) | imm < 0x10000 = Right (ImmW (int imm))
-immToW imm = Left $ "Value " ++ show imm ++ " is too large for a word"
-
-immToB :: ImmValue -> Either String ImmValue
-immToB (ImmB imm) = Right (ImmB imm)
-immToB (ImmW imm) | imm < 0x100 = Right (ImmB (int imm))
-immToB (ImmL imm) | imm < 0x100 = Right (ImmB (int imm))
-immToB imm = Left $ "Value " ++ show imm ++ " is too large for a word"
 
 toHasmPos :: SourcePos -> SrcPos
 toHasmPos src = SrcPos (sourceName src) (sourceLine src) (sourceColumn src)

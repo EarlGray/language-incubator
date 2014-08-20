@@ -4,7 +4,7 @@ module HasmTypes (
   module Data.Int,
   module X86CPU,
   -- routines:
-  safeHead, int,
+  safeHead, int, immToW, immToB, isWord8,
 
   HasmStatement(..), Directive(..), 
   ParseResult, HasmStmtWithPos, SrcPos(..)
@@ -17,6 +17,23 @@ import Data.Int
 
 int :: (Integral a, Num b) => a -> b
 int = fromIntegral
+
+isWord8 :: ImmValue -> Bool
+isWord8 (ImmB imm) = True
+isWord8 (ImmW imm) = imm < 0x100
+isWord8 (ImmL imm) = imm < 0x100
+
+immToW :: ImmValue -> Either String ImmValue
+immToW (ImmW imm) = Right (ImmW imm)
+immToW (ImmB imm) = Right (ImmW (int imm))
+immToW (ImmL imm) | imm < 0x10000 = Right (ImmW (int imm))
+immToW imm = Left $ "Value " ++ show imm ++ " is too large for a word"
+
+immToB :: ImmValue -> Either String ImmValue
+immToB (ImmB imm) = Right (ImmB imm)
+immToB (ImmW imm) | imm < 0x100 = Right (ImmB (int imm))
+immToB (ImmL imm) | imm < 0x100 = Right (ImmB (int imm))
+immToB imm = Left $ "Value " ++ show imm ++ " is too large for a word"
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
