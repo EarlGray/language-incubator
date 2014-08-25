@@ -126,9 +126,9 @@ asmsib = do
     _ -> fail "SIB format is invalid"
   where
     makeSIB scale mbInd mbBase =
-      if scale `elem` [1,2,4]
+      if scale `elem` [1,2,4,8]
       then return $ SIB (fromIntegral scale) mbInd mbBase
-      else fail "Scale is not 1,2,4"
+      else fail "Scale is not 1,2,4,8"
 
 
 asmregister = do
