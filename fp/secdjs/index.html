@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<script src='secd.js'></script>
+<script>
+function runSECD() {
+    var rectest = arr2cons(
+        ["DUM", "LDC", nil(),
+         "LDF", arr2cons([arr2cons(['x']), arr2cons([
+                  'LDC', 0, 'LD', 'x', 'EQ',
+                  'SEL', arr2cons(['LDC', 1, 'JOIN']),
+                         arr2cons(['LD', 'x',
+                                   'LDC', nil(),
+                                   'LDC', '1', 'LD', 'x', 'SUB',
+                                   'CONS',
+                                   'LD', 'fact', 'AP',
+                                   'MUL', 'JOIN']),
+                  'RTN'])]),
+         "CONS",
+         "LDF", arr2cons([arr2cons(['fact']), arr2cons([
+                    'LDC', nil(), 'LDC', 8, 'CONS',
+                    'LD', 'fact', 'AP', 'RTN',
+                ])]),
+         "RAP", "STOP"]);
+    var secd = new Secd(rectest);
+    secd.run();
+}
+</script>
+</head>
+<body>
+<input type='button' value='run' onclick='runSECD();' />
+</body>
+</html>
