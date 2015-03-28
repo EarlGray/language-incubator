@@ -26,7 +26,10 @@ int main(int argc, char const *argv[]) {
     LLVMModuleRef mod = LLVMModuleCreateWithName("sum");
 
     LLVMTypeRef param_types[] = { LLVMInt32Type(), LLVMInt32Type() };
-    LLVMTypeRef ret_type = LLVMFunctionType(LLVMInt32Type(), param_types, 2, 0);
+    LLVMTypeRef ret_type = LLVMFunctionType(LLVMInt32Type(), /* ret type */
+                                            param_types, /* arg types */
+                                            2, /* arg count */
+                                            0 /* is variadic */);
     LLVMValueRef sum = LLVMAddFunction(mod, "sum", ret_type);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(sum, "entry");
