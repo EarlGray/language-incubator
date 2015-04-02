@@ -2,11 +2,11 @@
   open Parser
 }
 
-let var = ['a'-'z' 'A'-'Z']
+let var = ['a'-'z' 'A'-'Z']+
 
 rule token = parse
   | [' ' '\t' '\n' '\r']  { token lexbuf }
-  | ['0'-'9']             { INT (int_of_string(Lexing.lexeme lexbuf)) }
+  | ['0'-'9']+            { INT (int_of_string(Lexing.lexeme lexbuf)) }
   | "int"                 { TINT }
   | "bool"                { TBOOL }
   | "true"                { TRUE }

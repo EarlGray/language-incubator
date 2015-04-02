@@ -22,4 +22,4 @@ miniml: $(CMOFILES)
 	$(OCAMLYACC) $<
 
 clean:
-	rm parser.ml parser.mli lexer.ml ; rm *.cmo *.cmi
+	rm parser.ml parser.mli lexer.ml ; rm *.cmo *.cmi ; true
