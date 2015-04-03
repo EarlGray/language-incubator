@@ -29,10 +29,9 @@ and type_of ctx = function
   | Less (e1, e2) -> check ctx TInt e1 ; check ctx TInt e2 ; TBool
   | Cons (e1, e2) -> let ty = type_of ctx e1 in check ctx (TList ty) e2 ; TList ty
   | If (e1, e2, e3) ->
-      check ctx e1 TBool ;
+      check ctx TBool e1 ;
       let ty = type_of ctx e2 in
-        check ctx ty e3 ;
-      ty
+        check ctx ty e3 ; ty
   | Fun (x, ty, e) -> TArrow (ty, type_of ((x, ty)::ctx) e)
   | Rec (x, ty, e) -> check ((x, ty)::ctx) ty e ; ty
   | Match (e1, ty, e2, x, y, e3) ->
@@ -53,13 +52,13 @@ and type_of ctx = function
                          ^ string_of_type ty))
   | Pair (e1, e2) -> TTimes (type_of ctx e1, type_of ctx e2)
   | Fst e ->
-    (match type_of ctx e1 with 
+    (match type_of ctx e with 
       | TTimes (ty1, _) -> ty1
       | ty -> type_error (string_of_expr e
                          ^ " is used a pair, but its type is "
                          ^ string_of_type ty))
   | Snd e ->
-    (match type_of ctx e1 with 
+    (match type_of ctx e with 
       | TTimes (_, ty) -> ty
       | ty -> type_error (string_of_expr e
                          ^ " is used a pair, but its type is "

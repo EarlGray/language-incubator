@@ -1,4 +1,4 @@
-CMOFILES    := syntax.cmo type_check.cmo machine.cmo compile.cmo parser.cmo lexer.cmo miniml.cmo
+CMOFILES    := syntax.cmo type_check.cmo interpret.cmo parser.cmo lexer.cmo minihs.cmo
 
 OCAMLC      = ocamlc
 OCAMLLEX    = ocamllex
@@ -6,7 +6,7 @@ OCAMLYACC   = ocamlyacc
 
 .PHONY: clean
 
-miniml: $(CMOFILES)
+minihs: $(CMOFILES)
 	$(OCAMLC) -o $@ $^
 
 %.cmo: %.ml

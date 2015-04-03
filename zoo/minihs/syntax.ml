@@ -7,7 +7,14 @@
 type name = string
 
 type htype =
-    Var of name
+  | TInt
+  | TBool
+  | TTimes of htype * htype
+  | TArrow of htype * htype
+  | TList of htype
+
+type expr =
+  | Var of name
   | Int of int
   | Bool of bool
   | Times of expr * expr
@@ -41,7 +48,7 @@ let string_of_type ty =
       match ty with
       | TInt -> (4, "int")
       | TBool -> (4, "bool")
-      | TList -> (3, to_str 3 ty ^ " list")
+      | TList ty -> (3, to_str 3 ty ^ " list")
       | TTimes (ty1, ty2) -> (2, (to_str 2 ty1) ^ " * " ^ (to_str 2 ty2))
       | TArrow (ty1, ty2) -> (1, (to_str 1 ty1) ^ " -> " ^ (to_str 0 ty2))
     in
@@ -54,7 +61,7 @@ let string_of_expr e =
     let (m, str) =
       match e with
       | Int n ->                (10, string_of_int n)
-      | Bool b ->               (10, string_of_bool n)
+      | Bool b ->               (10, string_of_bool b)
       | Var x ->                (10, x)
       | Pair (e1, e2) ->        (10, "(" ^ (to_str 0 e1) ^ ", " ^ (to_str 0 e2) ^ ")")
       | Nil ty ->               (10, "[" ^ (string_of_type ty) ^ "]")
@@ -78,7 +85,7 @@ let string_of_expr e =
                                     ^ " | " ^ x ^ "::" ^ y ^ " -> " ^ (to_str 3 e2))
       | Fun (x, ty, e) ->     (10, "<fun>")
       | Rec (x, ty, e) ->     (10, "<rec>")
-    in  
+    in
       if m > n then str else "(" ^ str ^ ")"
   in
     to_str (-1) e
@@ -97,7 +104,7 @@ let rec subst s = function
   | If (e1, e2, e3)   -> If (subst s e1, subst s e2, subst s e3)
   | Fun (x, ty, e)    -> let s' = List.remove_assoc x s in Fun (x, ty, subst s' e)
   | Rec (x, ty, e)    -> let s' = List.remove_assoc x s in Rec (x, ty, subst s' e)
-  | Match (e1, ty, e2, x, t, e3)  ->
+  | Match (e1, ty, e2, x, y, e3)  ->
       let s' = List.remove_assoc y (List.remove_assoc x s) in
         Match (subst s e1, ty, subst s e2, x, y, subst s' e3)
   | Apply (e1, e2)    -> Apply (subst s e1, subst s e2)

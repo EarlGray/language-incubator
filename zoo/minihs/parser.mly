@@ -1,9 +1,8 @@
+%{
 (***********************************************
     Taken from
- http://andrej.com/plzoo/html/minihaskell.html 
+ http://andrej.com/plzoo/html/minihaskell.html
 ************************************************)
-
-%{
     open Syntax
 %}
 
@@ -53,9 +52,9 @@
 %%
 
 toplevel:
-  | EOF
-  | lettop  { [] }
-  | exprtop { $1 } 
+  | EOF     { [] }
+  | lettop  { $1 }
+  | exprtop { $1 }
   | cmdtop  { $1 }
 
 lettop:
@@ -65,7 +64,7 @@ lettop:
 
 exprtop:
   | expr EOF    { [Expr $1] }
-  | expr SEMICOLON2 toplevel  { $1 :: $3 }
+  | expr SEMICOLON2 toplevel  { Expr $1 :: $3 }
 
 cmdtop:
   | cmd EOF     { [$1] }
@@ -123,7 +122,7 @@ ty:
   | TINT            { TInt }
   | ty TIMES ty     { TTimes ($1, $3) }
   | ty ARROW ty     { TArrow ($1, $3) }
-  | ty TLIST        { TList $1 } 
+  | ty TLIST        { TList $1 }
   | LPAREN ty RPAREN  { $2 }
 
 %%

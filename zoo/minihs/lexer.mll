@@ -23,7 +23,7 @@ rule token = parse
   | '$' [^'\n']* '\n'   { incr_linenum lexbuf ; token lexbuf }
   | '\n'                { incr_linenum lexbuf ; token lexbuf }
   | [' ' '\t']          { token lexbuf }
-  | ['0' '9']+          { INT (int_of_string(lexeme lexbuf)) }
+  | ['0'-'9']+          { INT (int_of_string(lexeme lexbuf)) }
   | "bool"              { TBOOL }
   | "else"              { ELSE }
   | "false"             { FALSE }
