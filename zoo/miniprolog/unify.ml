@@ -22,3 +22,4 @@ and unify_lists env lst1 lst2 =
 
 let unify_atoms env (c1, ts1) (c2, ts2) =
   if c1 = c2 then unify_lists env ts1 ts2 else raise NoUnify
+

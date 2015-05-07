@@ -1,5 +1,5 @@
 {
-  open Syntax
+  open Parser
   open Lexing
 
   let incr_linenum lexbuf =
@@ -13,8 +13,8 @@
 let const = ['a'-'z'] ['_' 'a'-'z' 'A'-'Z' '0'-'9']*
 let var = ['A'-'Z'] ['_' 'a'-'z' 'A'-'Z' '0'-'9']*
 
-rule token =
-  | '#' [^'\n']* '\n' { incr_linenum lexbuf; token lexbuf }
+rule token = parse
+  | '%' [^'\n']* '\n' { incr_linenum lexbuf; token lexbuf }
   | '\n'            { incr_linenum lexbuf; token lexbuf }
   | [' ' '\t']      { token lexbuf }
   | "$use"          { USE }

@@ -7,6 +7,8 @@
 %token FROM
 %token COMMA
 %token TRUE
+%token PERIOD
+%token LPAREN RPAREN
 %token GOAL
 %token QUIT
 %token SEMICOLON2
@@ -53,7 +55,7 @@ assertion:
 
 atom:
   | CONST                     { ($1, []) }
-  | CONSE LPAREN args RPAREN  { ($1, $3) }
+  | CONST LPAREN args RPAREN  { ($1, $3) }
 
 clause:
   | TRUE              { [] }
