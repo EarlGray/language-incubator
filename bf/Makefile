@@ -5,7 +5,7 @@ BF_SRC=brainfuck.cpp
 MAIN_SRC=brhello.cpp
 
 
-CC=gcc
+CC=g++
 CCFLAGS=-O3 -c -march=core2
 LD=g++
 
