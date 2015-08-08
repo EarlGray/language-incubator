@@ -9,6 +9,8 @@ type BBOff = Int
 -- |
 data BBCommands = BBAdd | BBSub | BBPut | BBGet | BBLeft | BBRight deriving Show
 
+type BasicBlock = [BBCommands]
+
 -- |  Effects from point of view of a cell:
 -- |  mutations may be caused by the program or by input, or both
 data CellEffect = CellEffect
@@ -38,18 +40,18 @@ nullBBEffects = BBEffects
   { bbChangeSet = M.empty
   , bbEventSet  = ([], [])
   , bbEndOffset = 0
-  } 
+  }
 
-parseBasicBlock :: String -> ([BBCommands], String)
+parseBasicBlock :: String -> (BasicBlock, String)
 parseBasicBlock = go []
   where
     go acc []         = (reverse acc, [])
-    go acc ('+':cs)   = go (BBAdd:acc)   cs 
-    go acc ('-':cs)   = go (BBSub:acc)   cs 
-    go acc ('<':cs)   = go (BBLeft:acc)  cs 
-    go acc ('>':cs)   = go (BBRight:acc) cs 
-    go acc ('.':cs)   = go (BBPut:acc)   cs 
-    go acc (',':cs)   = go (BBGet:acc)   cs 
+    go acc ('+':cs)   = go (BBAdd:acc)   cs
+    go acc ('-':cs)   = go (BBSub:acc)   cs
+    go acc ('<':cs)   = go (BBLeft:acc)  cs
+    go acc ('>':cs)   = go (BBRight:acc) cs
+    go acc ('.':cs)   = go (BBPut:acc)   cs
+    go acc (',':cs)   = go (BBGet:acc)   cs
     go acc s@('[':cs) = (reverse acc, s)
     go acc s@(']':cs) = (reverse acc, s)
     go acc (_:cs)     = go acc cs
@@ -57,7 +59,7 @@ parseBasicBlock = go []
 -- |
 -- |  Analyze effects of a basic block
 -- |
-inferBBEffects :: [BBCommands] -> BBEffects
+inferBBEffects :: BasicBlock -> BBEffects
 inferBBEffects ops = go nullBBEffects ops
   where -- cs = changset, es = eventset, pos = offset:
     go (BBEffects cs (ein, eout) pos) []
@@ -74,7 +76,7 @@ inferBBEffects ops = go nullBBEffects ops
         = go (BBEffects (chngGet pos cs (length ein)) (pos:ein, eout) pos) ops
     go (BBEffects cs (ein, eout) pos) (BBPut:ops)
         = go (BBEffects cs (ein, (outEv pos cs):eout) pos) ops
-    
+
     chngAdd adder pos changeset =
       let upd Nothing = Just $ CellEffect Nothing adder
           upd (Just (CellEffect inp mut)) =
@@ -110,4 +112,36 @@ bbtests = [
                     ]),
       bbEndOffset = 0
   })]
-    
+
+
+-- |
+-- |    Iterated blocks
+-- |
+
+data IteratedBlock
+  = IBBasic BasicBlock
+  | IBLoop [IteratedBlock]
+  deriving Show
+
+parseLoop :: String -> ([IteratedBlock], String)
+parseLoop = go []
+  where
+    go acc (']':cs) = (reverse acc, cs)
+    go acc ('[':cs) =
+      case parseLoop cs of
+        (body, cs') -> go (IBLoop body : acc) cs'
+    go acc cs =
+      case parseBasicBlock cs of
+        (bb, cs') -> go (IBBasic bb : acc) cs'
+
+parseTop :: String -> [IteratedBlock]
+parseTop = go []
+  where
+    go acc "" = reverse acc
+    go acc ('[':cs) =
+      case parseLoop cs of
+        (body, cs') -> go (IBLoop body : acc) cs'
+    go acc cs =
+      case parseBasicBlock cs of
+        (bb, cs') -> go (IBBasic bb : acc) cs'
+
