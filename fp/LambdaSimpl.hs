@@ -109,4 +109,38 @@ substchk :: Int -> TermInf -> TermChk -> TermChk
 substchk i r (Inf e) = Inf (substinf i r e)
 substchk i r (Lam e) = Lam (substchk (i+1) r e)
 
-  
+quote0 :: Value -> TermChk
+quote0 = quote 0
+
+quote :: Int -> Value -> TermChk
+quote i (VLam f)     = Lam (quote (i + 1) (f (vfree (Quote i))))
+quote i (VNeutral n) = Inf (neutralQuote i n)
+
+neutralQuote :: Int -> Neutral -> TermInf
+neutralQuote i (NFree x)  = boundfree i x
+neutralQuote i (NApp n v) = neutralQuote i n :@: quote i v
+
+boundfree :: Int -> Name -> TermInf
+boundfree i (Quote k) = Bound (i - k - 1)
+boundfree i x         = Free x
+
+
+{-
+ -    Examples
+ -}
+
+id'     = Lam (Inf (Bound 0))
+const'  = Lam (Lam (Inf (Bound 1)))
+
+tfree a = TFree (Global a)
+free x  = Inf (Free (Global x))
+
+term1   = Ann id' (Fun (tfree "a") (tfree "a")) :@: free "y"
+term2   = Ann const' (Fun (Fun (tfree "b") (tfree "b"))
+                          (Fun (tfree "a")
+                               (Fun (tfree "b") (tfree "b"))))
+          :@: id' :@: free "y"
+
+env1    = [(Global "y", HasType (tfree "a")),
+           (Global "a", HasKind Star)]
+env2    = [(Global "b", HasKind Star)] ++ env1
