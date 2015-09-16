@@ -172,10 +172,10 @@ DEFCODE "LIT",3,,LIT
 	addiu $sp, $sp, -4
 	sw    $t0, ($sp)
 	NEXT
-	
+
 ##
 ##		Stack manipulation
-## 
+##
 DEFCODE "DROP",4,,DROP
 	lw    $t0, ($sp)
 	addiu $sp, $sp, 4
@@ -196,7 +196,7 @@ DEFCODE "DUP",3,,DUP
 
 DEFCODE "OVER",4,,OVER
 	addiu $sp, $sp, -4
-	lw    $t0, 8($sp)      # get the second stack element, 
+	lw    $t0, 8($sp)      # get the second stack element,
 	sw    $t0, ($sp)       # push on top
 	NEXT
 
@@ -229,7 +229,7 @@ DEFCODE "?DUP",4,,QDUP
 
 ##
 ##		Return stack words
-## 
+##
 DEFCODE ">R",2,,TOR
 	lw    $t0, ($sp)
 	addiu $sp, $sp, 4      # pop from the param stack
@@ -533,7 +533,7 @@ next_key:
 1: # no data in the iobuf, read() more
 	la    $s1, iobuf
 	sw    $s1, ($t0)        # iobufcur = iobuf
-	
+
 	move  $a0, $0           # arg[0] = FILENO_STDIN;
 	move  $a1, $s1          # arg[1] = iobuf;
 	li    $a2, IOBUFSZ      # arg[2] = IOBUFSZ;
@@ -586,9 +586,57 @@ next_word:
 	j 4b
 
 
+# takes a character ($a3), base ($a2)
+# returns ($v1): -1 if is not valid digit, number otherwise
+digit_in_base:
+	blt   $a3, '0', 5f		# number can't be below '0'
+	bgt   $a2, 10, 2f       # base is more than 10?
+	addiu $t0, $a2, '0'     # t0 <- upper limit
+	bge   $a3, $t0, 5f      # number can't be above '0'+base
+1:  subi  $v1, $a3, '0'     # $v1 : the return value
+	jr    $ra
+
+2:  # base is more than 10
+	bgt   $a2, 36, 5f       # base must be <= 36
+	subiu $a2, $a2, 10      # base -= 10
+	ble   $a3, '9', 1b      # is inside decimal range
+	subi  $v1, $a3, 'A'     # t1 = c - 'A'
+	bltz  $v1, 5f           # less than 'A'?
+	bge   $v1, $a2, 4f      # not in 'A'..'A'+base-10 range
+	addiu $v1, $v1, 10
+	jr    $ra
+
+4:  blt   $a3, 'a', 5f      # cannot be less than 'a' here
+	subi  $v1, $a3, 'a'     # t1 = c - 'a'
+	bge   $v1, $a2, 5f      # above 'a'+base-10 range
+	addiu $v1, $v1, 10
+	jr    $ra
+
+5:  # failed
+	li    $v1, -1
+	jr    $ra
+
+
+/*
+# takes a str_addr ($a0), str_len ($a1)
+# returns a number ($v0), number of unconverted syms ($v1)
+parse_number:
+	addiu $sp, $sp, -4
+	sw    $ra, ($sp)
+
+	lw    $a2, (var_BASE)
+	move  $v0, $0
+	beqz  $a1, 1f           # a zero-length string returns 0
+
+1:
+	lw    $ra, ($sp)
+	addiu $sp, $sp, 4
+	jr    $ra
+*/
+
 # $a0 contains address of a one-byte output buffer
 emit_byte:
-  li    $a2, 1            # arg[2] = 1 (byte)
+	li    $a2, 1            # arg[2] = 1 (byte)
 	move  $a1, $a0          # arg[1] = &outbuf
 	li    $a0, 1            # arg[0] = FILENO_STROUT
 	li    $v0, __NR_write
@@ -616,13 +664,15 @@ DEFCODE "WORD",4,,WORD
 	sw    $v1,  ($sp)       # str_len
 	NEXT
 
-/*
 DEFCODE "NUMBER",6,,NUMBER
 	# parses a number from string
 	#  str_len str_addr ... -> num ...
-
+	lw    $a1,  ($sp)       # str_len
+	lw    $a0, 4($sp)       # str_addr
+	jal   parse_number
+	sw    $v1,  ($sp)       # unconverted characters
+	sw    $v0, 4($sp)       # the number
 	NEXT
-*/
 
 .section .rodata
 cold_start:
