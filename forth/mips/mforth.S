@@ -17,7 +17,7 @@
 next_intruction:
 	lw    $t0, ($s0)
 	addiu $s0, 4
-	lw    $t0, ($t0)	 # read CodeWord
+	lw    $t0, ($t0)         # read CodeWord
 	lw    $t0, ($t0)         # read where is points
 	jr    $t0                # jump there
 
@@ -587,52 +587,78 @@ next_word:
 
 
 # takes a character ($a3), base ($a2)
-# returns ($v1): -1 if is not valid digit, number otherwise
+# returns ($t7): -1 if is not valid digit, number otherwise
+# clobbers: $t9, $t8
 digit_in_base:
-	blt   $a3, '0', 5f		# number can't be below '0'
-	bgt   $a2, 10, 2f       # base is more than 10?
-	addiu $t0, $a2, '0'     # t0 <- upper limit
-	bge   $a3, $t0, 5f      # number can't be above '0'+base
-1:  subi  $v1, $a3, '0'     # $v1 : the return value
+	blt   $a3, '0', $Lerr    # number can't be below '0'
+	bgt   $a2, 10, 2f        # base is more than 10?
+	addiu $t9, $a2, '0'      # t9 <- upper limit
+	bge   $a3, $t9, $Lerr    # number can't be above '0'+base
+
+$L1:
+	addi  $t7, $a3, -'0'     # $t7 : the return value
 	jr    $ra
 
 2:  # base is more than 10
-	bgt   $a2, 36, 5f       # base must be <= 36
-	subiu $a2, $a2, 10      # base -= 10
-	ble   $a3, '9', 1b      # is inside decimal range
-	subi  $v1, $a3, 'A'     # t1 = c - 'A'
-	bltz  $v1, 5f           # less than 'A'?
-	bge   $v1, $a2, 4f      # not in 'A'..'A'+base-10 range
-	addiu $v1, $v1, 10
+	bgt   $a2, 36, $Lerr     # base must be <= 36
+	addiu $t8, $a2, -10      # base -= 10
+	ble   $a3, '9', $L1      # is inside decimal range
+	addi  $t7, $a3, -'A'     # v2 = c - 'A'
+	bltz  $t7, $Lerr         # less than 'A'?
+	bge   $t7, $t8, 4f       # not in 'A'..'A'+base-10 range
+	addiu $t7, $t7, 10
 	jr    $ra
 
-4:  blt   $a3, 'a', 5f      # cannot be less than 'a' here
-	subi  $v1, $a3, 'a'     # t1 = c - 'a'
-	bge   $v1, $a2, 5f      # above 'a'+base-10 range
-	addiu $v1, $v1, 10
+4:  blt   $a3, 'a', $Lerr    # cannot be less than 'a' here
+	addi  $t7, $a3, -'a'     # t1 = c - 'a'
+	bge   $t7, $t8, $Lerr    # above 'a'+base-10 range
+	addiu $t7, $t7, 10
 	jr    $ra
 
-5:  # failed
-	li    $v1, -1
+$Lerr:  # failed
+	li    $t7, -1
 	jr    $ra
 
 
-/*
 # takes a str_addr ($a0), str_len ($a1)
 # returns a number ($v0), number of unconverted syms ($v1)
 parse_number:
 	addiu $sp, $sp, -4
 	sw    $ra, ($sp)
+	move  $v1, $a1          # n_unconv = slen
 
-	lw    $a2, (var_BASE)
-	move  $v0, $0
-	beqz  $a1, 1f           # a zero-length string returns 0
+	lw    $a2, (var_BASE)   # a2 = base
+	move  $v0, $0           # res = 0
+	move  $t6, $0			# negative = false
 
-1:
+	lb    $a3, ($a0)
+	beq   $a3, '-', 1f
+	beq   $a3, '+', 2f
+	j     3f
+1:	li    $t6, 1            # negative = true
+2:  addi  $a0, $a0, 1
+	addi  $v1, $v1, -1
+3:
+	beqz  $v1, 5f           # a zero-length string returns 0
+
+	lb    $a3, ($a0)
+	jal   digit_in_base
+	bltz  $t7, 5f
+
+	mult  $a2, $v0
+	mflo  $v0
+	add   $v0, $v0, $t7
+	addi  $v1, $v1, -1
+	addi  $a0, $a0, 1
+	j 3b
+
+5:
+	beqz  $t6, 6f
+	neg   $v0
+6:
 	lw    $ra, ($sp)
 	addiu $sp, $sp, 4
 	jr    $ra
-*/
 
 # $a0 contains address of a one-byte output buffer
 emit_byte:
