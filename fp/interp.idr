@@ -35,11 +35,11 @@ using (G:Vect n Ty)  -- the context
           -> Expr G a
 
   data Env : Vect n Ty -> Type where
-    -- given a proof that a variable if defined in the context,
-    --   we can produce a value from the environment:
     Nil   : Env Nil
     (::)  : interpTy a -> Env G -> Env (a :: G)
   
+  -- given a proof that a variable if defined in the context,
+  --   we can produce a value from the environment:
   lookup : HasType i G t -> Env G -> interpTy t
   lookup Stop    (x :: xs) = x
   lookup (Pop k) (x :: xs) = lookup k xs
@@ -60,12 +60,12 @@ using (G:Vect n Ty)  -- the context
 
   add : Expr G (TyFun TyInt (TyFun TyInt TyInt)) -- \x.\y.y + x
   add = Lam (Lam (Op (+) (Var Stop) (Var (Pop Stop))))
-  -- interp [] (App (App add (Val 2)) (Val 2)) gives 4 : Int
+  -- `interp [] (App (App add (Val 2)) (Val 2))` gives `4 : Int`
 
   iszero : Expr G (TyFun TyInt TyBool)
   iszero = Lam (Op (==) (Var Stop) (Val 0))
 
-  -- interp [] (App fact (Val 4)) gives 24 : Int
+  -- `interp [] (App fact (Val 4))` gives `24 : Int`
   fact : Expr G (TyFun TyInt TyInt)
   fact = Lam (If (App iszero (Var Stop))
                  (Val 1)
