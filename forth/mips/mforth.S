@@ -1,28 +1,36 @@
+#define __NR_sbrk 9
+#define __NR_exit 1
 #include <asm-generic/unistd.h>
+
+.set INITIAL_USERMEM_SIZE, (1024 * 512)
+.set RETURN_STACK_SIZE, (1024 * 16)
+.set IOBUFSZ,1024
+.set WORDSZ,32
 
 /*********************************************************/
 .text
 
 # $fp is the return stack pointer
 .macro PUSH_RSP reg
-	addiu $fp, $fp, -4
+	addiu $fp, -4
 	sw    \reg, ($fp)
 .endm
 .macro POP_RSP reg
 	lw    \reg, ($fp)
-	addiu $fp, $fp, 4
+	addiu $fp, 4
 .endm
 
 # $s0 as "instruction pointer"
-next_intruction:
+next_instruction:
 	lw    $t0, ($s0)
 	addiu $s0, 4
-	lw    $t0, ($t0)         # read CodeWord
-	lw    $t0, ($t0)         # read where is points
-	jr    $t0                # jump there
+
+	lw    $t1, ($t0)         # read where is points, $t0 for DOCOL
+	jr    $t1                # jump there
 
 .macro NEXT
-	j next_intruction
+	move  $t0, $t0
+	j next_instruction
 .endm
 
 # the interpreter function, DO COLON
@@ -30,21 +38,9 @@ next_intruction:
 .align 4
 DOCOL:
 	PUSH_RSP $s0
-	addiu $t0, $t0, 4
+	addiu $t0, 4
 	move  $s0, $t0
 	NEXT
-
-_start:
-	sw    $sp, var_S0
-	la    $fp, return_stack_top
-	la    $s0, cold_start
-	NEXT
-
-/*********************************************************/
-.data
-
-return_stack_top:
-	.space (1024 * 1024 * 4)
 
 /*********************************************************/
 .section .rodata
@@ -57,7 +53,7 @@ return_stack_top:
 
 #### DEFWORD
 .macro DEFWORD name, namelen, flags=0, label
-	.section .rodata
+	.text
 	.align 4
 name_\label :
 	.globl name_\label
@@ -73,7 +69,7 @@ name_\label :
 
 #### DEFCODE
 .macro DEFCODE name, namelen, flags=0, label
-	.section .rodata
+	.text
 	.align 4
 name_\label :
 	.globl name_\label
@@ -81,14 +77,11 @@ name_\label :
 	.set link,name_\label
 	.byte \flags+\namelen
 	.ascii "\name"
-	.align 4 		# pad
 \label :
+	.align 4 		# pad
 	.globl \label
 	.globl code_\label
 	.int code_\label        # codeword
-
-	.text
-	.align 4
 code_\label :
 .endm
 
@@ -96,7 +89,7 @@ code_\label :
 .macro DEFVAR name, namelen, flags=0, label, initial=0
 	DEFCODE \name,\namelen,\flags,\label
 	la    $t0, var_\name
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 
@@ -110,7 +103,7 @@ var_\name :
 .macro DEFCONST name, namelen, flags=0, label, value
 	DEFCODE \name,\namelen,\flags,\label
 	li    $t0, \value
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 .endm
@@ -118,7 +111,7 @@ var_\name :
 .macro DEFSYM name, namelen, flags=0, label, sym
 	DEFCODE \name,\namelen,\flags,\label
 	la    $t0, \sym
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 .endm
@@ -135,7 +128,7 @@ DEFVAR "STATE",5,,STATE
 DEFVAR "HERE",4,,HERE
 
 # the most recently defined word
-DEFVAR "LATEST",6,,LATEST,name_SYSCALL0
+DEFVAR "LATEST",6,,LATEST,0
 
 # top of the parameter stack
 DEFVAR "S0",2,,SZ
@@ -168,8 +161,8 @@ DEFCODE "EXIT",4,,EXIT
 
 DEFCODE "LIT",3,,LIT
 	lw    $t0, ($s0)
-	addiu $s0, $s0, 4
-	addiu $sp, $sp, -4
+	addiu $s0, 4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 
@@ -178,7 +171,7 @@ DEFCODE "LIT",3,,LIT
 ##
 DEFCODE "DROP",4,,DROP
 	lw    $t0, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	NEXT
 
 DEFCODE "SWAP",4,,SWAP
@@ -190,7 +183,7 @@ DEFCODE "SWAP",4,,SWAP
 
 DEFCODE "DUP",3,,DUP
 	lw    $t0, ($sp)
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 
@@ -222,7 +215,7 @@ DEFCODE "?DUP",4,,QDUP
 	# duplicate if non-zero
 	lw    $t0, ($sp)
 	beqz  $t0, 1f
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 1:
 	NEXT
@@ -232,28 +225,28 @@ DEFCODE "?DUP",4,,QDUP
 ##
 DEFCODE ">R",2,,TOR
 	lw    $t0, ($sp)
-	addiu $sp, $sp, 4      # pop from the param stack
+	addiu $sp, 4           # pop from the param stack
 	PUSH_RSP $t0           # push to the return stack
 	NEXT
 
 DEFCODE "R>",2,,FROMR
 	POP_RSP $t0            # pop from the return stack
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)       # push to the param stack
 	NEXT
 
 DEFCODE "RSP@",4,,RSPFETCH
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $fp, ($sp)       # push RSP to the param stack
 	NEXT
 
 DEFCODE "RSP!",4,,RSPSTORE
 	lw    $fp, ($sp)
-	addiu $sp, $sp, 4      # pop RSP from the param stack
+	addiu $sp, 4           # pop RSP from the param stack
 	NEXT
 
 DEFCODE "RDROP",5,,RDROP
-	addiu $fp, $fp, 4
+	addiu $fp, 4
 	NEXT
 
 ##
@@ -261,7 +254,7 @@ DEFCODE "RDROP",5,,RDROP
 ##
 DEFCODE "DSP@",4,,DSPFETCH
 	move  $t0, $sp
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 
@@ -275,7 +268,7 @@ DEFCODE "DSP!",4,,DSPSTORE
 DEFCODE "!",1,,STORE
 	lw    $t1, ($sp)       # address to store at
 	lw    $t0, 4($sp)      # data to store
-	addiu $sp, $sp, 8
+	addiu $sp, 8
 	sw    $t0, ($t1)
 	NEXT
 
@@ -288,7 +281,7 @@ DEFCODE "@",1,,FETCH
 DEFCODE "+!",2,,ADDSTORE
 	lw    $t1,  ($sp)       # address
 	lw    $t0, 4($sp)       # addend
-	addiu $sp, $sp, 8
+	addiu $sp, 8
 	lw    $t2, ($t1)
 	add   $t2, $t2, $t0
 	sw    $t2, ($t1)
@@ -297,7 +290,7 @@ DEFCODE "+!",2,,ADDSTORE
 DEFCODE "C!",2,,STOREBYTE
 	lw    $t1, ($sp)       # address to store at
 	lw    $t0, 4($sp)      # data to store
-	addiu $sp, $sp, 8
+	addiu $sp, 8
 	sb    $t0, ($t1)
 	NEXT
 
@@ -325,7 +318,7 @@ DEFCODE "CMOVE",5,,CMOVE
 	lw    $t0,  ($sp)
 	lw    $t1, 4($sp)
 	lw    $t2, 8($sp)
-	addiu $sp, $sp, 12
+	addiu $sp, 12
 	move  $t3, $0
 	???
 	NEXT
@@ -360,7 +353,7 @@ DEFCODE "4-",2,,DECR4
 
 DEFCODE "+",1,,ADD
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	add   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -368,7 +361,7 @@ DEFCODE "+",1,,ADD
 
 DEFCODE "-",1,,SUB
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	sub   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -376,7 +369,7 @@ DEFCODE "-",1,,SUB
 
 DEFCODE "*",1,,MUL
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	mult  $t0, $t1
 	mflo  $t0            # ignore overflow
@@ -395,7 +388,7 @@ DEFCODE "/MOD",4,,DIVMOD
 
 DEFCODE "=",1,,EQU
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	seq   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -403,7 +396,7 @@ DEFCODE "=",1,,EQU
 
 DEFCODE "<>",2,,NEQU
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	sne   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -411,7 +404,7 @@ DEFCODE "<>",2,,NEQU
 
 DEFCODE "<",1,,LT
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	slt   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -419,7 +412,7 @@ DEFCODE "<",1,,LT
 
 DEFCODE ">",1,,GT
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	sgt   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -427,7 +420,7 @@ DEFCODE ">",1,,GT
 
 DEFCODE "<=",2,,LE
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	sle   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -435,7 +428,7 @@ DEFCODE "<=",2,,LE
 
 DEFCODE "=>",2,,GE
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	sge   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -467,7 +460,7 @@ DEFCODE "0>",2,,ZGT
 
 DEFCODE "AND",3,,AND
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	and   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -475,7 +468,7 @@ DEFCODE "AND",3,,AND
 
 DEFCODE "OR",2,,OR
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	or    $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -483,7 +476,7 @@ DEFCODE "OR",2,,OR
 
 DEFCODE "XOR",3,,XOR
 	lw    $t1, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $t0, ($sp)
 	xor   $t0, $t0, $t1
 	sw    $t0, ($sp)
@@ -503,19 +496,6 @@ DEFCODE "INVERT",6,,INVERT
 #### DATA
 .data
 
-.align 4
-.set IOBUFSZ,1024
-iobuf:    .space (IOBUFSZ + 1)
-
-.align 4
-.set WORDSZ,32
-wordbuf:  .space WORDSZ
-
-.align 4
-iobufend: .int iobuf
-iobufcur: .int iobuf
-
-
 #### RODATA
 .section .rodata
 
@@ -523,10 +503,11 @@ err_parse_msg:
 	.asciiz "PARSE ERROR: "
 .equ ERR_PARSE_LEN, (. - err_parse_msg)
 
-nl_msg: .ascii "\n"
+err_msg:
+	.asciiz "FATAL ERROR!"
+.equ ERR_MSG_LEN, (. - err_msg)
 
-cold_start:
-	.int QUIT
+nl_msg: .ascii "\n"
 
 .text
 
@@ -567,7 +548,7 @@ next_key:
 
 # no arguments, returns word_addr ($v0), word_len ($v1)
 next_word:
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $ra, ($sp)        # $ra will be used by `next_key`
 
 	move  $s2, $0           # how many bytes read
@@ -580,7 +561,7 @@ next_word:
 
 2:  # add to `wordbuf`
 	sb    $v0, ($s2)
-	addiu $s2, $s2, 1
+	addiu $s2, 1
 	jal next_key
 	beq   $v0, ' ' , 3f
 	beq   $v0, '\t', 3f
@@ -591,7 +572,7 @@ next_word:
 	la    $v0, wordbuf
 	move  $v1, $s2
 	lw    $ra, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	jr    $ra
 
 4:  # skip the comment
@@ -620,13 +601,13 @@ $L1:
 	addi  $t7, $a3, -'A'     # v2 = c - 'A'
 	bltz  $t7, $Lerr         # less than 'A'?
 	bge   $t7, $t8, 4f       # not in 'A'..'A'+base-10 range
-	addiu $t7, $t7, 10
+	addiu $t7, 10
 	jr    $ra
 
 4:  blt   $a3, 'a', $Lerr    # cannot be less than 'a' here
 	addi  $t7, $a3, -'a'     # t1 = c - 'a'
 	bge   $t7, $t8, $Lerr    # above 'a'+base-10 range
-	addiu $t7, $t7, 10
+	addiu $t7, 10
 	jr    $ra
 
 $Lerr:  # failed
@@ -637,7 +618,7 @@ $Lerr:  # failed
 # takes a str_addr ($a0), str_len ($a1)
 # returns a number ($v0), number of unconverted syms ($v1)
 parse_number:
-	addiu $sp, $sp, -4
+	addiu $sp, -4
 	sw    $ra, ($sp)
 	move  $v1, $a1          # n_unconv = slen
 
@@ -671,7 +652,7 @@ parse_number:
 	neg   $v0
 6:
 	lw    $ra, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	jr    $ra
 
 # $a0 contains address of a one-byte output buffer
@@ -764,7 +745,7 @@ DEFCODE "FIND",4,,FIND
 	lw    $a1,  ($sp)       # len
 	lw    $a0, 4($sp)       # addr
 	jal   find_word
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lw    $v0, ($sp)
 	NEXT
 
@@ -787,13 +768,13 @@ DEFCODE "CREATE",6,,CREATE
 	# len name ... -> ...
 	lw    $t0,  ($sp)       # len
 	lw    $t1, 4($sp)       # name
-	addiu $sp, $sp, 8
+	addiu $sp, 8
 	lw    $t2, (var_HERE)
 	lw    $t3, (var_LATEST)
 	sw    $t3, ($t2)        # write old LATEST at HERE
 	sw    $t2, (var_LATEST)
 	sb    $t0, 4($t2)       # write len at HERE
-	addiu $t2, $t2, 5
+	addiu $t2, 5
 	# copy the word
 $Lbytecpy:
 	beqz  $t0, $Lcopied     #
@@ -813,13 +794,13 @@ $Lcopied: # now pad to 4
 	# *HERE++ = val;
 	lw    $t2, (var_HERE)
 	sw    \reg, ($t2)
-	addiu $t2, $t2, 4
+	addiu $t2, 4
 	sw    $t2, (var_HERE)
 .endm
 
 DEFCODE ",",1,,COMMA
 	lw    $t0, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	PUTHERE $t0
 	NEXT
 
@@ -839,7 +820,7 @@ DEFCODE "]",1,F_IMMED,RBRAC
 DEFCODE "HIDDEN",6,,HIDDEN
 	# dict_entry ... -> ... toggling HIDDEN bit
 	lw    $t0, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	lb    $t1, 4($t0)
 	xori  $t1, $t1, F_HIDDEN # toggle
 	sb    $t1, 4($t0)
@@ -866,7 +847,7 @@ DEFWORD ":",1,,COLON
 	.int RBRAC              # go to compile mode
 	.int EXIT               # compile the definiton
 
-DEFWORD ";"1,F_IMMED,SEMICOLON
+DEFWORD ";",1,F_IMMED,SEMICOLON
 	.int LIT, EXIT, COMMA   # append EXIT
 	.int LATEST, FETCH, HIDDEN  # toggle HIDDEN back
 	.int LBRAC              # go back to immediate mode
@@ -878,8 +859,8 @@ DEFCODE "'",1,,TICK
 	# e.g. :LIT2 IMMED  ' LIT , 2 , ;
 	#   -- LIT2 inside a definition appends LIT 2
 	lw    $t0, ($s0)
-	addiu $s0, $s0, 4
-	addiu $sp, $sp, -4
+	addiu $s0, 4
+	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
 
@@ -892,9 +873,9 @@ DEFCODE "BRANCH",6,,BRANCH
 DEFCODE "0BRANCH",7,,ZBRANCH
 	# 0BRANCH <n> skips n words if the stack top is 0
 	lw    $t0, ($sp)
-	addiu $sp, $sp, 4
+	addiu $sp, 4
 	beqz  $t0, code_BRANCH
-	addiu $s0, $s0, 4       # skip the offset otherwise
+	addiu $s0, 4            # skip the offset otherwise
 	NEXT
 
 DEFCODE "LITSTRING",9,,LITSTRING
@@ -902,8 +883,8 @@ DEFCODE "LITSTRING",9,,LITSTRING
 	# takes a string literal in a compiled word
 	# puts <len> <addr> on the stack
 	lw    $t0, ($s0)        # take the length
-	addiu $s0, $s0, 4       # s0 is now the literal address
-	addiu $sp, $sp, -8
+	addiu $s0, 4            # s0 is now the literal address
+	addiu $sp, -8
 	sw    $s0, 4($sp)
 	sw    $t0,  ($sp)
 	# skip the string
@@ -922,7 +903,7 @@ DEFCODE "TELL",4,,TELL
 	lw    $a2,  ($sp)       # str_len
 	li    $v0, __NR_write
 	syscall
-	addiu $sp, $sp, 8
+	addiu $sp, 8
 	NEXT
 
 /*
@@ -1013,8 +994,8 @@ interpret_lit:
 	beqz  $t1, $Lcompile_lit
 $Lexec_lit:
 	# execute a literal: push it on the stack
-	addiu $sp, $sp, -4
-	lw    $v1, ($sp)
+	addiu $sp, -4
+	sw    $v1, ($sp)
 	NEXT
 $Lcompile_lit:
 	# compile a literal:
@@ -1022,7 +1003,7 @@ $Lcompile_lit:
 	la    $t0, LIT
 	sw    $t0,  ($t2)
 	sw    $v1, 4($t2)
-	addiu $t2, $t2, 8
+	addiu $t2, 8
 	sw    $t2, (var_HERE)
 	NEXT
 
@@ -1033,3 +1014,75 @@ DEFWORD "QUIT",4,,QUIT
 	.int BRANCH, -8         # loop back indefinitely
 
 
+##
+##	The entry point
+##
+/*********************************************************/
+.section .rodata
+cold_start:
+	.int QUIT
+
+/*********************************************************/
+.data
+
+.align 4
+iobuf:    .space (IOBUFSZ + 1)
+
+.align 4
+wordbuf:  .space WORDSZ
+
+.align 4
+iobufend: .int iobuf
+iobufcur: .int iobuf
+
+/*********************************************************/
+.bss
+return_stack:
+.space RETURN_STACK_SIZE
+return_stack_top:
+
+
+/*********************************************************/
+.text
+.globl _start, __start
+
+__start:
+_start:
+	la    $t0, link
+	sw    $t0, var_LATEST
+
+	sw    $sp, var_S0
+	la    $fp, return_stack_top
+
+	jal   setup_user_memory
+
+	la    $s0, QUIT
+	NEXT
+
+setup_user_memory:
+	move  $a0, $0
+	li    $v0, __NR_sbrk
+	syscall
+	bnez  $a3, syscall_failed
+
+	sw    $v0, var_HERE
+	li    $t0, INITIAL_USERMEM_SIZE
+	add   $v0, $t0
+	move  $a0, $v0
+	li    $v0, __NR_sbrk
+	syscall
+
+	jr    $ra
+
+syscall_failed:
+	li    $a0, 128
+	li    $v0, __NR_exit
+	syscall
+
+	li    $a0, 1
+	la    $a1, err_msg
+	li    $a2, ERR_MSG_LEN
+	li    $v0, __NR_write
+	syscall
+1:
+	j 1b
