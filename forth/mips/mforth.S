@@ -17,7 +17,7 @@
 next_intruction:
 	lw    $t0, ($s0)
 	addiu $s0, 4
-	lw    $t0, ($t0)	 # read CodeWord
+	lw    $t0, ($t0)         # read CodeWord
 	lw    $t0, ($t0)         # read where is points
 	jr    $t0                # jump there
 
