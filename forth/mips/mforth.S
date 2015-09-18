@@ -1,6 +1,4 @@
-#define __NR_sbrk 9
-#define __NR_exit 1
-#include <asm-generic/unistd.h>
+#include <syscall.h>
 
 .set INITIAL_USERMEM_SIZE, (1024 * 512)
 .set RETURN_STACK_SIZE, (1024 * 16)
@@ -24,8 +22,8 @@
 next_instruction:
 	lw    $t0, ($s0)
 	addiu $s0, 4
-
 	lw    $t1, ($t0)         # read where is points, $t0 for DOCOL
+	#move  $t0, $t0
 	jr    $t1                # jump there
 
 .macro NEXT
@@ -1041,6 +1039,8 @@ return_stack:
 .space RETURN_STACK_SIZE
 return_stack_top:
 
+user_memory:
+.space INITIAL_USERMEM_SIZE
 
 /*********************************************************/
 .text
@@ -1054,25 +1054,11 @@ _start:
 	sw    $sp, var_S0
 	la    $fp, return_stack_top
 
-	jal   setup_user_memory
+	la    $t0, user_memory
+	sw    $t0, var_HERE
 
-	la    $s0, QUIT
+	la    $s0, cold_start
 	NEXT
-
-setup_user_memory:
-	move  $a0, $0
-	li    $v0, __NR_sbrk
-	syscall
-	bnez  $a3, syscall_failed
-
-	sw    $v0, var_HERE
-	li    $t0, INITIAL_USERMEM_SIZE
-	add   $v0, $t0
-	move  $a0, $v0
-	li    $v0, __NR_sbrk
-	syscall
-
-	jr    $ra
 
 syscall_failed:
 	li    $a0, 128
