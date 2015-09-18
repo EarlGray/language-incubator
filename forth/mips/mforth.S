@@ -500,6 +500,7 @@ DEFCODE "INVERT",6,,INVERT
 ##		Input/output
 ##
 
+#### DATA
 .data
 
 .align 4
@@ -513,6 +514,19 @@ wordbuf:  .space WORDSZ
 .align 4
 iobufend: .int iobuf
 iobufcur: .int iobuf
+
+
+#### RODATA
+.section .rodata
+
+err_parse_msg:
+	.asciiz "PARSE ERROR: "
+.equ ERR_PARSE_LEN, (. - err_parse_msg)
+
+nl_msg: .ascii "\n"
+
+cold_start:
+	.int QUIT
 
 .text
 
@@ -542,7 +556,7 @@ next_key:
 	bnez  $a3, 2f           # syscall failed
 
 	addu  $s1, $s1, $v0     # iobuf + nread
-	sw    $s1, iobufend($0)
+	sw    $s1, (iobufend)
 	j next_key              # tail-rec. self-call
 
 2: # error or end of input; bail out
@@ -587,52 +601,78 @@ next_word:
 
 
 # takes a character ($a3), base ($a2)
-# returns ($v1): -1 if is not valid digit, number otherwise
+# returns ($t7): -1 if is not valid digit, number otherwise
+# clobbers: $t9, $t8
 digit_in_base:
-	blt   $a3, '0', 5f		# number can't be below '0'
-	bgt   $a2, 10, 2f       # base is more than 10?
-	addiu $t0, $a2, '0'     # t0 <- upper limit
-	bge   $a3, $t0, 5f      # number can't be above '0'+base
-1:  subi  $v1, $a3, '0'     # $v1 : the return value
+	blt   $a3, '0', $Lerr    # number can't be below '0'
+	bgt   $a2, 10, 2f        # base is more than 10?
+	addiu $t9, $a2, '0'      # t9 <- upper limit
+	bge   $a3, $t9, $Lerr    # number can't be above '0'+base
+
+$L1:
+	addi  $t7, $a3, -'0'     # $t7 : the return value
 	jr    $ra
 
 2:  # base is more than 10
-	bgt   $a2, 36, 5f       # base must be <= 36
-	subiu $a2, $a2, 10      # base -= 10
-	ble   $a3, '9', 1b      # is inside decimal range
-	subi  $v1, $a3, 'A'     # t1 = c - 'A'
-	bltz  $v1, 5f           # less than 'A'?
-	bge   $v1, $a2, 4f      # not in 'A'..'A'+base-10 range
-	addiu $v1, $v1, 10
+	bgt   $a2, 36, $Lerr     # base must be <= 36
+	addiu $t8, $a2, -10      # base -= 10
+	ble   $a3, '9', $L1      # is inside decimal range
+	addi  $t7, $a3, -'A'     # v2 = c - 'A'
+	bltz  $t7, $Lerr         # less than 'A'?
+	bge   $t7, $t8, 4f       # not in 'A'..'A'+base-10 range
+	addiu $t7, $t7, 10
 	jr    $ra
 
-4:  blt   $a3, 'a', 5f      # cannot be less than 'a' here
-	subi  $v1, $a3, 'a'     # t1 = c - 'a'
-	bge   $v1, $a2, 5f      # above 'a'+base-10 range
-	addiu $v1, $v1, 10
+4:  blt   $a3, 'a', $Lerr    # cannot be less than 'a' here
+	addi  $t7, $a3, -'a'     # t1 = c - 'a'
+	bge   $t7, $t8, $Lerr    # above 'a'+base-10 range
+	addiu $t7, $t7, 10
 	jr    $ra
 
-5:  # failed
-	li    $v1, -1
+$Lerr:  # failed
+	li    $t7, -1
 	jr    $ra
 
 
-/*
 # takes a str_addr ($a0), str_len ($a1)
 # returns a number ($v0), number of unconverted syms ($v1)
 parse_number:
 	addiu $sp, $sp, -4
 	sw    $ra, ($sp)
+	move  $v1, $a1          # n_unconv = slen
 
-	lw    $a2, (var_BASE)
-	move  $v0, $0
-	beqz  $a1, 1f           # a zero-length string returns 0
+	lw    $a2, (var_BASE)   # a2 = base
+	move  $v0, $0           # res = 0
+	move  $t6, $0			# negative = false
 
-1:
+	lb    $a3, ($a0)
+	beq   $a3, '-', 1f
+	beq   $a3, '+', 2f
+	j     3f
+1:	li    $t6, 1            # negative = true
+2:  addi  $a0, $a0, 1
+	addi  $v1, $v1, -1
+3:
+	beqz  $v1, 5f           # a zero-length string returns 0
+
+	lb    $a3, ($a0)
+	jal   digit_in_base
+	bltz  $t7, 5f
+
+	mult  $a2, $v0
+	mflo  $v0
+	add   $v0, $v0, $t7
+	addi  $v1, $v1, -1
+	addi  $a0, $a0, 1
+	j 3b
+
+5:
+	beqz  $t6, 6f
+	neg   $v0
+6:
 	lw    $ra, ($sp)
 	addiu $sp, $sp, 4
 	jr    $ra
-*/
 
 # $a0 contains address of a one-byte output buffer
 emit_byte:
@@ -642,6 +682,52 @@ emit_byte:
 	li    $v0, __NR_write
 	syscall
 	jr $ra
+
+find_word:
+# takes str_addr ($a0), str_len ($a1)
+# return dict entry in $v0 (maybe NULL)
+	lw    $t0, var_LATEST   # curr_item = LATEST
+$Llookup:
+	beqz  $t0, $Ldone       # NULL, fail
+	# compare length
+	lb    $t1, 4($t0)       # load len/flags
+	andi  $t1, $t1, (F_HIDDEN | F_LENMASK)
+	bne   $t1, $a1, $Lnext  # will fail if HIDDEN
+	# compare the string
+	move  $t9, $a1          # len
+	move  $t8, $a0          # str
+	addiu $t7, $t0, 5       # link+5
+$Lsymcmp:
+	beqz  $t9, $Ldone       # if (!len) goto $Ldone
+	lb    $t5, ($t7)
+	lb    $t6, ($t8)
+	bne   $t5, $t6, $Lnext  # if wrd[0] != src[0] goto $Lnext
+	addi  $t7, $t7, 1       # wrd++
+	addi  $t8, $t8, 1       # str++
+	addi  $t9, $t9, -1      # --len
+	j $Lsymcmp
+$Lnext: # move to the next word
+	lw    $t0, ($t0)
+	j $Llookup
+$Ldone:
+	move  $v0, $t0
+	jr    $ra
+
+codeword_addr:
+# takes a dict entry pointer ($a0)
+# returns its codeword pointer ($v0)
+	addi  $a0, $a0, 4
+	lb    $t0, ($a0)
+	andi  $t0, $t0, F_LENMASK
+	addi  $t0, $t0, 1
+	# pad to 4
+	andi  $t2, $t0, 3
+	slt   $t2, $0, $t2      # t2 = 0 < t2 ? 1 : 0
+	srl   $t0, $t0, 2       # t0 >>= 2
+	add   $t0, $t0, $t2     # t0 += t2
+	sll   $t0, $t0, 2       # t0 <<= 2
+	add   $v0, $a0, $t0
+	jr    $ra
 
 DEFCODE "KEY",3,,KEY
 	jal next_key
@@ -674,7 +760,276 @@ DEFCODE "NUMBER",6,,NUMBER
 	sw    $v0, 4($sp)       # the number
 	NEXT
 
-.section .rodata
-cold_start:
-.int QUIT
+DEFCODE "FIND",4,,FIND
+	lw    $a1,  ($sp)       # len
+	lw    $a0, 4($sp)       # addr
+	jal   find_word
+	addiu $sp, $sp, 4
+	lw    $v0, ($sp)
+	NEXT
+
+DEFCODE ">CFA",4,,TCFA
+	# "Code Field Address"?
+	# link_ptr ... -> interp_ptr ...
+	lw    $a0, ($sp)
+	jal   codeword_addr
+	sw    $v0, ($sp)
+	NEXT
+
+DEFWORD ">DFA",4,,TDFA
+	# link_ptr to the first instruction pointer
+	.int TCFA
+	.int INCR4
+	.int EXIT
+
+DEFCODE "CREATE",6,,CREATE
+	# writes the header of a new word:
+	# len name ... -> ...
+	lw    $t0,  ($sp)       # len
+	lw    $t1, 4($sp)       # name
+	addiu $sp, $sp, 8
+	lw    $t2, (var_HERE)
+	lw    $t3, (var_LATEST)
+	sw    $t3, ($t2)        # write old LATEST at HERE
+	sw    $t2, (var_LATEST)
+	sb    $t0, 4($t2)       # write len at HERE
+	addiu $t2, $t2, 5
+	# copy the word
+$Lbytecpy:
+	beqz  $t0, $Lcopied     #
+
+	addi  $t0, $t0, -1
+	addi  $t1, $t1, 1
+	addi  $t2, $t2, 1       # ++HERE
+	j $Lbytecpy
+$Lcopied: # now pad to 4
+	addi  $t2, $t2, 3
+	srl   $t2, $t2, 2
+	sll   $t2, $t2, 2
+	sw    $t2, (var_HERE)
+	NEXT
+
+.macro PUTHERE reg
+	# *HERE++ = val;
+	lw    $t2, (var_HERE)
+	sw    \reg, ($t2)
+	addiu $t2, $t2, 4
+	sw    $t2, (var_HERE)
+.endm
+
+DEFCODE ",",1,,COMMA
+	lw    $t0, ($sp)
+	addiu $sp, $sp, 4
+	PUTHERE $t0
+	NEXT
+
+DEFCODE "[",1,F_IMMED,LBRAC
+	# always executed, even in compile mode!
+	# STATE = 0, switch to immediate mode
+	sw    $0, (var_STATE)
+	NEXT
+
+DEFCODE "]",1,F_IMMED,RBRAC
+	# always executed, even in compile mode!
+	# STATE = 1, switch to compile mode
+	li    $t0, 1
+	sw    $t0, (var_STATE)
+	NEXT
+
+DEFCODE "HIDDEN",6,,HIDDEN
+	# dict_entry ... -> ... toggling HIDDEN bit
+	lw    $t0, ($sp)
+	addiu $sp, $sp, 4
+	lb    $t1, 4($t0)
+	xori  $t1, $t1, F_HIDDEN # toggle
+	sb    $t1, 4($t0)
+	NEXT
+
+DEFWORD "HIDE",4,,HIDE
+	.int WORD               # read a word after HIDE
+	.int FIND               # get its dict entry
+	.int HIDDEN
+	.int EXIT
+
+DEFCODE "IMMED",5,,IMMED
+	# dict_entry ... -> ... making the LATEST word immediate
+	lb    $t1, (var_LATEST + 4)
+	xori  $t1, $t1, F_IMMED
+	sb    $t1, (var_LATEST + 4)
+	NEXT
+
+DEFWORD ":",1,,COLON
+	.int WORD               # read a word
+	.int CREATE             # write its header into the dictionary
+	.int LIT, DOCOL, COMMA  # append DOCOL
+	.int LATEST, FETCH, HIDDEN  # make the word hidden (until compilation ends)
+	.int RBRAC              # go to compile mode
+	.int EXIT               # compile the definiton
+
+DEFWORD ";"1,F_IMMED,SEMICOLON
+	.int LIT, EXIT, COMMA   # append EXIT
+	.int LATEST, FETCH, HIDDEN  # toggle HIDDEN back
+	.int LBRAC              # go back to immediate mode
+	.int EXIT
+
+DEFCODE "'",1,,TICK
+	# fetches codeword of the word on the next word
+	# typical usage: ' FOO , -- append FOO codeword
+	# e.g. :LIT2 IMMED  ' LIT , 2 , ;
+	#   -- LIT2 inside a definition appends LIT 2
+	lw    $t0, ($s0)
+	addiu $s0, $s0, 4
+	addiu $sp, $sp, -4
+	sw    $t0, ($sp)
+	NEXT
+
+DEFCODE "BRANCH",6,,BRANCH
+	# BRANCH <n> skips n words
+	lw    $t0, ($s0)
+	add   $s0, $s0, $t0
+	NEXT
+
+DEFCODE "0BRANCH",7,,ZBRANCH
+	# 0BRANCH <n> skips n words if the stack top is 0
+	lw    $t0, ($sp)
+	addiu $sp, $sp, 4
+	beqz  $t0, code_BRANCH
+	addiu $s0, $s0, 4       # skip the offset otherwise
+	NEXT
+
+DEFCODE "LITSTRING",9,,LITSTRING
+	# LITSTRING <len> <str...>
+	# takes a string literal in a compiled word
+	# puts <len> <addr> on the stack
+	lw    $t0, ($s0)        # take the length
+	addiu $s0, $s0, 4       # s0 is now the literal address
+	addiu $sp, $sp, -8
+	sw    $s0, 4($sp)
+	sw    $t0,  ($sp)
+	# skip the string
+	add   $s0, $s0, $t0
+	# pad to 4
+	addi  $s0, $s0, 3
+	srl   $s0, $s0, 2
+	sll   $s0, $s0, 2      # ??? andi  $s0, $s0, ~3
+	NEXT
+
+DEFCODE "TELL",4,,TELL
+	# write to stdout a string on the stack
+	# len addr ... -> ...
+	li    $a0, 1            # FILENO_STDOUT
+	lw    $a1, 4($sp)       # str_addr
+	lw    $a2,  ($sp)       # str_len
+	li    $v0, __NR_write
+	syscall
+	addiu $sp, $sp, 8
+	NEXT
+
+/*
+ *	Jonesforth is pretty cryptic here.
+ *	First, we have to find_word next_word to see if it's defined.
+ *	If it is not found, assume it to be a literal, try to parse as number;
+ *
+ *	Interpret the results:
+ *	If it is a word:
+ *		if STATE is IMMED or it is F_IMMED:
+ *			jump to its codeword;
+ *		if STATE is COMPILE:
+ *			append its codeword;
+ *	If is a literal:
+ *		if STATE is IMMED: push it on the stack;
+ *		if STATE is COMPILE: append LIT, append it;
+ */
+
+next_token:
+	move  $s7, $ra
+	jal   next_word
+	move  $s2, $v0
+	move  $s3, $v1
+
+	move  $a0, $s2
+	move  $a1, $s3
+	jal   find_word
+	# now $v0 may be a dict entry
+
+	bnez  $v0, $Lexit
+	# no, it's not; assume it's a literal number
+	move  $a0, $s2
+	move  $a1, $s3
+	jal   parse_number
+	bnez  $v1, $Lparse_error
+	move  $v1, $v0
+	move  $v0, $0
+
+$Lexit:
+	jr    $s7
+	# returns:
+	# 	token (addr in $s2, len in $s3),
+	#   either a word: dict entry in $v0
+	# 	or  a literal: zero in $v0, literal in $v1
+
+$Lparse_error:
+	# not a known word or number
+	li    $a0, 2            # arg[0] = FILENO_STDERR
+	la    $a1, err_parse_msg
+	li    $a2, ERR_PARSE_LEN
+	li    $v0, __NR_write
+	syscall
+
+	li    $a0, 2
+	move  $a1, $s2
+	move  $a2, $s3
+	li    $v0, __NR_write
+	syscall
+
+	li    $a0, 2
+	la    $a1, nl_msg
+	li    $a2, 1
+	li    $v0, __NR_write
+	syscall
+	NEXT
+
+DEFCODE "INTERPRET",9,,INTERPRET
+	jal   next_token
+	beqz  $v0, interpret_lit
+
+interpret_word:
+	lw    $t1, (var_STATE)  # 0/1: EXEC/COMPILE
+	lb    $t0, 4($v0)
+	andi  $t0, $t0, F_IMMED
+
+	beqz  $t1, $Lexec_word  # if STATE == EXEC goto $Lexec_word
+	bnez  $t0, $Lexec_word  # if IMMED goto $Lexec_word
+$Lcompile_word:
+	PUTHERE $v0
+	NEXT
+$Lexec_word:
+	move  $a0, $v0
+	jal   codeword_addr
+	jr    $v0
+
+interpret_lit:
+	lw    $t1, (var_STATE)
+	beqz  $t1, $Lcompile_lit
+$Lexec_lit:
+	# execute a literal: push it on the stack
+	addiu $sp, $sp, -4
+	lw    $v1, ($sp)
+	NEXT
+$Lcompile_lit:
+	# compile a literal:
+	lw    $t2, (var_HERE)
+	la    $t0, LIT
+	sw    $t0,  ($t2)
+	sw    $v1, 4($t2)
+	addiu $t2, $t2, 8
+	sw    $t2, (var_HERE)
+	NEXT
+
+
+DEFWORD "QUIT",4,,QUIT
+	.int RZ, RSPSTORE       # R0 RSP!, clear the return stack
+	.int INTERPRET
+	.int BRANCH, -8         # loop back indefinitely
+
 
