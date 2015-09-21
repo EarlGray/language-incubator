@@ -1,3 +1,12 @@
+/*
+ *	This is a port of JonesForth
+ *	implementation/tutorial from x86 to MIPS (O32).
+ *
+ *	Compilation:
+ *	$ gcc -nostdlib mforth.S -o mforth
+ */
+
+
 #include <syscall.h>
 
 .set INITIAL_USERMEM_SIZE, (1024 * 512)
