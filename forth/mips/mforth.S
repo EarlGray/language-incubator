@@ -33,7 +33,7 @@ next_instruction:
 
 # the interpreter function, DO COLON
 # argument $t0 points to codeword
-.align 4
+.p2align 2
 DOCOL:
 	PUSH_RSP $s0
 	addiu $t0, 4
@@ -52,31 +52,31 @@ DOCOL:
 #### DEFWORD
 .macro DEFWORD name, namelen, flags=0, label
 	.text
-	.align 4
+	.p2align 2
 name_\label :
 	.globl name_\label
 	.int link
 	.set link,name_\label
 	.byte \flags+\namelen
 	.ascii "\name"
-	.align 4	# pad to 4
-	.globl \label
+	.p2align 2	# pad
 \label :
+	.globl \label
 	.int DOCOL
 .endm
 
 #### DEFCODE
 .macro DEFCODE name, namelen, flags=0, label
 	.text
-	.align 4
+	.p2align 2
 name_\label :
 	.globl name_\label
 	.int link
 	.set link,name_\label
 	.byte \flags+\namelen
 	.ascii "\name"
+	.p2align 2	# pad
 \label :
-	.align 4 		# pad
 	.globl \label
 	.globl code_\label
 	.int code_\label        # codeword
@@ -92,7 +92,7 @@ code_\label :
 	NEXT
 
 	.data
-	.align 4
+	.p2align 2
 var_\name :
 	.int \initial
 .endm
@@ -163,6 +163,12 @@ DEFCODE "LIT",3,,LIT
 	addiu $sp, -4
 	sw    $t0, ($sp)
 	NEXT
+
+DEFCODE "BYE",3,,BYE
+	li    $a0, 0
+	li    $v0, __NR_exit
+	syscall
+1:	j 1b
 
 ##
 ##		Stack manipulation
@@ -512,20 +518,19 @@ nl_msg: .ascii "\n"
 # no arguments, returns a read byte in $v0
 next_key:
 	# is there any data to read?
-	la    $t0, iobufcur     # &iobufcur
-	la    $t1, iobufend     # &iobufend
+	lw    $t0, (iobufcur)   # iobufcur
+	lw    $t1, (iobufend)   # iobufend
 	bge   $t0, $t1, 1f      # if no data, jump to 1:
 
 	# fetch a byte from iobuf
-	lw    $t2, ($t0)        # the pointer in `iobufcur`
-	lb    $v0, ($t2)        # a byte of input; the return value
-	addi  $t2, $t2, 1
-	sw    $t2, ($t0)        # increment `iobufcur`
+	lb    $v0, ($t0)        # a byte of input; the return value
+	addi  $t0, $t0, 1
+	sw    $t0, (iobufcur)   # increment `iobufcur`
 	jr    $ra
 
 1: # no data in the iobuf, read() more
 	la    $s1, iobuf
-	sw    $s1, ($t0)        # iobufcur = iobuf
+	sw    $s1, (iobufcur)   # iobufcur = iobuf
 
 	move  $a0, $0           # arg[0] = FILENO_STDIN;
 	move  $a1, $s1          # arg[1] = iobuf;
@@ -549,7 +554,6 @@ next_word:
 	addiu $sp, -4
 	sw    $ra, ($sp)        # $ra will be used by `next_key`
 
-	move  $s2, $0           # how many bytes read
 1:  # search for a non-blank
 	jal next_key
 	beq   $v0, '\\', 4f
@@ -557,10 +561,11 @@ next_word:
 	beq   $v0, '\n', 1b
 	beq   $v0, '\t', 1b
 
+	move  $s2, $0           # how many bytes read
 2:  # add to `wordbuf`
-	sb    $v0, ($s2)
+	sb    $v0, wordbuf($s2)
 	addiu $s2, 1
-	jal next_key
+	jal   next_key
 	beq   $v0, ' ' , 3f
 	beq   $v0, '\t', 3f
 	beq   $v0, '\n', 3f
@@ -622,7 +627,7 @@ parse_number:
 
 	lw    $a2, (var_BASE)   # a2 = base
 	move  $v0, $0           # res = 0
-	move  $t6, $0			# negative = false
+	move  $t6, $0           # negative = false
 
 	lb    $a3, ($a0)
 	beq   $a3, '-', 1f
@@ -920,9 +925,8 @@ DEFCODE "TELL",4,,TELL
  *		if STATE is COMPILE: append LIT, append it;
  */
 
-next_token:
+parse_token:
 	move  $s7, $ra
-	jal   next_word
 	move  $s2, $v0
 	move  $s3, $v1
 
@@ -969,7 +973,8 @@ $Lparse_error:
 	NEXT
 
 DEFCODE "INTERPRET",9,,INTERPRET
-	jal   next_token
+	jal   next_word
+	jal   parse_token
 	beqz  $v0, interpret_lit
 
 interpret_word:
@@ -985,11 +990,12 @@ $Lcompile_word:
 $Lexec_word:
 	move  $a0, $v0
 	jal   codeword_addr
+	lw    $v0, ($v0)
 	jr    $v0
 
 interpret_lit:
 	lw    $t1, (var_STATE)
-	beqz  $t1, $Lcompile_lit
+	bnez  $t1, $Lcompile_lit
 $Lexec_lit:
 	# execute a literal: push it on the stack
 	addiu $sp, -4
