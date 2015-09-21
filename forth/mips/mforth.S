@@ -780,12 +780,13 @@ DEFCODE "CREATE",6,,CREATE
 	addiu $t2, 5
 	# copy the word
 $Lbytecpy:
-	beqz  $t0, $Lcopied     #
-
-	addi  $t0, $t0, -1
-	addi  $t1, $t1, 1
-	addi  $t2, $t2, 1       # ++HERE
-	j $Lbytecpy
+	beqz  $t0, $Lcopied     # while (count) {
+	lb    $t3, ($t1)        #       vvv  *name;
+	sb    $t3, ($t2)        #    *HERE =  ^^^
+	addi  $t0, $t0, -1      #    --count;
+	addi  $t1, $t1, 1       #    ++name;
+	addi  $t2, $t2, 1       #    ++HERE;
+	j $Lbytecpy             # }
 $Lcopied: # now pad to 4
 	addi  $t2, $t2, 3
 	srl   $t2, $t2, 2
@@ -985,13 +986,16 @@ interpret_word:
 	beqz  $t1, $Lexec_word  # if STATE == EXEC goto $Lexec_word
 	bnez  $t0, $Lexec_word  # if IMMED goto $Lexec_word
 $Lcompile_word:
+	move  $a0, $v0
+	jal   codeword_addr
 	PUTHERE $v0
 	NEXT
 $Lexec_word:
 	move  $a0, $v0
 	jal   codeword_addr
-	lw    $v0, ($v0)
-	jr    $v0
+	move  $t0, $v0
+	lw    $t1, ($t0)
+	jr    $t1               # must be $t0, it may be DOCOL
 
 interpret_lit:
 	lw    $t1, (var_STATE)
