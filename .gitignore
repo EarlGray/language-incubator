@@ -7,3 +7,5 @@
 *.tab.c
 *.yy.c
 *.ll
+*.beam
+tags
