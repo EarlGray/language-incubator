@@ -9,6 +9,7 @@
 
 #include <syscall.h>
 
+.equ NULL, 0
 .set INITIAL_USERMEM_SIZE, (1024 * 512)
 .set RETURN_STACK_SIZE, (1024 * 16)
 .set IOBUFSZ,1024
@@ -167,10 +168,10 @@ DEFCODE "EXIT",4,,EXIT
 	NEXT
 
 DEFCODE "LIT",3,,LIT
-	lw    $t0, ($s0)
+	lw    $t1, ($s0)
 	addiu $s0, 4
 	addiu $sp, -4
-	sw    $t0, ($sp)
+	sw    $t1, ($sp)
 	NEXT
 
 DEFCODE "BYE",3,,BYE
@@ -812,9 +813,9 @@ $Lcopied: # now pad to 4
 .endm
 
 DEFCODE ",",1,,COMMA
-	lw    $t0, ($sp)
+	lw    $t1, ($sp)
 	addiu $sp, 4
-	PUTHERE $t0
+	PUTHERE $t1
 	NEXT
 
 DEFCODE "[",1,F_IMMED,LBRAC
@@ -823,7 +824,7 @@ DEFCODE "[",1,F_IMMED,LBRAC
 	sw    $0, (var_STATE)
 	NEXT
 
-DEFCODE "]",1,F_IMMED,RBRAC
+DEFCODE "]",1,,RBRAC
 	# always executed, even in compile mode!
 	# STATE = 1, switch to compile mode
 	li    $t0, 1
@@ -845,11 +846,12 @@ DEFWORD "HIDE",4,,HIDE
 	.int HIDDEN
 	.int EXIT
 
-DEFCODE "IMMED",5,,IMMED
-	# dict_entry ... -> ... making the LATEST word immediate
-	lb    $t1, (var_LATEST + 4)
-	xori  $t1, $t1, F_IMMED
-	sb    $t1, (var_LATEST + 4)
+DEFCODE "IMMED",5,F_IMMED,IMMED
+	# ... -> ... making the LATEST word immediate
+	lw    $t2, (var_LATEST)
+	lb    $t1, 4($t2)
+	xori  $t1, F_IMMED
+	sb    $t1, 4($t2)
 	NEXT
 
 DEFWORD ":",1,,COLON
@@ -871,10 +873,10 @@ DEFCODE "'",1,,TICK
 	# typical usage: ' FOO , -- append FOO codeword
 	# e.g. :LIT2 IMMED  ' LIT , 2 , ;
 	#   -- LIT2 inside a definition appends LIT 2
-	lw    $t0, ($s0)
+	lw    $t1, ($s0)
 	addiu $s0, 4
 	addiu $sp, -4
-	sw    $t0, ($sp)
+	sw    $t1, ($sp)
 	NEXT
 
 DEFCODE "BRANCH",6,,BRANCH
@@ -1030,6 +1032,49 @@ DEFWORD "QUIT",4,,QUIT
 	.int INTERPRET
 	.int BRANCH, -8         # loop back indefinitely
 
+##
+##  May be defined in a Forth file, but...
+##
+
+# : IF IMMED ' 0BRANCH , HERE @ 0 , ;
+DEFWORD "IF",2,F_IMMED,IF
+	.int TICK, ZBRANCH, COMMA
+	.int HERE, FETCH
+	.int LIT, 0, COMMA
+	.int EXIT
+
+# : ELSE IMMED ' 0BRANCH , HERE @ 0 , SWAP DUP HERE @ SWAP - SWAP ! ;
+DEFWORD "ELSE",4,F_IMMED,ELSE
+	.int TICK, ZBRANCH, COMMA
+	.int HERE, FETCH
+	.int LIT, 0, COMMA
+	.int SWAP, DUP, HERE, FETCH
+	.int SWAP, SUB, SWAP, STORE
+	.int EXIT
+
+# : THEN IMMED DUP HERE @ SWAP - SWAP ! ;
+DEFWORD "THEN",4,F_IMMED,THEN
+	.int DUP
+	.int HERE, FETCH
+	.int SWAP, SUB, SWAP, STORE
+	.int EXIT
+
+DEFWORD "BEGIN",5,F_IMMED,BEGIN
+	.int HERE, FETCH
+	.int EXIT
+
+DEFWORD "WHILE",5,F_IMMED,WHILE
+	.int TICK, ZBRANCH, COMMA
+	.int HERE, FETCH
+	.int LIT, 0, COMMA
+	.int EXIT
+
+DEFWORD "REPEAT",6,F_IMMED,REPEAT
+	.int TICK, BRANCH, COMMA
+	.int SWAP, HERE, FETCH, SUB, COMMA
+	.int DUP, HERE, FETCH
+	.int SWAP, SUB, SWAP, STORE
+	.int EXIT
 
 ##
 ##	The entry point
