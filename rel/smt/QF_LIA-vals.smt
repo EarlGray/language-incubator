@@ -1,3 +1,5 @@
+;; $ z3 -smt QF_LIA-vals.smt
+
 (set-logic QF_LIA)
 (set-option :produce-models true)
 
