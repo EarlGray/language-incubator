@@ -12,19 +12,23 @@ ctx_elem(Ctx, {X, Ty}) :- memberchk({X, Ty}, Ctx).
 type(_, true, bool).
 type(_, false, bool).
 
-type(Ctx, X, Ty1) :- isvar(X),
-  ctx_elem(Ctx, {X, Ty1}).
-
-type(Ctx, lam(X, T), arr(Ty1, Ty2)) :-
-  isvar(X),
-  ctx_intro(Ctx1, Ctx, {X, Ty1}),
-  type(Ctx1, T, Ty2).
-
+% [T-If]
 type(Ctx, ite(T1, T2, T3), Ty) :-
   type(Ctx, T1, bool),
   type(Ctx, T2, Ty),
   type(Ctx, T3, Ty).
 
+% [T-Var]
+type(Ctx, X, Ty1) :- isvar(X),
+  ctx_elem(Ctx, {X, Ty1}).
+
+% [T-Abs]
+type(Ctx, lam(X, T), arr(Ty1, Ty2)) :-
+  isvar(X),
+  ctx_intro(Ctx1, Ctx, {X, Ty1}),
+  type(Ctx1, T, Ty2).
+
+% [T-App]
 type(Ctx, app(T1, T2), Ty) :-
   type(Ctx, T1, arr(Ty1, Ty)),
   type(Ctx, T2, Ty1).
