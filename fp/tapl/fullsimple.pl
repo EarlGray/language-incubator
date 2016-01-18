@@ -1,4 +1,4 @@
-module(fullsimple, []).
+:- module(fullsimple, []).
 
 istype(bool).
 istype(nat).
@@ -108,10 +108,11 @@ eval(Vars, app(T1, T2), V) :-
   eval(Vars, T2, V2),
   eval([{X, V2} | Vars], TLam, V).
 
-% builtins:
+% [E-AppBuiltin]
 eval(Vars, app(T1, T2), V) :-
   eval(Vars, T1, prolog(F)),
   eval(Vars, T2, V2),
+  % a builtin must take one argument and unify the result:
   call(F, V2, V).
 
 % [E-As]
@@ -135,18 +136,6 @@ eval(Vars, plus(T1, T2), V) :-
   eval(Vars, T2, Y), isnat(Y),
   eval(Vars, plus(X, Y), V).
 
-eval(Vars, int_of_nat(T), I) :-
-  eval(Vars, T, N),
-  int_of_nat(N, I).
-
-eval(Vars, nat_of_int(T), N) :-
-  eval(Vars, T, I),
-  nat_of_int(I, N).
-
-eval(Vars, print(T), unit) :-
-  eval(Vars, T, V),
-  !, write(V).
-
 %% builtins:
 int_of_nat(z, 0).
 int_of_nat(s(N1), I) :- int_of_nat(N1, I1), I is I1 + 1.
@@ -160,7 +149,7 @@ prelude_write(Term, unit) :- write(Term).
 %% Prelude
 prelude_defs([
   {id,          arr(X, X),      lam(x, x)},
-  % {add,         arr(int, arr(int, int)),  lam(X, lam(y, plus(X, y))) },
+% {add,         arr(int, arr(int, int)),  lam(X, lam(y, plus(X, y))) },
   {nat_of_int,  arr(int, nat),  prolog(nat_of_int)},
   {int_of_nat,  arr(nat, int),  prolog(int_of_nat)},
   {print,       arr(_, unit),   prolog(prelude_write)}
