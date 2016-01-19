@@ -1,3 +1,23 @@
+% fullsimple:
+%
+% <type> ::= bool | nat | int | unit | <type> -> <type> | <type> * <type>
+% <term> ::= true | false                                     : bool
+%         | <nat>                                             : nat
+%         | unit                                              : unit
+%         | ite(<term1:bool>, <term2:type>, <term3:type>)     : type
+%         | <var>                                             : type(ctx)
+%         | lam(<var:t1>, <term:t2>)                          : t1 -> t2
+%         | app(<term1:t1->t2>, <term2:t1>)                   : t2
+%         | do([<term:unit>, <term:unit>, ..., <term:type>])  : type
+%         | as(<term>, <type>)                                : type
+%         | let({<var>, <term>}, <term:type>)                 : type
+%         | plus(<term:nat>, <term:nat>)                      : nat
+%         | plus(<term:int>, <term:int>)                      : int
+%         | pair(<term>, <term>)  | fst(<term:pair>) | snd(<term:pair>)
+% <nat> ::= z | s(<term>)
+%
+% + a small prelude
+%
 :- module(fullsimple, []).
 
 istype(bool).
@@ -149,7 +169,6 @@ prelude_write(Term, unit) :- write(Term).
 %% Prelude
 prelude_defs([
   {id,          arr(X, X),      lam(x, x)},
-% {add,         arr(int, arr(int, int)),  lam(X, lam(y, plus(X, y))) },
   {nat_of_int,  arr(int, nat),  prolog(nat_of_int)},
   {int_of_nat,  arr(nat, int),  prolog(int_of_nat)},
   {print,       arr(_, unit),   prolog(prelude_write)}

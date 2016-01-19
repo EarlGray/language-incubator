@@ -93,6 +93,8 @@ var v = EVar v ()
 app t1 t2 = EApp t1 t2 ()
 lam (v, ty) body = ELam (v, ty) body ()
 
+t_id = lam ("x", TBool) (var "x")
+
 tcheck = getty . typechk []
 
 test0 = tcheck (app (lam ("x", TBool) (var "x")) false) == TBool
