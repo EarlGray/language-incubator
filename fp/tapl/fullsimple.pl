@@ -1,6 +1,6 @@
 % fullsimple:
 %
-% <type> ::= bool | nat | int | unit | <type> -> <type> | <type> * <type>
+% <type> ::= bool | nat | int | unit | <type> -> <type> | <type> * <type> | <type>+<type>
 % <term> ::= true | false                                     : bool
 %         | <nat>                                             : nat
 %         | unit                                              : unit
@@ -13,7 +13,13 @@
 %         | let({<var>, <term>}, <term:type>)                 : type
 %         | plus(<term:nat>, <term:nat>)                      : nat
 %         | plus(<term:int>, <term:int>)                      : int
-%         | pair(<term>, <term>)  | fst(<term:pair>) | snd(<term:pair>)
+%         | pair(<term:t1>, <term:t2>)                        : t1 * t2
+%         | fst(<term:pair>) | snd(<term:pair>)
+%         | inl(<term:t1>) | inr(<term:t2>)                   : t1 + t2
+%         | case(<term:t1+t2>,
+%             {<var:t1>, <term:type>},
+%             {<var:t2>, <term:type>})                        : type 
+%
 % <nat> ::= z | s(<term>)
 %
 % + a small prelude
@@ -26,6 +32,7 @@ istype(int).
 istype(unit).
 istype(arr(Ty1, Ty2)) :- istype(Ty1), istype(Ty2).
 istype(pair(Ty1, Ty2)) :- istype(Ty1), istype(Ty2).
+istype(uni(Ty1, Ty2)) :- istype(Ty1), istype(Ty2).
 
 %% typing rules
 % [T-Unit]
@@ -42,7 +49,7 @@ type(Ctx, ite(T1, T2, T3), Ty) :-
   type(Ctx, T3, Ty).
 
 % [T-Var]
-type(Ctx, Var, Ty) :- atom(Var),
+type(Ctx, Var, Ty) :- isvar(Var), !,
   memberchk({Var, Ty}, Ctx).
 
 % [T-Zero], [T-Succ]
@@ -50,8 +57,8 @@ type(_, z, nat).
 type(Ctx, s(N), nat) :- type(Ctx, N, nat).
 type(Ctx, iszero(T), bool) :- type(Ctx, T, nat).
 
-% [T-Abs]
-type(Ctx, lam(X, T), arr(Ty1, Ty2)) :- atom(X),
+% [T-Lam]
+type(Ctx, lam(X, T), arr(Ty1, Ty2)) :- isvar(X),
   type([{X, Ty1} | Ctx], T, Ty2).
 
 % [T-App]
@@ -70,7 +77,7 @@ type(Ctx, do([T | Ts]), Ty) :- type(Ctx, T, unit), type(Ctx, do(Ts), Ty).
 type(Ctx, as(T, Ty), Ty) :- type(Ctx, T, Ty).
 
 % [T-Let]
-type(Ctx, let({X, T1}, T2), Ty) :- atom(X),
+type(Ctx, let({X, T1}, T2), Ty) :- isvar(X),
   type(Ctx, T1, Ty1),
   type([{X, Ty1} | Ctx], T2, Ty).
 
@@ -89,16 +96,27 @@ type(Ctx, plus(T1, T2), nat) :-
 type(Ctx, plus(T1, T2), int) :-
   type(Ctx, T1, int), type(Ctx, T2, int).
 
+% [T-Inl], [T-Inr], [T-Case]
+type(Ctx, inl(T), uni(Ty, _)) :- type(Ctx, T, Ty).
+type(Ctx, inr(T), uni(_, Ty)) :- type(Ctx, T, Ty).
+type(Ctx, case(T0, {Vl, Tl}, {Vr, Tr}), Ty) :-
+  isvar(Vl), isvar(Vr), !,
+  type(Ctx, T0, uni(Ty1, Ty2)),
+  Ctx1 = [{Vl, Ty1} | Ctx], type(Ctx1, Tl, Ty),
+  Ctx2 = [{Vr, Ty2} | Ctx], type(Ctx2, Tr, Ty),
+
 %% evaluation rules
 isnat(z).
 isnat(s(_)).
+
+isvar(V) :- atom(V).
 
 eval(_, unit, unit).
 
 eval(_, true, true).
 eval(_, false, false).
 
-eval(_, lam(X, T), lam(X, T)) :- atom(X).
+eval(_, lam(X, T), lam(X, T)) :- isvar(X).
 
 eval(_, Num, Num) :- number(Num).
 
@@ -113,7 +131,7 @@ eval(Vars, fst(T), V) :- eval(Vars, T, pair(V, _)).
 eval(Vars, snd(T), V) :- eval(Vars, T, pair(_, V)).
 
 % [E-Var]
-eval(Vars, Var, Val) :- atom(Var), !,
+eval(Vars, Var, Val) :- isvar(Var), !,
   memberchk({Var, Val}, Vars).
 
 % [E-If]
@@ -143,6 +161,7 @@ eval(Vars, let({X, T1}, T2), V) :-
   eval(Vars, T1, VX),
   eval([{X, VX} | Vars], T2, V).
 
+% [E-Plus]
 eval(Vars, plus(T1, T2), V) :-
   eval(Vars, T1, X), number(X),
   eval(Vars, T2, Y), number(Y),
@@ -155,6 +174,19 @@ eval(Vars, plus(T1, T2), V) :-
   eval(Vars, T1, X), isnat(X),
   eval(Vars, T2, Y), isnat(Y),
   eval(Vars, plus(X, Y), V).
+
+% [E-Inl], [E-Inr]
+eval(Vars, inl(T), inl(V)) :- eval(Vars, T, V).
+eval(Vars, inr(T), inr(V)) :- eval(Vars, T, V).
+% [E-CaseInl], [E-CaseInr], [E-Case]
+eval(Vars, case(T0, {Var, TL}, {_, _}), Val) :-
+  eval(Vars, T0, inl(V0)),
+  !, Vars1 = [{Var, V0} | Vars],
+  eval(Vars1, TL, Val).
+eval(Vars, case(T0, {_, _}, {Var, TR}), Val) :-
+  eval(Vars, T0, inr(V0)),
+  !, Vars1 = [{Var, V0} | Vars],
+  eval(Vars1, TR, Val).
 
 %% builtins:
 int_of_nat(z, 0).
