@@ -52,14 +52,43 @@ test(e_case_z) :-
 test(e_case_sz) :-
   fullsimple:eval([{x, s(z)}], case(x, {z, true}, {s(_), false}), false).
 
+declare_iseven(
+    lam(iseven,
+        lam(n,
+            case(n,
+              {z, true},
+              {s(n1),
+                case(n1,
+                  {z, false},
+                  {s(n2), app(iseven, n2)})})))).
+
+test(e_fix_iseven_z) :-
+  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  fullsimple:eval([], app(IsEven, z), true).
+test(e_fix_iseven_sz) :-
+  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  fullsimple:eval([], app(IsEven, s(z)), false).
+test(e_fix_iseven_ssssz) :-
+  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  fullsimple:eval([], app(IsEven, s(s(s(s(z))))), true).
+
 %% Prelude
-test(e_iszero_z) :-
+test(e_pre_iszero_z) :-
   fullsimple:evalp([{x, z}], app(iszero, x), true).
-test(e_iszero_sz) :-
+test(e_pre_iszero_sz) :-
   fullsimple:evalp([{x, s(z)}], app(iszero, x), false).
-test(e_iszero_lam, [fail]) :-
+test(e_pre_iszero_lam, [fail]) :-
   fullsimple:evalp([{x, lam(y, y)}], app(iszero, x), false).
 
+test(e_pre_pred_z) :-
+  fullsimple:evalp([{n, z}], app(pred, n), z).
+test(e_pre_pred_ssz) :-
+  fullsimple:evalp([{n, s(s(z))}], app(pred, n), s(z)).
+test(e_pre_int) :-
+  Predi = lam(i, app(int_of_nat, app(pred, app(nat_of_int, i)))),
+  fullsimple:evalp([{predi, Predi}], app(predi, 42), 41).
+
+% test(e_fix_mult) :- Mult = lam(
 
 :- end_tests(fullsimple).
 

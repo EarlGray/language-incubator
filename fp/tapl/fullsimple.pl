@@ -18,10 +18,11 @@
 %         | inl(<term:t1>) | inr(<term:t2>)                   : t1 + t2
 %         | case(<term:t1+t2>,
 %             {<var:t1>, <term:type>},
-%             {<var:t2>, <term:type>})                        : type 
+%             {<var:t2>, <term:type>})                        : type
 %         | case(<term:nat>,
 %             {z, <term:rty>},
 %             {s(<var:vty>), <term:rty>})                     : rty
+%         | fix(<term:type->type>)                            : type
 %
 % <nat> ::= z | s(<term>)
 %
@@ -111,10 +112,15 @@ type(Ctx, case(T0, {Vl, Tl}, {Vr, Tr}), Ty) :- !,
   Ctx1 = [{Vl, Ty1} | Ctx], type(Ctx1, Tl, Ty),
   Ctx2 = [{Vr, Ty2} | Ctx], type(Ctx2, Tr, Ty).
 
+% [T-Fix]
+type(Ctx, fix(T), Ty) :- !,
+  type(Ctx, T, arr(Ty, Ty)).
+
 %% evaluation rules
 isnat(z).
 isnat(s(_)).
 
+isvar(z) :- !, fail.
 isvar(true) :- !, fail.
 isvar(false) :- !, fail.
 isvar(V) :- atom(V).
@@ -199,14 +205,20 @@ eval(Vars, case(T0, {_, _}, {Var, TR}), Val) :-
   eval(Vars, T0, inr(V0)),
   !, Vars1 = [{Var, V0} | Vars],
   eval(Vars1, TR, Val).
-  
+
+% [E-Fix]
+eval(Vars, fix(Tf), V) :- !,
+  eval(Vars, Tf, Tl), Tl = lam(X, Tb),
+  VarsF = [{X, fix(Tl)} | Vars],
+  eval(VarsF, Tb, V).
+
 %% builtins:
-int_of_nat(z, 0).
-int_of_nat(s(N1), I) :- int_of_nat(N1, I1), I is I1 + 1.
+int_of_nat(z, 0) :- !.
+int_of_nat(s(N1), I) :- !, int_of_nat(N1, I1), I is I1 + 1.
 
 nat_of_int(I, _) :- I < 0, !, fail.
-nat_of_int(0, z).
-nat_of_int(I, s(N)) :- I1 is I - 1, nat_of_int(I1, N).
+nat_of_int(0, z) :- !.
+nat_of_int(I, s(N)) :- !, I1 is I - 1, nat_of_int(I1, N).
 
 prelude_write(Term, unit) :- write(Term).
 
@@ -214,6 +226,7 @@ prelude_write(Term, unit) :- write(Term).
 prelude_defs([
   {id,          arr(X, X),      lam(x, x)},
   {iszero,      arr(nat, bool), lam(x, case(x, {z, true}, {s(any), false}))},
+  {pred,        arr(nat, nat),  lam(n, case(n, {z, z}, {s(n1), n1}))},
   {nat_of_int,  arr(int, nat),  prolog(nat_of_int)},
   {int_of_nat,  arr(nat, int),  prolog(int_of_nat)},
   {print,       arr(_, unit),   prolog(prelude_write)}
