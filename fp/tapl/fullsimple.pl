@@ -212,7 +212,18 @@ eval(Vars, fix(Tf), V) :- !,
   VarsF = [{X, fix(Tl)} | Vars],
   eval(VarsF, Tb, V).
 
-%% builtins:
+%% naive subst(What, With, Where, Result)
+subst(What, _, _, _) :- not(atom(What)), !, fail.
+subst(What, With, What, With) :- !.
+subst(What, With, ite(Cond, Then, Else), ite(CondS, ThenS, ElseS)) :- !,
+  subst(What, With, Cond, CondS),
+  subst(What, With, Then, ThenS),
+  subst(What, With, Else, ElseS).
+subst(V, With, lam(V, Tb), lam(With, TbS)) :- !,
+  subst(V, With, Tb, TbS).
+subst(_, _, What, What).
+
+%
 int_of_nat(z, 0) :- !.
 int_of_nat(s(N1), I) :- !, int_of_nat(N1, I1), I is I1 + 1.
 

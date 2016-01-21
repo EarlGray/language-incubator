@@ -88,6 +88,12 @@ test(e_pre_int) :-
   Predi = lam(i, app(int_of_nat, app(pred, app(nat_of_int, i)))),
   fullsimple:evalp([{predi, Predi}], app(predi, 42), 41).
 
+test(subst_nonatom, [fail]) :- fullsimple:subst(12, 13, 12, 13).
+test(subst_atom_id) :- fullsimple:subst(x, y, x, y).
+test(subst_atom_no) :- fullsimple:subst(x, y, z, z).
+test(subst_num_id)  :- fullsimple:subst(x, 12, x, 12).
+test(subst_num_no)  :- fullsimple:subst(x, 12, y, y).
+
 % test(e_fix_mult) :- Mult = lam(
 
 :- end_tests(fullsimple).
