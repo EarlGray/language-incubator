@@ -17,8 +17,8 @@
 %         | fst(<term:pair>) | snd(<term:pair>)
 %         | inl(<term:t1>) | inr(<term:t2>)                   : t1 + t2
 %         | case(<term:t1+t2>,
-%             {<var:t1>, <term:type>},
-%             {<var:t2>, <term:type>})                        : type
+%             {inl(<var:t1>), <term:type>},
+%             {inr(<var:t2>), <term:type>})                   : type
 %         | case(<term:nat>,
 %             {z, <term:rty>},
 %             {s(<var:vty>), <term:rty>})                     : rty
@@ -106,7 +106,7 @@ type(Ctx, case(T0, {z, Tz}, {s(V), Ts}), Ty) :- !,
   type(Ctx, T0, nat),
   type(Ctx, Tz, Ty),
   CtxS = [{V, nat} | Ctx], type(CtxS, Ts, Ty).
-type(Ctx, case(T0, {Vl, Tl}, {Vr, Tr}), Ty) :- !,
+type(Ctx, case(T0, {inl(Vl), Tl}, {inr(Vr), Tr}), Ty) :- !,
   isvar(Vl), isvar(Vr),
   type(Ctx, T0, uni(Ty1, Ty2)),
   Ctx1 = [{Vl, Ty1} | Ctx], type(Ctx1, Tl, Ty),
@@ -197,11 +197,11 @@ eval(Vars, case(T0, {z, Tz}, {s(_), _}), Val) :-
 eval(Vars, case(T0, {z, _}, {s(V), Ts}), Val) :-
   !, eval(Vars, T0, s(N)), Vars1 = [{V, N} | Vars],
   eval(Vars1, Ts, Val).
-eval(Vars, case(T0, {Var, TL}, {_, _}), Val) :-
+eval(Vars, case(T0, {inl(Var), TL}, {inr(_), _}), Val) :-
   eval(Vars, T0, inl(V0)),
   !, Vars1 = [{Var, V0} | Vars],
   eval(Vars1, TL, Val).
-eval(Vars, case(T0, {_, _}, {Var, TR}), Val) :-
+eval(Vars, case(T0, {inl(_), _}, {inr(Var), TR}), Val) :-
   eval(Vars, T0, inr(V0)),
   !, Vars1 = [{Var, V0} | Vars],
   eval(Vars1, TR, Val).
@@ -209,18 +209,42 @@ eval(Vars, case(T0, {_, _}, {Var, TR}), Val) :-
 % [E-Fix]
 eval(Vars, fix(Tf), V) :- !,
   eval(Vars, Tf, Tl), Tl = lam(X, Tb),
-  VarsF = [{X, fix(Tl)} | Vars],
-  eval(VarsF, Tb, V).
+  subst(X, fix(Tl), Tb, TbS),
+  eval(Vars, TbS, V).
 
 %% naive subst(What, With, Where, Result)
 subst(What, _, _, _) :- not(atom(What)), !, fail.
 subst(What, With, What, With) :- !.
-subst(What, With, ite(Cond, Then, Else), ite(CondS, ThenS, ElseS)) :- !,
-  subst(What, With, Cond, CondS),
-  subst(What, With, Then, ThenS),
-  subst(What, With, Else, ElseS).
 subst(V, With, lam(V, Tb), lam(With, TbS)) :- !,
-  subst(V, With, Tb, TbS).
+  subst(V, With, Tb, TbS). % here be dragonbugs
+subst(_, _, [], []) :- !.
+subst(V, With, [T | Ts], [TS | TSs]) :- !,
+  subst(V, With, T, TS),
+  subst(V, With, Ts, TSs).
+subst(V, With, as(T, Ty), as(Ts, Ty)) :- !,
+  subst(V, With, T, Ts).
+subst(V, With, let({X, Tx}, Tl), let({X, TxS}, TlS)) :- X \= V, !,
+  subst(V, With, Tx, TxS), subst(V, With, Tl, TlS).
+subst(V, W, case(V, {z, Tz}, {s(Y), Ts}), case(W, {z, TzS}, {s(Y), TsS})) :- !,
+  subst(V, W, Tz, TzS), subst(V, W, Ts, TsS).
+subst(V, W, case(X, {z, Tz}, {s(V), Ts}), case(X, {z, TzS}, {s(W), TsS})) :- !,
+  subst(V, W, Tz, TzS), subst(V, W, Ts, TsS).
+subst(V, W, case(X, {z, Tz}, {s(Y), Ts}), case(X, {z, TzS}, {s(Y), TsS})) :- !,
+  subst(V, W, Tz, TzS), subst(V, W, Ts, TsS).
+subst(V, W, Fun, FunS) :- functor(Fun, Name, 1), !,
+  arg(1, Fun, Arg), subst(V, W, Arg, ArgS),
+  functor(FunS, Name, 1), arg(1, FunS, ArgS).
+subst(V, W, Fun, FunS) :- functor(Fun, Name, 2), !,
+  arg(1, Fun, Arg1), subst(V, W, Arg1, Arg1S),
+  arg(2, Fun, Arg2), subst(V, W, Arg2, Arg2S),
+  functor(FunS, Name, 2),
+  arg(1, FunS, Arg1S), arg(2, FunS, Arg2S).
+subst(V, W, Fun, FunS) :- functor(Fun, Name, 3), !,
+  arg(1, Fun, Arg1), subst(V, W, Arg1, Arg1S),
+  arg(2, Fun, Arg2), subst(V, W, Arg2, Arg2S),
+  arg(3, Fun, Arg3), subst(V, W, Arg3, Arg3S),
+  functor(FunS, Name, 3),
+  arg(1, FunS, Arg1S), arg(2, FunS, Arg2S), arg(3, FunS, Arg3S).
 subst(_, _, What, What).
 
 %
