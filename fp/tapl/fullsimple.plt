@@ -72,6 +72,13 @@ test(e_fix_iseven_ssssz) :-
   declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
   fullsimple:eval([], app(IsEven, s(s(s(s(z))))), true).
 
+test(t_rec_intint) :-
+  fullsimple:type([], {x=2, y=3}, {x:int, y:int}).
+test(t_rec_1) :-
+  fullsimple:type([], {x=3}, {x:int}).
+test(t_rec_1eq, [fail]) :-
+  fullsimple:type([], x=3, _).
+
 %% Prelude
 test(e_pre_iszero_z) :-
   fullsimple:evalp([{x, z}], app(iszero, x), true).
@@ -93,8 +100,6 @@ test(subst_atom_id) :- fullsimple:subst(x, y, x, y).
 test(subst_atom_no) :- fullsimple:subst(x, y, z, z).
 test(subst_num_id)  :- fullsimple:subst(x, 12, x, 12).
 test(subst_num_no)  :- fullsimple:subst(x, 12, y, y).
-
-% test(e_fix_mult) :- Mult = lam(
 
 :- end_tests(fullsimple).
 

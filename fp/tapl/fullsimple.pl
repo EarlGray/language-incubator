@@ -1,6 +1,9 @@
 % fullsimple:
 %
-% <type> ::= bool | nat | int | unit | <type> -> <type> | <type> * <type> | <type>+<type>
+% <type> ::= bool
+%          | nat | int | unit
+%          | <type> -> <type> | <type> * <type> | <type>+<type>
+%          | {<var>:<type>, ... }
 % <term> ::= true | false                                     : bool
 %         | <nat>                                             : nat
 %         | unit                                              : unit
@@ -23,6 +26,8 @@
 %             {z, <term:rty>},
 %             {s(<var:vty>), <term:rty>})                     : rty
 %         | fix(<term:type->type>)                            : type
+%         | { <var1>=<term:ty1>, ...}                         : { <var1>:<ty1>, ...}
+%         | <term:{.., <var>:<ty>, ..}>:<var>                 : ty
 %
 % <nat> ::= z | s(<term>)
 %
@@ -115,6 +120,19 @@ type(Ctx, case(T0, {inl(Vl), Tl}, {inr(Vr), Tr}), Ty) :- !,
 % [T-Fix]
 type(Ctx, fix(T), Ty) :- !,
   type(Ctx, T, arr(Ty, Ty)).
+
+% [T-Rec], [T-RecProj]
+type(Ctx, {Ts}, {Tys}) :- !, rectype(Ctx, Ts, Tys).
+%type(Ctx, T:F, Ty) :- !, isvar(F), type(Ctx, T, {RecTy}), .
+
+tmember(V:_Ty, V) :- !.
+tmember((V:_Ty, _), V) :- !.
+tmember((_:_Ty, Vs), V) :- tmember(Vs, V).
+
+rectype(Ctx, V=T, V:Ty) :- !, type(Ctx, T, Ty).
+rectype(Ctx, (V=T, Ts), (V:Ty, Tys)) :- !,
+  type(Ctx, T, Ty),
+  rectype(Ctx, Ts, Tys).
 
 %% evaluation rules
 isnat(z).
