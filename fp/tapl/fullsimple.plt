@@ -16,7 +16,6 @@ test(t_appid, [nondet]) :-
 test(t_plus0) :-
   Term = plus(2, 2),
   fullsimple:type([], Term, int).
-
 test(e_plus0) :-
   Term = plus(2, 2),
   fullsimple:eval([], Term, 4).
@@ -30,9 +29,11 @@ test(e_let0) :-
 test(t_case_ret) :-
   fullsimple:type([], case(inl(true), {inl(l), 1}, {inr(r), 0}), int).
 
-test(t_inr0) :- fullsimple:type([], inr(4), uni(_, int)).
-test(t_inl0) :- fullsimple:type([], inl(true), uni(bool, _)).
-
+test(t_uni_inr0) :- fullsimple:type([], inr(4), uni(_, int)).
+test(t_uni_inl0) :- fullsimple:type([], inl(true), uni(bool, _)).
+test(t_uni_infer) :-
+  fullsimple:type([{x, Ty1}], case(x, {inl(n), n}, {inr(b), ite(b, 0, 1)}), Ty2),
+  Ty1 = uni(int, bool), Ty2 = int.
 test(t_case_let) :-
   Term = let({u, inr(4)}, case(u, {inl(l), l}, {inr(r), plus(r, r)})),
   fullsimple:type([], Term, int).
@@ -40,7 +41,6 @@ test(t_case_let) :-
 test(e_case_let0) :-
   Term = let({u, inr(4)}, case(u, {inl(l), l}, {inr(r), plus(r, r)})),
   fullsimple:eval([], Term, 8).
-
 test(e_case_ite0) :-
   Term = case(inr(true), {inl(l), 1}, {inr(r), ite(r, 2, 3)}),
   fullsimple:eval([], Term, 2).
