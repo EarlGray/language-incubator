@@ -78,6 +78,26 @@ test(t_rec_1) :-
   fullsimple:type([], {x=3}, {x:int}).
 test(t_rec_1eq, [fail]) :-
   fullsimple:type([], x=3, _).
+test(t_recfld_point_x) :-
+  fullsimple:type([{point, {x:int, y:int}}], point/x, int).
+test(t_rec_nested) :-
+  Term = let({p1, {x=2, y=3}},
+           let({p2, {x=5, y=6}},
+             {start=p1, end=p2})),
+  fullsimple:type([], Term, {start:{x:int, y:int}, end:{x:int, y:int}} ).
+test(t_recfld_nested) :-
+  Term = let({p1, {x=2, y=3}},
+           let({p2, {x=5, y=6}},
+             {start=p1, end=p2})),
+  fullsimple:type([], let({line, Term}, line/start/x, int).
+
+test(e_recfld) :-
+  fullsimple:eval([{point, {x=2, y=3}}], point/y, 3).
+test(e_recfld_nested) :-
+  Line = {start={x=0, y=0}, end={x=5, y=6}},
+  fullsimple:eval([{line, Line}], line/end/y, 6).
+test(e_rec_recfld) :-
+  fullsimple:eval([], {x=8, y=6}/x, 8).
 
 %% Prelude
 test(e_pre_iszero_z) :-

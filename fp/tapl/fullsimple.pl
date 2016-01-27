@@ -27,7 +27,7 @@
 %             {s(<var:vty>), <term:rty>})                     : rty
 %         | fix(<term:type->type>)                            : type
 %         | { <var1>=<term:ty1>, ...}                         : { <var1>:<ty1>, ...}
-%         | <term:{.., <var>:<ty>, ..}>:<var>                 : ty
+%         | <term:{.., <var>:<ty>, ..}>/<var>                 : ty
 %
 % <nat> ::= z | s(<term>)
 %
@@ -123,11 +123,18 @@ type(Ctx, fix(T), Ty) :- !,
 
 % [T-Rec], [T-RecProj]
 type(Ctx, {Ts}, {Tys}) :- !, rectype(Ctx, Ts, Tys).
-%type(Ctx, T:F, Ty) :- !, isvar(F), type(Ctx, T, {RecTy}), .
+% a shortcut for field(T, F), '/' used because it is left-accociative
+type(Ctx, T/F, Ty) :- !, type(Ctx, field(T, F), Ty).
+type(Ctx, field(T, F), Ty) :- !, isvar(F),
+  type(Ctx, T, {RecTy}), fieldtype(RecTy, F, Ty).
 
 tmember(V:_Ty, V) :- !.
 tmember((V:_Ty, _), V) :- !.
 tmember((_:_Ty, Vs), V) :- tmember(Vs, V).
+
+fieldtype(V:Ty, V, Ty) :- !.
+fieldtype((V:Ty, _), V, Ty) :- !.
+fieldtype((_:_, Vs), V, Ty) :- fieldtype(Vs, V, Ty).
 
 rectype(Ctx, V=T, V:Ty) :- !, type(Ctx, T, Ty).
 rectype(Ctx, (V=T, Ts), (V:Ty, Tys)) :- !,
@@ -229,6 +236,20 @@ eval(Vars, fix(Tf), V) :- !,
   eval(Vars, Tf, Tl), Tl = lam(X, Tb),
   subst(X, fix(Tl), Tb, TbS),
   eval(Vars, TbS, V).
+
+eval(Vars, {Ts}, {Vs}) :- !, receval(Vars, Ts, Vs).
+eval(Vars, T/F, V) :- !, eval(Vars, field(T, F), V). % a shortcut
+eval(Vars, field(T, F), V) :- !, isvar(F),
+  eval(Vars, T, {VT}),
+  recget(VT, F, V).
+
+receval(Vars, X=T, X=V) :- !, eval(Vars, T, V).
+receval(Vars, (X=T, Ts), (X=V, Vs)) :- !,
+  eval(Vars, T, V), receval(Vars, Ts, Vs).
+
+recget(F=V, F, V) :- !.
+recget((F=V, _), F, V) :- !.
+recget((_=_, Vs), F, V) :- !, recget(Vs, F, V).
 
 %% naive subst(What, With, Where, Result)
 subst(What, _, _, _) :- not(atom(What)), !, fail.
