@@ -53,24 +53,30 @@ test(e_case_sz) :-
   fullsimple:eval([{x, s(z)}], case(x, {z, true}, {s(_), false}), false).
 
 declare_iseven(
-    lam(iseven,
-        lam(n,
-            case(n,
-              {z, true},
-              {s(n1),
-                case(n1,
-                  {z, false},
-                  {s(n2), app(iseven, n2)})})))).
+    lam(n,
+        case(n,
+          {z, true},
+          {s(n1),
+            case(n1,
+              {z, false},
+              {s(n2), app(iseven, n2)})}))).
 
 test(e_fix_iseven_z) :-
-  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  declare_iseven(IsEvenF), IsEven = fix(lam(iseven, IsEvenF)),
   fullsimple:eval([], app(IsEven, z), true).
 test(e_fix_iseven_sz) :-
-  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  declare_iseven(IsEvenF), IsEven = fix(lam(iseven, IsEvenF)),
   fullsimple:eval([], app(IsEven, s(z)), false).
 test(e_fix_iseven_ssssz) :-
-  declare_iseven(IsEvenF), IsEven = fix(IsEvenF),
+  declare_iseven(IsEvenF), IsEven = fix(lam(iseven, IsEvenF)),
   fullsimple:eval([], app(IsEven, s(s(s(s(z))))), true).
+
+test(t_letrec_iseven) :- declare_iseven(IsEven),
+  fullsimple:type([], letrec({iseven, IsEven}, iseven), arr(nat, bool)).
+test(e_letrec_iseven_4) :- declare_iseven(IsEven),
+  fullsimple:evalp([], letrec({iseven, IsEven}, app(iseven, app(nat_of_int, 4))), true).
+test(e_letrec_iseven_sz) :- declare_iseven(IsEven),
+  fullsimple:eval([], letrec({iseven, IsEven}, app(iseven, s(z))), false).
 
 test(t_rec_intint) :-
   fullsimple:type([], {x=2, y=3}, {x:int, y:int}).
@@ -89,7 +95,7 @@ test(t_recfld_nested) :-
   Term = let({p1, {x=2, y=3}},
            let({p2, {x=5, y=6}},
              {start=p1, end=p2})),
-  fullsimple:type([], let({line, Term}, line/start/x, int).
+  fullsimple:type([], let({line, Term}, line/start/x), int).
 
 test(e_recfld) :-
   fullsimple:eval([{point, {x=2, y=3}}], point/y, 3).
