@@ -131,6 +131,13 @@ type(Ctx, T/F, Ty) :- !, type(Ctx, field(T, F), Ty).
 type(Ctx, field(T, F), Ty) :- !, isvar(F),
   type(Ctx, T, {RecTy}), fieldtype(RecTy, F, Ty).
 
+% Typing Error
+type(Ctx, T, Ty) :-
+  format(user_error,
+    'Error:\n  can\'t unify:\t~p\n  with type:\t~p\n  in context:\t~p\n',
+    [T, Ty, Ctx]),
+  fail.
+
 tmember(V:_Ty, V) :- !.
 tmember((V:_Ty, _), V) :- !.
 tmember((_:_Ty, Vs), V) :- tmember(Vs, V).
@@ -248,6 +255,9 @@ eval(Vars, T/F, V) :- !, eval(Vars, field(T, F), V). % a shortcut
 eval(Vars, field(T, F), V) :- !, isvar(F),
   eval(Vars, T, {VT}),
   recget(VT, F, V).
+
+eval(Vars, T, _) :-
+  format(user_error, 'Evaluation stuck\n  on term:\t~p\n  with vars:\t~p', [T, Vars]), fail.
 
 receval(Vars, X=T, X=V) :- !, eval(Vars, T, V).
 receval(Vars, (X=T, Ts), (X=V, Vs)) :- !,
