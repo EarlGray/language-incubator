@@ -51,5 +51,7 @@ type(Store, Ctx, lam(X, T), Ty) :- !,
   tcheck(Ty2, arr(Ty1, Ty2), Ty).
 
 %% Eval relation: 
+eval(_, _, unit, unit) :- !.
+eval(_, Ctx, Var, Val) :- atom(Var), memberchk({Var, Val}, Ctx), !.
 
 % vim: set syntax=prolog ts=2 sw=2

@@ -21,9 +21,11 @@ between(Before, Inside, After, In) :-
 break(Cond, Head, Tail, In) :-
   append(Head, [C | Rest], In),
   forall(member(S, Head), apply(Cond, S)),
-  not(call(Cond, C)), Tail = [C | Rest].
+  not(call(Cond, C)), Tail = [C | Rest], !.
 
-%many(Cond, Items, In) :-
+% many(Cond, Items, In) :-
+%   break(Cond, Word, Rest, In),
+%   break(not(Cond), _, Words, Rest),
 
 parse_form(Lst, Form) :-
   between(['('], Inside, [')'], Lst),
