@@ -6,6 +6,7 @@ test(t_var_ok) :- fullref:type([], [{x, int}], x, Ty), Ty = int.
 test(t_var_unknown) :- fullref:type([], [{x, int}], y, Ty), Ty = err({unknown_var, y}).
 
 test(t_ref_unit) :- fullref:type([], [], ref(unit), Ty), Ty = ref(unit).
+test(t_ref_num)  :- fullref:type([], [], ref(5), Ty), Ty = ref(int).
 test(t_ref_ctx) :- fullref:type([], [{x, unit}], ref(x), Ty), Ty = ref(unit).
 
 test(t_dereftwice_ctx) :- fullref:type([], [{x, ref(ref(unit))}], @(@(x)), Ty), Ty = unit.
@@ -19,6 +20,12 @@ test(t_set_typemismatch) :-
 test(t_set_refexpected) :-
   fullref:type([], [{x, unit}], set(x, unit), Ty),
   Ty = err({'T-Assign, ref expected:', x}). 
+
+test(t_seq_nothing) :- fullref:type([], [], do([]), Ty), Ty = err(_).
+test(t_seq_one)     :- fullref:type([], [{y, ref(int)}, {x, int}], do([x]), Ty), Ty = int.
+test(t_seq_twice)   :-
+  Term = do([set(y, x), @(y)]),
+  fullref:type([], [{y, ref(int)}, {x, int}], Term, Ty), Ty = int.
 
 test(t_lam_id) :- fullref:type([], [], lam(x, x), Ty), Ty = arr(Any, Any).
 

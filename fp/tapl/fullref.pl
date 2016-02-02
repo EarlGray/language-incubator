@@ -1,17 +1,18 @@
 %% fullref
-% <type>
-%   ::= arr(<type>, <type>)
-%     | unit
-%     | ref(<type>)
+%
+% <type> ::= arr(<type>, <type>) | unit | int | ref(<type>)
+% <value> ::= lam(<var>, <term>) | unit | <int> | <loc>
 %
 % <term>
 %   ::= <var>                       : type(ctx, store)
+%     | <int>                       : int
 %     | lam(<var:ty1>,<term:ty2>)   : arr(ty1, ty2)
 %     | app(<term:arr(ty1,ty2)>, <term:ty1>)    : ty2
 %     | unit                        : unit
 %     | ref(<term:type>)            : ref(<type>)
 %     | @<term:ref(<type>)>         : <type>
 %     | set(<term>, <term>)         : unit
+%     | do([<term:unit>, .., <term:ty>])       : ty
 
 :- module(fullref, []).
 
@@ -28,6 +29,8 @@ textract1(_, _, Err, err(Err)) :- !.
 %% Type relation: type(Store, Ctx, Term, Type).
 % [T-Unit]
 type(_, _, unit, unit) :- !.                
+% [T-Int]
+type(_, _, T, int) :- number(T), !.
 % [T-Var]
 type(_, Ctx, X, Ty) :- atom(X), vartype(Ctx, X, Ty), !.
 
@@ -45,6 +48,11 @@ type(Store, Ctx, set(T1, T2), Ty) :- !,   % [T-Assign]
     (Ty2 = Ty1 -> Ty = unit ; Ty = err({'T-Assign, type mismatch', Ty1, Ty2}))
     ; Ty = err({'T-Assign, ref expected:', T1})).
 
+type(Store, Ctx, do([T]), Ty) :- type(Store, Ctx, T, Ty), !.  % [T-Seq]
+type(Store, Ctx, do([T | Ts]), Ty) :- !,
+  type(Store, Ctx, T, unit),
+  type(Store, Ctx, do(Ts), Ty).
+
 type(Store, Ctx, lam(X, T), Ty) :- !,
   Ctx1 = [{X, Ty1} | Ctx],
   type(Store, Ctx1, T, Ty2),
@@ -53,5 +61,7 @@ type(Store, Ctx, lam(X, T), Ty) :- !,
 %% Eval relation: 
 eval(_, _, unit, unit) :- !.
 eval(_, Ctx, Var, Val) :- atom(Var), memberchk({Var, Val}, Ctx), !.
+
+%eval(Store, Ctx, app(T1, T2), ) :-
 
 % vim: set syntax=prolog ts=2 sw=2
