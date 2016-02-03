@@ -13,6 +13,9 @@
 %     | @<term:ref(<type>)>         : <type>
 %     | set(<term>, <term>)         : unit
 %     | do([<term:unit>, .., <term:ty>])       : ty
+%
+% Sugar:
+%   let(<var>=<term1>, <term2:type>) => app(lam(<var>, <term2>), <term1>)
 
 :- module(fullref, []).
 
@@ -53,15 +56,55 @@ type(Store, Ctx, do([T | Ts]), Ty) :- !,
   type(Store, Ctx, T, unit),
   type(Store, Ctx, do(Ts), Ty).
 
-type(Store, Ctx, lam(X, T), Ty) :- !,
+type(Store, Ctx, lam(X, T), Ty) :- !,       % [T-Lam]
   Ctx1 = [{X, Ty1} | Ctx],
   type(Store, Ctx1, T, Ty2),
   tcheck(Ty2, arr(Ty1, Ty2), Ty).
+type(Store, Ctx, app(T1, T2), Ty) :- !,     % [T-App]
+  type(Store, Ctx, T1, arr(Ty1, Ty)),
+  type(Store, Ctx, T2, Ty1).
 
-%% Eval relation: 
-eval(_, _, unit, unit) :- !.
-eval(_, Ctx, Var, Val) :- atom(Var), memberchk({Var, Val}, Ctx), !.
+% sugar:
+type(Store, Ctx, let(X=T1, T2), Ty) :- !,
+  type(Store, Ctx, app(lam(X, T2), T1), Ty).
 
-%eval(Store, Ctx, app(T1, T2), ) :-
+%% Run-time store:
+store(Heap) :- !, Heap = heap{newloc:0}.
+store_get(Heap, loc(L), Val) :- Val = Heap.get(L).
+store_set(Heap0, Heap1, loc(L), Val) :- Heap1 = Heap0.put(L, Val).
+store_new(Heap0, Heap1, loc(Loc), Val) :-
+  Loc = Heap0.get(newloc), NewLoc is Loc + 1,
+  Heap01 = Heap0.put(newloc, NewLoc),
+  Heap1 = Heap01.put(Loc, Val).
+
+%% Eval relation: eval(Env, {Heap0, Term}, {Heap1, Value}).
+eval(_, {Heap, unit}, {Heap, unit}) :- !.
+eval(_, {Heap, Num}, {Heap, Num}) :- number(Num), !.
+eval(Env, {Heap, Var}, {Heap, Val}) :- atom(Var), memberchk({Var, Val}, Env), !.
+eval(_, {H, lam(X, T)}, {H, lam(X, T)}) :- !, atom(X).
+
+% [E-App]
+eval(Env, {Heap, app(T1, T2)}, {Heap1, Val}) :- !,
+  eval(Env, {Heap, T2}, {Heap00, Varg}),
+  eval(Env, {Heap00, T1}, {Heap01, lam(X, Tb)}),
+  Env1 = [{X, Varg} | Env],
+  eval(Env1, {Heap01, Tb}, {Heap1, Val}).
+% [E-Deref]
+eval(Env, {Heap0, @(T)}, {Heap1, Val}) :- !,
+  eval(Env, {Heap0, T}, {Heap1, Loc}),
+  store_get(Heap1, Loc, Val).
+% [E-Assign]
+eval(Env, {Heap0, set(TRef, TVal)}, {Heap1, unit}) :- !,
+  eval(Env, {Heap0, TRef}, {Heap01, Loc}),
+  eval(Env, {Heap01, TVal}, {Heap02, Val}),
+  store_set(Heap02, Heap1, Loc, Val).
+% [E-Ref]
+eval(Env, {Heap0, ref(T)}, {Heap1, Loc}) :-
+  eval(Env, {Heap0, T}, {Heap01, Val}),
+  store_new(Heap01, Heap1, Loc, Val).
+
+% desugar:
+eval(Env, {H0, let(X=T1, T2)}, {H1, V}) :- !,
+  eval(Env, {H0, app(lam(X, T2), T1)}, {H1, V}).
 
 % vim: set syntax=prolog ts=2 sw=2
