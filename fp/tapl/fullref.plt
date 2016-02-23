@@ -44,9 +44,9 @@ test(e_var)  :- fullref:eval([{x, 5}], {H, x}, {H, 5}).
 test(e_app)  :- fullref:eval([{id, lam(x, x)}], {H, app(id, 5)}, {H, 5}).
 
 test(e_let)  :- fullref:store(H0),
-  fullref:eval([], {H0, let(r=ref(2), @(r))}, {H1, 2}).
+  fullref:eval([], {H0, let(r=ref(2), @(r))}, {_H1, 2}).
 test(e_do_set_deref) :- fullref:store(H0),
-  fullref:eval([], {H0, let(r=ref(0), do([set(r, 1), @(r)]))}, {H1, 1}).
+  fullref:eval([], {H0, let(r=ref(0), do([set(r, 1), @(r)]))}, {_H1, 1}).
 
 :- end_tests(fullref).
 
