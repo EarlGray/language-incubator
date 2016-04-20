@@ -26,8 +26,9 @@
 %             {z, <term:rty>},
 %             {s(<var:vty>), <term:rty>})                     : rty
 %         | fix(<term:type->type>)                            : type
+%         | letrec({<var>, <term>}, <term:type>)              : type
 %         | { <var1>=<term:ty1>, ...}                         : { <var1>:<ty1>, ...}
-%         | <term:{.., <var>:<ty>, ..}>:<var>                 : ty
+%         | <term:{.., <var>:<ty>, ..}>/<var>                 : ty
 %
 % <nat> ::= z | s(<term>)
 %
@@ -117,17 +118,33 @@ type(Ctx, case(T0, {inl(Vl), Tl}, {inr(Vr), Tr}), Ty) :- !,
   Ctx1 = [{Vl, Ty1} | Ctx], type(Ctx1, Tl, Ty),
   Ctx2 = [{Vr, Ty2} | Ctx], type(Ctx2, Tr, Ty).
 
-% [T-Fix]
+% [T-Fix], [T-Letrec]
 type(Ctx, fix(T), Ty) :- !,
   type(Ctx, T, arr(Ty, Ty)).
+type(Ctx, letrec({X, T1}, T2), Ty) :- !,
+  type(Ctx, let({X, fix(lam(X, T1))}, T2), Ty). % just syntactic sugar for fix
 
 % [T-Rec], [T-RecProj]
 type(Ctx, {Ts}, {Tys}) :- !, rectype(Ctx, Ts, Tys).
-%type(Ctx, T:F, Ty) :- !, isvar(F), type(Ctx, T, {RecTy}), .
+% a shortcut for field(T, F), '/' used because it is left-accociative
+type(Ctx, T/F, Ty) :- !, type(Ctx, field(T, F), Ty).
+type(Ctx, field(T, F), Ty) :- !, isvar(F),
+  type(Ctx, T, {RecTy}), fieldtype(RecTy, F, Ty).
+
+% Typing Error
+type(Ctx, T, Ty) :-
+  format(user_error,
+    'Error:\n  can\'t unify:\t~p\n  with type:\t~p\n  in context:\t~p\n',
+    [T, Ty, Ctx]),
+  fail.
 
 tmember(V:_Ty, V) :- !.
 tmember((V:_Ty, _), V) :- !.
 tmember((_:_Ty, Vs), V) :- tmember(Vs, V).
+
+fieldtype(V:Ty, V, Ty) :- !.
+fieldtype((V:Ty, _), V, Ty) :- !.
+fieldtype((_:_, Vs), V, Ty) :- fieldtype(Vs, V, Ty).
 
 rectype(Ctx, V=T, V:Ty) :- !, type(Ctx, T, Ty).
 rectype(Ctx, (V=T, Ts), (V:Ty, Tys)) :- !,
@@ -224,11 +241,31 @@ eval(Vars, case(T0, {inl(_), _}, {inr(Var), TR}), Val) :-
   !, Vars1 = [{Var, V0} | Vars],
   eval(Vars1, TR, Val).
 
-% [E-Fix]
+% [E-Fix], [E-Letrec]
 eval(Vars, fix(Tf), V) :- !,
   eval(Vars, Tf, Tl), Tl = lam(X, Tb),
   subst(X, fix(Tl), Tb, TbS),
   eval(Vars, TbS, V).
+eval(Vars, letrec({X, T1}, T2), V) :- !,
+  eval(Vars, let({X, fix(lam(X, T1))}, T2), V).
+
+% [E-Rec], [E-Recfld]
+eval(Vars, {Ts}, {Vs}) :- !, receval(Vars, Ts, Vs).
+eval(Vars, T/F, V) :- !, eval(Vars, field(T, F), V). % a shortcut
+eval(Vars, field(T, F), V) :- !, isvar(F),
+  eval(Vars, T, {VT}),
+  recget(VT, F, V).
+
+eval(Vars, T, _) :-
+  format(user_error, 'Evaluation stuck\n  on term:\t~p\n  with vars:\t~p', [T, Vars]), fail.
+
+receval(Vars, X=T, X=V) :- !, eval(Vars, T, V).
+receval(Vars, (X=T, Ts), (X=V, Vs)) :- !,
+  eval(Vars, T, V), receval(Vars, Ts, Vs).
+
+recget(F=V, F, V) :- !.
+recget((F=V, _), F, V) :- !.
+recget((_=_, Vs), F, V) :- !, recget(Vs, F, V).
 
 %% naive subst(What, With, Where, Result)
 subst(What, _, _, _) :- not(atom(What)), !, fail.
