@@ -58,8 +58,13 @@ fn compile(prog: &String) -> Vec<Op> {
 fn print_trace(_: &[u64; 8]) {}
 #[cfg(trace)]
 fn print_trace(trace: &[u64; 8]) {
+    let mut total = 0u64;
+    for n in trace.iter() {
+        total += *n
+    }
+
     let mut stderr = io::stderr();
-    writeln!(&mut stderr, "\nTRACING INFO:").expect("");
+    writeln!(&mut stderr, "\nTRACING INFO ({} total):", total).expect("");
     writeln!(&mut stderr, "| + | {}\t", trace[0]).expect("trace[0]: failed");
     writeln!(&mut stderr, "| - | {}\t", trace[1]).expect("trace[1]: failed");
     writeln!(&mut stderr, "| < | {}\t", trace[2]).expect("trace[2]: failed");
@@ -144,7 +149,7 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
 
 fn run(source: &String) {
     let ops = compile(source);
-    // println!("compiled: {:?}", &ops);
+    // writeln!(&mut io::stderr(), "compiled: {:?}", &ops).expect("");
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
