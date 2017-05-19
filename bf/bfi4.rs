@@ -36,7 +36,10 @@ enum Op {
 
     LoopA(isize),   // [-], [+]
     LoopM(isize),   // [>], [<]
+
     LoopAMAM(isize, isize, isize, isize),  // like [->+<]
+    // MulAdd(isize, isize),                  // [ -1 >MulAdd.1 +MulAdd.2 <MulAdd.1 ]
+
     LoopMAMA(isize, isize, isize, isize),  // like [>+<-]
 }
 
@@ -77,10 +80,18 @@ fn compile_internal_loop(ops: &mut Vec<Op>, beginp: usize) -> Op {
             _ => ()
         }
     }
-    if cp > 4 {
+    if cp >= 5 {
         match (&ops[cp-5], &ops[cp-4], &ops[cp-3], &ops[cp-2], &ops[cp-1]) {
+            /*
+            (&Op::Begin(_), &Op::Add(-1), &Op::Move(m1), &Op::Add(a2), &Op::Move(m2))
+                if m1 == -m2 =>
+            {
+                ops.truncate(cp - 5);
+                return Op::MulAdd(m1, a2);
+            },
+            */
             (&Op::Begin(_), &Op::Add(a1), &Op::Move(m1), &Op::Add(a2), &Op::Move(m2)) => {
-                ops.pop(); ops.pop(); ops.pop(); ops.pop(); ops.pop();
+                ops.truncate(cp - 5);
                 return Op::LoopAMAM(a1, m1, a2, m2);
             },
             (&Op::Begin(_), &Op::Move(m1), &Op::Add(a1), &Op::Move(m2), &Op::Add(a2)) => {
@@ -144,9 +155,9 @@ fn compile(prog: &String) -> Vec<Op> {
 }
 
 #[cfg(not(trace))]
-fn print_trace(_: &[u64; 10], _: Option<HashMap<String, u64>>) {}
+fn print_trace(_: &[u64; 32], _: Option<HashMap<String, u64>>) {}
 #[cfg(trace)]
-fn print_trace(trace: &[u64; 10], loops: Option<HashMap<String, u64>>) {
+fn print_trace(trace: &[u64; 32], loops: Option<HashMap<String, u64>>) {
     let mut total = 0u64;
     for n in trace.iter() {
         total += *n
@@ -154,16 +165,17 @@ fn print_trace(trace: &[u64; 10], loops: Option<HashMap<String, u64>>) {
 
     let mut stderr = io::stderr();
     writeln!(&mut stderr, "\nTRACING INFO ({} total):", total).expect("");
-    writeln!(&mut stderr, "| Add   | {}\t", trace[0]).expect("trace[0]: failed");
-    writeln!(&mut stderr, "| Move  | {}\t", trace[1]).expect("trace[1]: failed");
-    writeln!(&mut stderr, "| Read  | {}\t", trace[2]).expect("trace[4]: failed");
-    writeln!(&mut stderr, "| Print | {}\t", trace[3]).expect("trace[5]: failed");
-    writeln!(&mut stderr, "| Begin | {}\t", trace[4]).expect("trace[6]: failed");
-    writeln!(&mut stderr, "| End   | {}\t", trace[5]).expect("trace[7]: failed");
-    writeln!(&mut stderr, "| [A]   | {}\t", trace[6]).expect("trace[7]: failed");
-    writeln!(&mut stderr, "| [M]   | {}\t", trace[7]).expect("trace[7]: failed");
-    writeln!(&mut stderr, "| [AMAM]| {}\t", trace[8]).expect("trace[7]: failed");
-    writeln!(&mut stderr, "| [MAMA]| {}\t", trace[9]).expect("trace[7]: failed");
+    writeln!(&mut stderr, "| Add   | {}\t", trace[0]).expect("");
+    writeln!(&mut stderr, "| Move  | {}\t", trace[1]).expect("");
+    writeln!(&mut stderr, "| Read  | {}\t", trace[2]).expect("");
+    writeln!(&mut stderr, "| Print | {}\t", trace[3]).expect("");
+    writeln!(&mut stderr, "| Begin | {}\t", trace[4]).expect("");
+    writeln!(&mut stderr, "| End   | {}\t", trace[5]).expect("");
+    writeln!(&mut stderr, "| [A]   | {}\t", trace[6]).expect("");
+    writeln!(&mut stderr, "| [M]   | {}\t", trace[7]).expect("");
+    writeln!(&mut stderr, "| [AMAM]| {}\t", trace[8]).expect("");
+    writeln!(&mut stderr, "| [MulA]| {}\t", trace[9]).expect("");
+    writeln!(&mut stderr, "| [MAMA]| {}\t", trace[10]).expect("");
 
     if let Some(loops) = loops {
         for (image, count) in loops.iter() {
@@ -179,7 +191,7 @@ macro_rules! trace_op {
 fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &mut Out) {
     let mut mem = [0u8; MEM_SIZE];
     let mut input = input.chars();
-    let mut trace = [0u64; 10];
+    let mut trace = [0u64; 32];
     let mut trace_loops = HashMap::<String, u64>::new();
 
     let mut cp = 0;  // code pointer
@@ -247,23 +259,25 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
                 trace_op!(trace, 7);
             },
             Op::LoopAMAM(a1, m1, a2, m2) => {
-                /*/ a popular special case:
-                if m1 == -m2 && a1 == -1 {
-                    let dst = (dp as isize + m1) as usize;
-                    let add = mem[dp] as usize as isize * a2;
-                    let add = Wrapping::<u8>(add as u8);
-                    mem[dst] = (Wrapping(mem[dst]) + add).0;
-                    mem[dp] = 0;
-                } else */ {
-                    while mem[dp] != 0 {
-                        mem[dp] = (mem[dp] as isize + a1) as u8;
-                        dp = (dp as isize + m1) as usize;
-                        mem[dp] = (mem[dp] as isize + a2) as u8;
-                        dp = (dp as isize + m2) as usize;
-                    }
+                while mem[dp] != 0 {
+                    mem[dp] = (mem[dp] as isize + a1) as u8;
+                    dp = (dp as isize + m1) as usize;
+                    mem[dp] = (mem[dp] as isize + a2) as u8;
+                    dp = (dp as isize + m2) as usize;
                 }
                 trace_op!(trace, 8);
             },
+            /*
+            Op::MulAdd(offset, by) => {
+                if mem[dp] != 0 {
+                    let dst = (dp as isize + offset) as usize;
+                    let mul = mem[dp] as isize;
+                    mem[dp] = 0;
+                    mem[dst] = (mem[dst] as isize + mul * by) as u8;
+                }
+                trace_op!(trace, 9);
+            },
+            */
             Op::LoopMAMA(m1, a1, m2, a2) => {
                 while mem[dp] != 0 {
                     dp = (dp as isize + m1) as usize;
@@ -271,11 +285,11 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
                     dp = (dp as isize + m2) as usize;
                     mem[dp] = (mem[dp] as isize + a2) as u8;
                 }
-                trace_op!(trace, 9);
+                trace_op!(trace, 10);
             }
         }
-        cp += 1;
 
+        cp += 1;
         if cp >= prog.len() {
             break;
         }
@@ -286,7 +300,7 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
 
 fn run(source: &String) {
     let ops = compile(source);
-    writeln!(&mut io::stderr(), "compiled: {:?}", &ops).expect("");
+    // writeln!(&mut io::stderr(), "compiled: {:?}", &ops).expect("");
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
