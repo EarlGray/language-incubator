@@ -38,7 +38,7 @@ enum Op {
     LoopM(isize),   // [>], [<]
 
     LoopAMAM(isize, isize, isize, isize),  // like [->+<]
-    // MulAdd(isize, isize),                  // [ -1 >MulAdd.1 +MulAdd.2 <MulAdd.1 ]
+    MulAdd(isize),                  // [ -1 >MulAdd.1 +1 <MulAdd.1 ]
 
     LoopMAMA(isize, isize, isize, isize),  // like [>+<-]
 }
@@ -82,14 +82,12 @@ fn compile_internal_loop(ops: &mut Vec<Op>, beginp: usize) -> Op {
     }
     if cp >= 5 {
         match (&ops[cp-5], &ops[cp-4], &ops[cp-3], &ops[cp-2], &ops[cp-1]) {
-            /*
-            (&Op::Begin(_), &Op::Add(-1), &Op::Move(m1), &Op::Add(a2), &Op::Move(m2))
+            (&Op::Begin(_), &Op::Add(-1), &Op::Move(m1), &Op::Add(1), &Op::Move(m2))
                 if m1 == -m2 =>
             {
                 ops.truncate(cp - 5);
-                return Op::MulAdd(m1, a2);
+                return Op::MulAdd(m1);
             },
-            */
             (&Op::Begin(_), &Op::Add(a1), &Op::Move(m1), &Op::Add(a2), &Op::Move(m2)) => {
                 ops.truncate(cp - 5);
                 return Op::LoopAMAM(a1, m1, a2, m2);
@@ -267,17 +265,15 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
                 }
                 trace_op!(trace, 8);
             },
-            /*
-            Op::MulAdd(offset, by) => {
+            Op::MulAdd(offset) => {
                 if mem[dp] != 0 {
                     let dst = (dp as isize + offset) as usize;
-                    let mul = mem[dp] as isize;
+                    let by = mem[dp] as isize;
                     mem[dp] = 0;
-                    mem[dst] = (mem[dst] as isize + mul * by) as u8;
+                    mem[dst] = (mem[dst] as isize + by) as u8;
                 }
                 trace_op!(trace, 9);
             },
-            */
             Op::LoopMAMA(m1, a1, m2, a2) => {
                 while mem[dp] != 0 {
                     dp = (dp as isize + m1) as usize;
