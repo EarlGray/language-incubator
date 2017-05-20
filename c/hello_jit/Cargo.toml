@@ -1,0 +1,7 @@
+[package]
+name = "hello_jit"
+version = "0.1.0"
+authors = ["Dmytro S <dmytrish@gmail.com>"]
+
+[dependencies]
+libc = "0.2.2"
