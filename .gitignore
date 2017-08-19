@@ -1,3 +1,8 @@
+*.dSYM
+target
+tmp
+a.out
+.stack-work
 .*.swp
 *.o
 *.a
