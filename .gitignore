@@ -1,4 +1,5 @@
 *.dSYM
+Cargo.lock
 target
 tmp
 a.out
