@@ -1,4 +1,3 @@
-use std::ops::IndexMut;
 use jit;
 
 /// The language
@@ -53,8 +52,29 @@ fn parse(prog: &str) -> Vec<Op> {
 }
 
 
-fn compile<Buf: IndexMut<usize>>(_ops: &Vec<Op>, _buf: &mut Buf) {
-    //
+#[cfg(
+  any(
+    not(target_family = "unix"),
+    not(any(
+      target_arch = "x86",
+      target_arch = "x86_64",
+    ))
+))]
+fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
+    target_error!("This target_arch/target_family is not supported");
+}
+
+#[cfg(all(target_family = "unix", target_arch = "x86"))]
+fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
+    target_error!("TODO: target_arch = x86");
+    use asm::x86;
+}
+
+#[cfg(all(target_family = "unix", target_arch = "x86_64"))]
+fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
+    use asm::x64;
+
+    exe.emit(x64::ret);
 }
 
 
@@ -66,7 +86,6 @@ pub fn run(contents: &str) {
     let mut exe = jit::Memory::new(jit::Pages(1));
     compile(&ops, &mut exe);
 
-    exe.emit(&[0xc3]);
 
     let entry = exe.get_entry();
     entry();

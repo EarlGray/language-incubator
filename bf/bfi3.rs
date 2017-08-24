@@ -53,7 +53,7 @@ fn loop_image(ops: &Vec<Op>) -> String {
     }
 }
 
-fn compile(prog: &String) -> Vec<Op> {
+fn parse(prog: &String) -> Vec<Op> {
     let mut ops = Vec::<Op>::new();
 
     let mut loops = Vec::<usize>::new();
@@ -198,8 +198,8 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
 }
 
 fn run(source: &String) {
-    let ops = compile(source);
-    // writeln!(&mut io::stderr(), "compiled: {:?}", &ops).expect("");
+    let ops = parse(source);
+    // writeln!(&mut io::stderr(), "parsed: {:?}", &ops).expect("");
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
