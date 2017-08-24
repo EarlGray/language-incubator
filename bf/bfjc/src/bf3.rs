@@ -74,21 +74,47 @@ fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
 fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
     use asm::x64;
 
+    /* TODO: save registers */
+
+    /* TODO: set up %rbp and %rbx */
+
+    /* TODO: compile operations */
+
+    /* TODO: restore %rbp and %rbx */
+
+    /* exit */
     exe.emit(x64::ret);
 }
 
 
+
+fn bf_print(c: char) {
+    print!("{}", c);
+}
+
 pub fn run(contents: &str) {
     println!("bf::run(): running!");
 
+    /* data memory */
+    const MEM_SIZE: usize = 30000;
+    let mut mem = [0; MEM_SIZE];
+    let memptr = &mut mem as *mut _ as usize;
+
+    println!("  mem\t = *0x{:x}!", memptr);
+
+    /* jit compilation */
     let ops = parse(contents);
 
+    let putchar = &bf_print as *const _ as usize;
+    println!("  print\t = *0x{:x}", putchar);
+
     let mut exe = jit::Memory::new(jit::Pages(1));
+    /* TODO: pass putchar/getchar */
     compile(&ops, &mut exe);
 
-
-    let entry = exe.get_entry();
-    entry();
+    /* run */
+    let entry = exe.get_entry1();
+    entry(memptr);
 
     println!("bf::run(): done!");
 }

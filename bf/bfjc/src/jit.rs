@@ -74,7 +74,10 @@ impl Memory {
         }
     }
 
-    pub fn get_entry(&self) -> (fn() -> i64) {
+    pub fn get_entry(&self) -> (fn() -> ()) {
+        unsafe { mem::transmute(self.contents) }
+    }
+    pub fn get_entry1(&self) -> (fn(usize) -> ()) {
         unsafe { mem::transmute(self.contents) }
     }
 }
