@@ -5,5 +5,6 @@ fn main() {
     let mut contents = String::new();
     bfjc::read_file(&mut contents);
 
-    bf3::run(&contents);
+    let mut lang = bf3::Impl::new();
+    bfjc::execute(&contents, &mut lang);
 }

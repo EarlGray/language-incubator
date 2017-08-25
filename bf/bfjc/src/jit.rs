@@ -83,3 +83,13 @@ impl Memory {
 }
 
 
+pub trait Compiler {
+    type IR;
+
+    fn parse(&self, source: &str) -> Self::IR;
+
+    fn set_putchar(&mut self, putchar: usize) -> &mut Self;
+    fn set_getchar(&mut self, getchar: usize) -> &mut Self;
+
+    fn compile(&self, program: &Self::IR, exe: &mut Memory);
+}

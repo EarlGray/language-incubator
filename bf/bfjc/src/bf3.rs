@@ -2,7 +2,7 @@ use jit;
 
 /// The language
 #[derive(Clone, PartialEq, Debug)]
-enum Op {
+pub enum Op {
     Add(isize),
     Move(isize),
     Print,
@@ -11,110 +11,103 @@ enum Op {
     End(usize)
 }
 
-fn parse(prog: &str) -> Vec<Op> {
-    let mut ops = Vec::<Op>::new();
 
-    let mut loops = Vec::<usize>::new();
+pub struct Impl {
+    getchar: usize,
+    putchar: usize
+}
 
-    for c in prog.chars() {
-        let cp = ops.len();
-        let op = match c {
-            '+' => Op::Add(1),
-            '-' => Op::Add(-1),
-            '<' => Op::Move(-1),
-            '>' => Op::Move(1),
-            '.' => Op::Print,
-            ',' => Op::Read,
-            '[' => {
-                loops.push(cp);
-                Op::Begin(0)
-            }
-            ']' => {
-                let beginp = loops.pop().expect("malformed loop");
-                ops[beginp] = Op::Begin(cp);
-
-                Op::End(beginp)
-            }
-            _ => continue
-        };
-        if cp > 0 {
-            // there may be a repeated command:
-            match (&op, &ops[cp - 1]) {
-                (&Op::Add(step),    &Op::Add(n))  => ops[cp - 1] = Op::Add(n + step),
-                (&Op::Move(step),   &Op::Move(n)) => ops[cp - 1] = Op::Move(n + step),
-                _ => ops.push(op)
-            }
-        } else {
-            ops.push(op);
-        }
+impl Impl {
+    pub fn new() -> Impl {
+        Impl { putchar: 0, getchar: 0 }
     }
-    ops
 }
 
+impl jit::Compiler for Impl {
+    type IR = Vec<Op>;
 
-#[cfg(
-  any(
-    not(target_family = "unix"),
-    not(any(
-      target_arch = "x86",
-      target_arch = "x86_64",
-    ))
-))]
-fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
-    target_error!("This target_arch/target_family is not supported");
-}
+    fn set_putchar(&mut self, putchar: usize) -> &mut Self {
+        self.putchar = putchar;
+        self
+    }
 
-#[cfg(all(target_family = "unix", target_arch = "x86"))]
-fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
-    target_error!("TODO: target_arch = x86");
-    use asm::x86;
-}
+    fn set_getchar(&mut self, getchar: usize) -> &mut Self {
+        self.getchar = getchar;
+        self
+    }
 
-#[cfg(all(target_family = "unix", target_arch = "x86_64"))]
-fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
-    use asm::x64;
+    fn parse(&self, prog: &str) -> Self::IR {
+        let mut ops = Vec::<Op>::new();
 
-    /* TODO: save registers */
+        let mut loops = Vec::<usize>::new();
 
-    /* TODO: set up %rbp and %rbx */
+        for c in prog.chars() {
+            let cp = ops.len();
+            let op = match c {
+                '+' => Op::Add(1),
+                '-' => Op::Add(-1),
+                '<' => Op::Move(-1),
+                '>' => Op::Move(1),
+                '.' => Op::Print,
+                ',' => Op::Read,
+                '[' => {
+                    loops.push(cp);
+                    Op::Begin(0)
+                }
+                ']' => {
+                    let beginp = loops.pop().expect("malformed loop");
+                    ops[beginp] = Op::Begin(cp);
 
-    /* TODO: compile operations */
+                    Op::End(beginp)
+                }
+                _ => continue
+            };
+            if cp > 0 {
+                // there may be a repeated command:
+                match (&op, &ops[cp - 1]) {
+                    (&Op::Add(step),    &Op::Add(n))  => ops[cp - 1] = Op::Add(n + step),
+                    (&Op::Move(step),   &Op::Move(n)) => ops[cp - 1] = Op::Move(n + step),
+                    _ => ops.push(op)
+                }
+            } else {
+                ops.push(op);
+            }
+        }
+        ops
+    }
 
-    /* TODO: restore %rbp and %rbx */
 
-    /* exit */
-    exe.emit(x64::ret);
-}
+    #[cfg(
+      any(
+        not(target_family = "unix"),
+        not(any(
+          target_arch = "x86",
+          target_arch = "x86_64",
+        ))
+    ))]
+    pub fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
+        target_error!("This target_arch/target_family is not supported");
+    }
 
+    #[cfg(all(target_family = "unix", target_arch = "x86"))]
+    pub fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
+        target_error!("TODO: target_arch = x86");
+        use asm::x86;
+    }
 
+    #[cfg(all(target_family = "unix", target_arch = "x86_64"))]
+    fn compile(&self, _ops: &Vec<Op>, exe: &mut jit::Memory) {
+        use asm::x64;
 
-fn bf_print(c: char) {
-    print!("{}", c);
-}
+        /* TODO: save registers */
 
-pub fn run(contents: &str) {
-    println!("bf::run(): running!");
+        /* TODO: set up %rbp and %rbx */
 
-    /* data memory */
-    const MEM_SIZE: usize = 30000;
-    let mut mem = [0; MEM_SIZE];
-    let memptr = &mut mem as *mut _ as usize;
+        /* TODO: compile operations */
 
-    println!("  mem\t = *0x{:x}!", memptr);
+        /* TODO: restore %rbp and %rbx */
 
-    /* jit compilation */
-    let ops = parse(contents);
-
-    let putchar = &bf_print as *const _ as usize;
-    println!("  print\t = *0x{:x}", putchar);
-
-    let mut exe = jit::Memory::new(jit::Pages(1));
-    /* TODO: pass putchar/getchar */
-    compile(&ops, &mut exe);
-
-    /* run */
-    let entry = exe.get_entry1();
-    entry(memptr);
-
-    println!("bf::run(): done!");
+        /* exit */
+        exe.emit(x64::ret);
+    }
 }

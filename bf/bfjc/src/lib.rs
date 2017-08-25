@@ -34,6 +34,37 @@ pub fn read_file(contents: &mut String) {
 }
 
 
+fn bf_print(c: char) {
+    print!("{}", c);
+}
+
+pub fn execute<L: jit::Compiler>(contents: &str, lang: &mut L) {
+    println!("bf::run(): running!");
+
+    let putchar = &bf_print as *const _ as usize;
+    lang.set_putchar(putchar);
+    println!("  print\t = *0x{:x}", putchar);
+
+    let mut exe = jit::Memory::new(jit::Pages(1));
+
+    /* jit compilation */
+    let ops = lang.parse(contents);
+    lang.compile(&ops, &mut exe);
+
+    /* data memory */
+    const MEM_SIZE: usize = 30000;
+    let mut mem = [0; MEM_SIZE];
+    let memptr = &mut mem as *mut _ as usize;
+
+    println!("  mem\t = *0x{:x}!", memptr);
+
+    /* run */
+    let entry = exe.get_entry1();
+    entry(memptr);
+
+    println!("bf::run(): done!");
+}
+
 /*
  *  Tests
  */
