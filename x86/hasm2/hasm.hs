@@ -1,7 +1,7 @@
 import Data.Word
 import Data.Int
 import Data.Bits
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, isJust)
 import qualified Data.Either as Ei
 import qualified Data.Map as M
 import qualified Data.List as L
@@ -29,17 +29,35 @@ immValue (Imm8 i8) = int i8
 immValue (Imm16 i16) = int i16
 immValue (Imm32 i32) = i32
 
+immSValue :: Imm -> Int32
+immSValue (Imm8 i) = int i
+immSValue (Imm16 i) = int i
+immSValue (Imm32 i) = int i
+
+immCast8s :: Imm -> Either EncodingError Imm
 immCast8s (Imm8 v) | v < 0x80 = Right (Imm8 v)
 immCast8s (Imm16 v) =
     let sv = (int v :: Int16)
     in if -128 <= sv && sv < 128
-        then Right (Imm8 (int (int sv :: Word16)))
+        then Right (Imm8 (int sv))
         else Left $ "cannot cast signed number to imm8: " ++ show v
 immCast8s (Imm32 v) =
     let sv = (int v :: Int32)
     in if -128 <= sv && sv < 128
-        then Right (Imm8 (int (int sv :: Word32)))
+        then Right (Imm8 (int sv))
         else Left $ "cannot cast signed number to imm8: " ++ show v
+immCast8s imm = Left $ "Cannot cast to imm8s: " ++ show imm
+{-
+immCast8s imm = immCastTo S8 (immValue imm)
+-}
+
+immCastTo :: ArgSize -> Word32 -> Either EncodingError Imm
+immCastTo S8 i | i < 0x100 = Right (Imm8 (int i))
+--immCastTo S8 i | i .&. 0xffffff80 == 0xffffff80 = Right (Imm8 (int i))
+immCastTo S16 i | i < 0x10000 = Right (Imm16 (int i))
+--immCastTo S16 i | i .&. 0xffff8000 == 0xffff8000 = Right (Imm16 (int i))
+immCastTo S32 i = Right (Imm32 i)
+immCastTo s i = Left $ "cannot cast the number " ++ show i ++ " to size " ++ show s
 
 
 -- |
@@ -149,6 +167,25 @@ isSize32 (ArgImm _) = True
 isSize32 (ArgMem _) = True
 isSize32 _ = False
 
+class Sizeable a where
+    sizeOf :: a -> Maybe ArgSize
+    isSize :: ArgSize -> a -> Bool
+    isSize s = maybe False (== s) . sizeOf
+
+instance Sizeable OpArgument where
+    sizeOf = getSizeOf
+
+instance Sizeable Arg where
+    sizeOf (AReg r) = sizeOf r
+    sizeOf (AMem s _) = Just s
+    sizeOf (AImm i) = sizeOf i
+
+instance Sizeable NamedReg where
+    sizeOf = Just . regSize
+
+instance Sizeable Imm where
+    sizeOf = Just . immSize
+
 
 -- |
 -- | Instructions pretty-printing
@@ -194,7 +231,7 @@ instance PrettyPrintable MemRef where
         po = maybe "" (\(i, s) -> ", " ++ pretty i ++ ", " ++ pretty s) moffset
 
 instance PrettyPrintable OpArgument where
-    pretty (ArgImm imm) = printf "0x%x" imm
+    pretty (ArgImm imm) = printf "$0x%x" imm
     pretty (ArgReg reg) = pretty reg
     pretty (ArgMem ref) = pretty ref
 
@@ -271,7 +308,7 @@ encodeMemRef (MemRef d (Just base) (Just (index, sc))) =
 withRM :: Word8 -> Encoding -> Encoding
 withRM stub enc = do
     (rmmod : bytes) <- enc
-    Right $ (stub `shiftL` 3 .&. rmmod : bytes)
+    Right $ ((stub `shiftL` 3 .|. rmmod) : bytes)
 
 withRMreg r = withRM (regIndex r)
 
@@ -289,13 +326,13 @@ instance Encodable NamedReg where
 preOpndsz = 0x66
 preAddrsz = 0x67
 
-type InstructionSyntax = (String, [OpArgument -> Bool])
+type ArgMatcher = Arg -> Maybe Arg
 
 
 data CodeByArgSize
     = ForAnySize [Word8]
     | ForSize8 [Word8]
-    | ForSize32 [Word8]                 -- 
+    | ForSize32 [Word8]                 --
     | ForSize32Reg [Word8]              -- [op + index(%reg)]
     | ForSize8and32 [Word8] [Word8]     -- 8, 16 with 0x67, 32
     | ForSize8and32imm [Word8] [Word8]  -- 8, 16 with 0x66, 32
@@ -304,40 +341,48 @@ data Encoder = Encoder ([Arg] -> Either EncodingError [Word8]) CodeByArgSize
 
 
 --- operand predicates:
-opLit val (ArgImm imm) = val == imm
-opLit _ _ = False
 
-opImm (ArgImm _) = True
-opImm _ = False
+--opLit :: Word32 -> Arg -> Maybe Arg
+opLit val (AImm imm) | val == immValue imm = Just (AImm imm)
+opLit _ _ = Nothing
 
-opImm8 (ArgImm imm) = imm < 0x100
-opImm8 _ = False
+opImm (AImm i) = Just (AImm i)
+opImm _ = Nothing
 
-opImm16 (ArgImm imm) = imm < 0x10000
-opImm16 _ = False
+opImm8 :: Arg -> Maybe Arg
+opImm8 (AImm imm) = either (const Nothing) (Just . AImm) $ immCastTo S8 $ immValue imm
+opImm8 _ = Nothing
 
--- TODO: sign-extended:
-opImm8s (ArgImm imm) = -128 <= v && v < 128
-  where v = int imm :: Int32
+opImm16 (AImm imm) = either (const Nothing) (Just . AImm) $ immCastTo S16 $immValue imm
+opImm16 _ = Nothing
 
-opReg (ArgReg _) = True
-opReg _ = False
+opImm8s (AImm imm) =
+    case immCast8s imm of
+      Left e -> Nothing
+      Right v -> Just (AImm v)
+opImm8s _ = Nothing
 
-opRegA (ArgReg r) = regIndex r == 0
-opRegA _ = False
+opReg r@(AReg _) = Just r
+opReg _ = Nothing
 
-opMoff (ArgMem (MemRef _ Nothing Nothing)) = True
-opMoff _ = False
+opRegA (AReg r) | regIndex r == 0 = Just (AReg r)
+opRegA _ = Nothing
 
-opMem (ArgMem _) = True
-opMem _ = False
+opMoff m@(AMem _ (MemRef _ Nothing Nothing)) = Just m
+opMoff _ = Nothing
 
-opRM arg = opReg arg || opMem arg
+opMem mem@(AMem _ _) = Just mem
+opMem _ = Nothing
 
-opRM32 (ArgMem _) = True
-opRM32 (ArgReg (Reg16 _)) = True
-opRM32 (ArgReg (Reg32 _)) = True
-opRM32 _ = False
+opRM arg = if isJust (opReg arg) || isJust (opMem arg) then Just arg else Nothing
+
+opRM32 arg =
+  case arg of
+    AMem S16 _ -> Just arg
+    AMem S32 _ -> Just arg
+    AReg (Reg16 _) -> Just arg
+    AReg (Reg32 _) -> Just arg
+    _ -> Nothing
 
 
 -- argument encoders:
@@ -347,13 +392,15 @@ encNP _ = Right []
 encI (AImm imm : _) = encode imm
 
 encMR :: [Arg] -> Encoding
+encMR [AReg reg, AReg reg'] = withRMreg reg $ encodeRMModReg reg'
 encMR [AReg reg, AMem _ mem] = withRMreg reg $ encodeMemRef mem
 encMR args = Left $ "expected `op %reg, r/m`, got: " ++ show args
 
 encM stub [AMem _ mem] = withRM stub $ encodeMemRef mem
 encM _ args = Left $ "expected `op r/m`, got: " ++ show args
 
-encRM [m@(AMem _ _), r@(AReg _)] = encMR [r, m] 
+encRM [r'@(AReg _), r@(AReg _)] = encMR [r, r']
+encRM [m@(AMem _ _), r@(AReg _)] = encMR [r, m]
 encRM args = Left $ "expected `op r/m, %reg`, got: " ++ show args
 
 encMI stub [AReg reg, AImm imm] = do
@@ -368,13 +415,17 @@ encIM stub [imm@(AImm _), mem@(AMem _ _)] = encMI stub [mem, imm]
 encIM stub args =
     Left $ "expected `op/" ++ show stub ++ " $imm, %reg`, got: " ++ show args
 
+encIM8s stub [AImm imm, reg@(AReg _)] = do
+    imm8 <- immCast8s imm
+    encIM stub [AImm imm8, reg]
 encIM8s stub [AImm imm, mem@(AMem _ _)] = do
     imm8 <- immCast8s imm
     encIM stub [AImm imm8, mem]
+encIM8s _ args = Left $ "expected imm8s, mem, got: " ++ show args
 
-encFD [AReg _, AMem _ (MemRef d Nothing Nothing)] = encode d
-encFD args = Left $ "expected _, moff, got: " ++ show args
-encTD [r, m] = encFD [m, r]
+encTD [AReg _, AMem _ (MemRef d Nothing Nothing)] = encode d
+encTD args = Left $ "expected _, moff, got: " ++ show args
+encFD [r, m] = encTD [m, r]
 
 encO [AReg r] = Right []
 encO args = Left $ "expected %reg, got: " ++ show args
@@ -382,82 +433,141 @@ encO args = Left $ "expected %reg, got: " ++ show args
 
 --- instruction encodings:
 
-instructions :: [(InstructionSyntax, Encoder)]
-instructions = [
-  (("add", [opImm8s, opRM32]),  Encoder (encIM8s 0) (ForAnySize [0x83])), -- sign-extended
-  (("add", [opImm, opRegA]),    Encoder encI        (ForSize8and32imm [0x04] [0x05])),
-  (("add", [opImm, opRM]),      Encoder (encIM 0)   (ForSize8and32imm [0x80] [0x81])),
-
-  (("int", [opLit 3]),          Encoder encNP       (ForSize8 [0xCC])),
-  (("int", [opImm8]),           Encoder encI        (ForSize8 [0xCD])),
-  (("into",[]),                  Encoder encNP       (ForAnySize [0xCE])),
-
-  (("mov", [opReg, opImm]),     Encoder (encMI 0)   (ForSize8and32 [0xc6] [0xc7])),
-  (("mov", [opMoff, opRegA]),   Encoder encFD       (ForSize8and32 [0xa0] [0xa1])),
-  (("mov", [opRegA, opMoff]),   Encoder encTD       (ForSize8and32 [0xa2] [0xa3])),
-  (("mov", [opReg, opRM]),      Encoder encMR       (ForSize8and32 [0x88] [0x89])),
-  (("mov", [opRM, opReg]),      Encoder encRM       (ForSize8and32 [0x8a] [0x8b])),
-  -- (("mov", [opSReg, opReg16]), ForSize16 [0x8c],     EncoderRM),
-  -- (("mov", [opReg16, opSReg]), ForSize16 [0x8e],     EncoderRM),
-
-  (("push", [opReg]),           Encoder encO        (ForSize32Reg [0x50])),
-  (("push", [opRM]),            Encoder (encM 6)    (ForSize32 [0xff])),
-  (("push", [opImm]),           Encoder encI        (ForSize8and32imm [0x6a] [0x68])),
-
-  (("ret",  []),            Encoder encNP (ForAnySize [0xc3])),
-  (("ret",  [opImm16]),      Encoder encI (ForAnySize [0xc2]))
+instructions :: M.Map String (String, [([ArgMatcher], Encoder)])
+instructions = M.fromList [
+  ("add", ("bwl", [
+    ([opImm8s, opRM32],  Encoder (encIM8s 0) (ForAnySize [0x83])), -- sign-extended
+    ([opImm, opRegA],    Encoder encI        (ForSize8and32imm [0x04] [0x05])),
+    ([opImm, opRM],      Encoder (encIM 0)   (ForSize8and32imm [0x80] [0x81]))
+    ])),
+  ("int", ("", [
+    ([opLit 3],          Encoder encNP       (ForSize8 [0xCC])),
+    ([opImm8],           Encoder encI        (ForSize8 [0xCD]))
+    ])),
+  ("into", ("", [
+    ([],   Encoder encNP       (ForAnySize [0xCE]))
+    ])),
+  ("mov", ("wbl", [
+    ([opReg, opImm],     Encoder (encMI 0)   (ForSize8and32 [0xc6] [0xc7])),
+    ([opMoff, opRegA],   Encoder encFD       (ForSize8and32 [0xa0] [0xa1])),
+    ([opRegA, opMoff],   Encoder encTD       (ForSize8and32 [0xa2] [0xa3])),
+    ([opReg, opRM],      Encoder encMR       (ForSize8and32 [0x88] [0x89])),
+    ([opRM, opReg],      Encoder encRM       (ForSize8and32 [0x8a] [0x8b]))
+--  ([opSReg, opReg16], ForSize16 [0x8c],     EncoderRM),
+--  ([opReg16, opSReg], ForSize16 [0x8e],     EncoderRM),
+    ])),
+  ("push", ("wbl", [
+    ([opReg],           Encoder encO        (ForSize32Reg [0x50])),
+    ([opRM],            Encoder (encM 6)    (ForSize32 [0xff])),
+    ([opImm],           Encoder encI        (ForSize8and32imm [0x6a] [0x68]))
+    ])),
+  ("ret", ("w", [
+    ([],             Encoder encNP (ForAnySize [0xc3])),
+    ([opImm16],      Encoder encI (ForAnySize [0xc2]))
+    ]))
   ]
 
 
 -- |
 -- | Assembling
 -- |
-findEncoders :: String -> [OpArgument] -> [Encoder]
-findEncoders name args = map snd $ filter by_name_args instructions
+findEncoders :: [([ArgMatcher], Encoder)] -> [Arg] -> [(Encoder, [Arg])]
+findEncoders instrs_encs args = mapMaybe by_name_args instrs_encs
   where
-    by_name_args ((n, argspec), _) = 
-        name == n &&
-        length args == length argspec &&
-        and (zipWith ($) argspec args)
+    by_name_args :: ([ArgMatcher], Encoder) -> Maybe (Encoder, [Arg])
+    by_name_args (argspec, enc) =
+        if length args == length argspec
+        then (\args -> (enc, args)) <$> sequenceA (zipWith ($) argspec args)
+        else Nothing
 
+encodeOp :: CodeByArgSize -> [Arg] -> Encoding
 encodeOp codeforsize args = do
     case codeforsize of
         ForAnySize bytes ->
             Right bytes
-        ForSize8 bytes | all isSize8 args ->
+        ForSize8 bytes | all (isSize S8) args ->
             Right bytes
-        ForSize8and32 bytes _ | all isSize8 args ->
+        ForSize8and32 bytes _ | all (isSize S8) args ->
             Right bytes
-        ForSize8and32 _ bytes | all isSize16 args ->
+        ForSize8and32 _ bytes | all (isSize S16) args ->
             Right (preAddrsz : bytes)
-        ForSize8and32 _ bytes | all isSize32 args ->
+        ForSize8and32 _ bytes | all (isSize S32) args ->
             Right bytes
-        ForSize8and32imm bytes _ | all isSize8 args ->
+        ForSize8and32imm bytes _ | all (isSize S8) args ->
             Right bytes
-        ForSize8and32imm _ bytes | all isSize16 args ->
+        ForSize8and32imm _ bytes | all (isSize S16) args ->
             Right (preOpndsz : bytes)
-        ForSize8and32imm _ bytes | all isSize32 args ->
+        ForSize8and32imm _ bytes | all (isSize S32) args ->
             Right bytes
         ForSize32Reg [b] ->
-            let [ArgReg r] = args
+            let [AReg r] = args
             in Right [b + regIndex r]
-        ForSize32 bytes | all isSize16 args ->  
+        ForSize32 bytes | all (isSize S16) args ->
             Right (preAddrsz : bytes)
-        ForSize32 bytes | all isSize32 args ->
+        ForSize32 bytes | all (isSize S32) args ->
             Right bytes
         _ -> Left $ "no encoding for " ++ show args
 
-checkSize :: String -> [OpArgument] -> Either EncodingError [Arg]
-checkSize = undefined
+checkSize :: Maybe ArgSize -> [OpArgument] -> Either EncodingError [Arg]
+checkSize _ [] = Right []
 
-encodeInstructionWith :: Encoder -> Instruction -> Encoding
-encodeInstructionWith enc op = undefined
+checkSize Nothing [ArgReg r] = Right [AReg r]
+checkSize Nothing [ArgImm i] = Left $ "cannot size the instruction"
+checkSize Nothing [ArgMem m] = Right [AMem S32 m]
+checkSize (Just s) [ArgReg r] | maybe True (== s) (sizeOf r) = Right [AReg r]
+checkSize (Just s) [ArgImm i] = (\i -> [AImm i]) <$> immCastTo s i
+checkSize (Just s) [ArgMem m] = Right [AMem s m]
+
+checkSize Nothing [ArgReg r, ArgReg r'] = Right [AReg r, AReg r']
+checkSize Nothing [ArgReg r, ArgImm i] = do
+    let Just s = sizeOf r
+    nimm <- immCastTo s i
+    Right [AReg r, AImm nimm]
+checkSize Nothing [ArgReg r, ArgMem m] =
+    let Just s = sizeOf r in Right [AReg r, AMem s m]
+checkSize Nothing [arg, ArgReg r] = do
+    [b, a] <- checkSize Nothing [ArgReg r, arg]
+    Right [a, b]
+checkSize Nothing [ArgMem m, ArgImm i] = Left $ "cannot size the instruction"
+checkSize Nothing [ArgImm i, ArgMem m] = Left $ "cannot size the instruction"
+
+checkSize (Just s) [arg1, arg2] = do
+    [arg1'] <- checkSize (Just s) [arg1]
+    [arg2'] <- checkSize (Just s) [arg2]
+    Right [arg1', arg2']
+
+checkSize Nothing args =
+    Left $ "cannot size the instruction: " ++ show args
+checkSize (Just s) args =
+    Left $ "cannot siz the " ++ show s ++ " instruction: " ++ show args
+
+
+findInstruction :: String -> Either EncodingError (String, Maybe ArgSize, [([ArgMatcher], Encoder)])
+findInstruction name =
+    case M.lookup name instructions of
+      Just (_, encoders) -> Right (name, Nothing, encoders)
+      Nothing ->
+        let (name', suffix) = (init name, last name)
+        in case M.lookup name' instructions of
+          Just (suffixes, encoders) | suffix `elem` suffixes ->
+            let sizes = [('b', S8), ('w', S16), ('l', S32)]
+            in Right (name', lookup suffix sizes, encoders)
+          _ ->
+            Left $ "unknown instruction: " ++ show name
+
+encodeInstructionWith :: (Encoder, [Arg]) -> Encoding
+encodeInstructionWith ((Encoder arg_enc op_enc), args) = do
+    -- TODO : prefixes
+    bytes_op <- encodeOp op_enc args
+    bytes_args <- arg_enc args
+    Right $ bytes_op ++ bytes_args
 
 encodeInstruction :: Instruction -> Encoding
 encodeInstruction op@(Op [] name args) = do
-    args' <- checkSize name args
-    let encoders = findEncoders name args
-    case map (\e -> encodeInstructionWith e op) encoders of
+    (name', sizehint, encoders) <- findInstruction name
+    args' <- checkSize sizehint args
+    let argsEncoders = findEncoders encoders args'
+    case map encodeInstructionWith argsEncoders of
       [] -> Left $ "no encoder found for: " ++ show op
       encs -> case Ei.partitionEithers encs of
         (_, (encoded:_)) -> Right encoded
@@ -489,6 +599,9 @@ ref3 (b, i, s)  = ArgMem $ MemRef NoDispl     (Just b) (Just (s, i))
 ref d (b, i, s) = ArgMem $ MemRef (Displ32 d) (Just b) (Just (s, i))
 
 add = Op [] "add"
+addb = Op [] "addb"
+addw = Op [] "addw"
+addl = Op [] "addl"
 addTests = [
   (add [imm 0x42, ArgReg (Reg8 AL)],    Right [0x04, 0x42]),
   (add [imm 0x08, ArgReg (Reg8 DH)],    Right [0x80, 0xc6, 0x08]),
@@ -498,12 +611,18 @@ addTests = [
   (add [imm 0xffff, ArgReg (Reg16 SP)], Right [0x66, 0x81, 0xc4, 0xff, 0xff]),
   (add [imm 0xff, eax],                 Right [0x05, 0xff, 0x00, 0x00, 0x00]),
   (add [imm 0xffff0000, eax],           Right [0x05, 0x00, 0x00, 0xff, 0xff]),
-  (add [imm 0xff, ref1 EAX],            Right [0x80, 0x00, 0xff]),
-  (add [imm 0xffff, ref1 EAX],        Right [0x66, 0x83, 0x00, 0xff]),
-  (add [imm 0xffff, ref1 EAX],          Right [0x81, 0x00, 0xff, 0xff, 0x00, 0x00]),
-  (add [imm 0xffffffff, ref1 EAX],      Right [0x83, 0x00, 0xff]),
-  (add [imm 1, ref1 EDX],              Right [0x80, 0x02, 0x01]),
-  (add [imm 1, ref1 EDX],               Right [0x83, 0x02, 0x01])
+  (addb [imm 0xff, ref1 EAX],            Right [0x80, 0x00, 0xff]),
+  (addb [imm (-1), ref1 EAX],           Right [0x80, 0x00, 0xff]),
+--(addw [imm 0xffff, ref1 EAX],          Right [0x66, 0x83, 0x00, 0xff]),
+  (addw [imm 0xffff, ref1 EAX],          Right [0x66, 0x81, 0x00, 0xff, 0xff]),
+  (addl [imm 0xffff, ref1 EAX],          Right [0x81, 0x00, 0xff, 0xff, 0x00, 0x00]),
+--(addl [imm 0xffffffff, ref1 EAX],      Right [0x83, 0x00, 0xff]),
+  (addl [imm 0xffffffff, ref1 EAX],      Right [0x81, 0x00, 0xff, 0xff, 0xff, 0xff]),
+--(addl [imm (-1), ref1 EAX],            Right [0x83, 0x00, 0xff]),
+  (addl [imm (-1), ref1 EAX],            Right [0x81, 0x00, 0xff, 0xff, 0xff, 0xff]),
+  (addb [imm 1, ref1 EDX],               Right [0x80, 0x02, 0x01]),
+  (addl [imm 1, ref1 EDX],               Right [0x83, 0x02, 0x01]),
+  (addw [imm (-1), ref1 EAX],           Right [0x66, 0x83, 0x00, 0xff])
   ]
 
 mov = Op [] "mov"
@@ -520,17 +639,20 @@ movTests = [
   ]
 
 push = Op [] "push"
+pushb = Op [] "pushb"
+pushw = Op [] "pushw"
+pushl = Op [] "pushl"
 pushTests = [
   (push [eax],                          Right [0x50]),
   (push [esp],                          Right [0x54]),
-  (push [imm 0x42],                     Right [0x6a, 0x42]),
-  (push [imm 0xc0fe],                   Right [0x66, 0x68, 0xfe, 0xc0]),
-  (push [imm 0xcafebabe],               Right [0x68, 0xbe, 0xba, 0xfe, 0xca])
+  (pushb [imm 0x42],                     Right [0x6a, 0x42]),
+  (pushw [imm 0xc0fe],                   Right [0x66, 0x68, 0xfe, 0xc0]),
+  (pushl [imm 0xcafebabe],               Right [0x68, 0xbe, 0xba, 0xfe, 0xca])
   ]
 
 retTests = [
   (Op [] "ret" [],                      Right [0xc3]),
-  (Op [] "ret" [imm 42],                Right [0xc2, 0x2a, 0x00])
+  (Op [] "retw" [imm 42],                Right [0xc2, 0x2a, 0x00])
   ]
 
 runTests tests = do
