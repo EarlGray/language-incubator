@@ -15,3 +15,5 @@ a.out
 *.ll
 *.beam
 tags
+node_modules
+package-lock.json
