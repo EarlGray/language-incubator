@@ -3,6 +3,7 @@ extern crate libc;
 use std::mem;
 use std::ops::{Index, IndexMut};
 
+use libc::c_void;
 
 /*
  *  Pages
@@ -53,14 +54,14 @@ impl Memory {
         let contents: *mut u8;
         let size = pages.byte_size();
         unsafe {
-            let mut _contents: *mut libc::c_void = mem::uninitialized();
+            let mut memptr: *mut libc::c_void = mem::MaybeUninit::uninit().assume_init();
 
-            libc::posix_memalign(&mut _contents, Pages::SIZE, size);
+            libc::posix_memalign(&mut memptr, Pages::SIZE, size);
             let flags = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
-            libc::mprotect(_contents, size, flags);
+            libc::mprotect(memptr, size, flags);
 
             // libc::memset(_contents, 0xc3, size);  // RET
-            contents = mem::transmute(_contents);
+            contents = mem::transmute(memptr);
         }
 
         Memory { contents: contents, emit_pos: 0, size: size }
@@ -74,10 +75,30 @@ impl Memory {
         }
     }
 
-    pub fn get_entry(&self) -> (fn() -> ()) {
+    pub fn emit_u32(&mut self, mut val: u32) {
+        let b1 = (val & 0xff) as u8;
+        val >>= 8;
+        let b2 = (val & 0xff) as u8;
+        val >>= 8;
+        let b3 = (val & 0xff) as u8;
+        val >>= 8;
+        let b4 = (val & 0xff) as u8;
+        self.emit(&[b1, b2, b3, b4]);
+    }
+
+    pub fn emit_u64(&mut self, val: u64) {
+        self.emit_u32(val as u32);
+        self.emit_u32((val >> 32) as u32);
+    }
+
+    pub fn current_position(&self) -> usize {
+        self.emit_pos
+    }
+
+    pub fn get_entry(&self) -> fn() -> () {
         unsafe { mem::transmute(self.contents) }
     }
-    pub fn get_entry1(&self) -> (fn(usize) -> ()) {
+    pub fn get_entry1(&self) -> fn(usize) -> () {
         unsafe { mem::transmute(self.contents) }
     }
 }
@@ -88,8 +109,8 @@ pub trait Compiler {
 
     fn parse(&self, source: &str) -> Self::IR;
 
-    fn set_putchar(&mut self, putchar: usize) -> &mut Self;
-    fn set_getchar(&mut self, getchar: usize) -> &mut Self;
+    fn set_putchar(&mut self, putchar: *mut c_void) -> &mut Self;
+    fn set_getchar(&mut self, getchar: *mut c_void, ctx: *mut c_void) -> &mut Self;
 
     fn compile(&self, program: &Self::IR, exe: &mut Memory);
 }

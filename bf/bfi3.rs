@@ -5,7 +5,6 @@
  * Compilation:
  * $ rustc --cfg trace -O -o bfi3.opt bfi3.rs
  */
-#![feature(io)]   // to allow `input.chars()`:
 
 use std::env;
 use std::fs::File;
@@ -132,7 +131,7 @@ macro_rules! trace_op {
 
 fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &mut Out) {
     let mut mem = [0u8; MEM_SIZE];
-    let mut input = input.chars();
+    let mut bytes = input.bytes();
     let mut trace = [0u64; 8];
     let mut trace_loops = HashMap::<String, u64>::new();
 
@@ -151,10 +150,8 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
                 trace_op!(trace, 2);
             },
             Op::Read   => {
-                let c = input.next();
-                let c = c.expect("end of stream");
-                let c = c.unwrap();
-                mem[dp] = c as u8;
+                let c = bytes.next().expect("Character").unwrap();
+                mem[dp] = c;
                 trace_op!(trace, 4);
             }
             Op::Print  => {
@@ -181,7 +178,7 @@ fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &m
                 trace_op!(trace, 7);
                 if cfg!(trace) {
                     if let Some(ref image) = *loop_image {
-                        let mut loop_trace = trace_loops.entry(image.clone()).or_insert(0);
+                        let loop_trace = trace_loops.entry(image.clone()).or_insert(0);
                         *loop_trace += 1;
                     }
                 }

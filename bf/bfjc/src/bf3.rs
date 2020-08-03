@@ -1,3 +1,8 @@
+extern crate libc;
+
+use std::ptr;
+use libc::c_void;
+
 use jit;
 
 /// The language
@@ -13,26 +18,32 @@ pub enum Op {
 
 
 pub struct Impl {
-    getchar: usize,
-    putchar: usize
+    putchar: *mut c_void,
+    getchar: *mut c_void,
+    getchar_ctx: *mut c_void,
 }
 
 impl Impl {
     pub fn new() -> Impl {
-        Impl { putchar: 0, getchar: 0 }
+        Impl {
+            putchar: ptr::null_mut(),
+            getchar: ptr::null_mut(),
+            getchar_ctx: ptr::null_mut(),
+        }
     }
 }
 
 impl jit::Compiler for Impl {
     type IR = Vec<Op>;
 
-    fn set_putchar(&mut self, putchar: usize) -> &mut Self {
+    fn set_putchar(&mut self, putchar: *mut c_void) -> &mut Self {
         self.putchar = putchar;
         self
     }
 
-    fn set_getchar(&mut self, getchar: usize) -> &mut Self {
+    fn set_getchar(&mut self, getchar: *mut c_void, ctx: *mut c_void) -> &mut Self {
         self.getchar = getchar;
+        self.getchar_ctx = ctx;
         self
     }
 
@@ -96,16 +107,50 @@ impl jit::Compiler for Impl {
     }
 
     #[cfg(all(target_family = "unix", target_arch = "x86_64"))]
-    fn compile(&self, _ops: &Vec<Op>, exe: &mut jit::Memory) {
+    fn compile(&self, ops: &Vec<Op>, exe: &mut jit::Memory) {
         use asm::x64;
 
-        /* TODO: save registers */
+        /* save registers */
+        exe.emit(&[0x55]); // push %rbp
+        exe.emit(&[0x53]); // push %rbx
+        exe.emit(&[0x48, 0x83, 0xec, 0x08]); // sub $8, %rsp
 
-        /* TODO: set up %rbp and %rbx */
+        /* set up %rbp and %rbx */
+        exe.emit(&[0x48, 0x89, 0xfd]); // movq %rdi, %rbp
+        exe.emit(&[0x48, 0x31, 0xdb]); // xorq %rbx, %rbx
 
-        /* TODO: compile operations */
+        /* compile operations */
+        for op in ops.iter() {
+            match op {
+                Op::Add(n) => {
+                    // addb $n, (%rbp, %rbx)
+                    exe.emit(&[0x80, 0x44, 0x1d, 0x00, *n as u8]);
+                },
+                Op::Move(n) => {
+                    // add $n, %rbx
+                    exe.emit(&[0x48, 0x81, 0xc3]);
+                    exe.emit_u32(*n as u32);
+                    // TODO: check if %rbx is in bounds
+                },
+                Op::Print => {
+                    // movb (%rbp, %rbx), %al
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
+                    // movzx %al, %rdi
+                    exe.emit(&[0x48, 0x0f, 0xb6, 0xf8]);
+                    // movabs $putchar, %rax
+                    exe.emit(&[0x48, 0xb8]);
+                    exe.emit_u64(self.putchar as u64);
+                    // call *%rax
+                    exe.emit(&[0xff, 0xd0]);
+                },
+                _ => panic!("TODO: bf3::compile({:?})", op)
+            }
+        }
 
-        /* TODO: restore %rbp and %rbx */
+        /* restore %rbp and %rbx */
+        exe.emit(&[0x48, 0x83, 0xc4, 0x08]); // add $8, %rsp
+        exe.emit(&[0x5b]); // pop %rbx
+        exe.emit(&[0x5d]); // pop %rbp
 
         /* exit */
         exe.emit(x64::ret);
