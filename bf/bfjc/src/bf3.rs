@@ -120,6 +120,8 @@ impl jit::Compiler for Impl {
         exe.emit(&[0x48, 0x31, 0xdb]); // xorq %rbx, %rbx
 
         /* compile operations */
+        let mut loop_addrs = Vec::<usize>::new();
+
         for op in ops.iter() {
             match op {
                 Op::Add(n) => {
@@ -142,6 +144,32 @@ impl jit::Compiler for Impl {
                     exe.emit_u64(self.putchar as u64);
                     // call *%rax
                     exe.emit(&[0xff, 0xd0]);
+                },
+                Op::Begin(_end) => {
+                    // movb (%rbp, %rbx), %al
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
+                    // test %al, %al
+                    exe.emit(&[0x84, 0xc0]);
+                    // jz <loop_end>
+                    exe.emit(&[0x0f, 0x84]);
+                    exe.emit_u32(0);    // to be filled later.
+                    // remember the address just behind the intruction
+                    let addr = exe.current_position();
+                    loop_addrs.push(addr);
+                },
+                Op::End(_begin) => {
+                    // movb (%rbp, %rbx), %al
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
+                    // test %al, %al
+                    exe.emit(&[0x84, 0xc0]);
+                    // jnz <loop_begin>
+                    let begin = loop_addrs.pop().expect("end without beginning");
+                    let end = exe.current_position() + 6;
+                    let offset = (end - begin) as u32;
+                    exe.emit(&[0x0f, 0x85]);
+                    exe.emit_u32((0 - offset as i32) as u32);
+                    // backfill the begin jump:
+                    exe.at(begin - 4).emit_u32(offset);
                 },
                 _ => panic!("TODO: bf3::compile({:?})", op)
             }

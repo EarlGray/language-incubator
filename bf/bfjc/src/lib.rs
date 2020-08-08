@@ -67,7 +67,9 @@ pub fn execute<L: jit::Compiler>(contents: &str, lang: &mut L) {
     eprintln!("  getchar\t = *0x{:x}", getchar as usize);
     // */
 
-    let mut exe = jit::Memory::new(jit::Pages(1));
+    // assume up to 16 bytes per Op:
+    let pages = jit::Pages::from(contents.len() * 16);
+    let mut exe = jit::Memory::new(pages);
     eprintln!("  code mem\t = *0x{:x}", &exe[0] as *const _ as usize);
 
     /* jit compilation */

@@ -15,6 +15,10 @@ pub struct Pages(pub usize);
 impl Pages {
     const SIZE: usize = 4096;
 
+    pub fn from(byte_size: usize) -> Pages {
+        Pages(byte_size / Pages::SIZE + 1)
+    }
+
     pub fn byte_size(&self) -> usize {
         self.0 * Pages::SIZE
     }
@@ -64,7 +68,7 @@ impl Memory {
             contents = mem::transmute(memptr);
         }
 
-        Memory { contents: contents, emit_pos: 0, size: size }
+        Memory { contents, size, emit_pos: 0 }
     }
 
     pub fn emit(&mut self, code: &[u8]) {
@@ -75,15 +79,8 @@ impl Memory {
         }
     }
 
-    pub fn emit_u32(&mut self, mut val: u32) {
-        let b1 = (val & 0xff) as u8;
-        val >>= 8;
-        let b2 = (val & 0xff) as u8;
-        val >>= 8;
-        let b3 = (val & 0xff) as u8;
-        val >>= 8;
-        let b4 = (val & 0xff) as u8;
-        self.emit(&[b1, b2, b3, b4]);
+    pub fn emit_u32(&mut self, val: u32) {
+        self.emit(&val.to_le_bytes());
     }
 
     pub fn emit_u64(&mut self, val: u64) {
@@ -93,6 +90,10 @@ impl Memory {
 
     pub fn current_position(&self) -> usize {
         self.emit_pos
+    }
+
+    pub fn at(&mut self, index: usize) -> Memory {
+        Memory { contents: self.contents, size: self.size, emit_pos: index }
     }
 
     pub fn get_entry(&self) -> fn() -> () {
