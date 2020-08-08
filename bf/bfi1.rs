@@ -1,5 +1,3 @@
-#![feature(io)]   // to allow `input.chars()`:
-
 use std::env;
 use std::fs::File;
 
@@ -77,7 +75,7 @@ fn find_jump(prog: &Vec<Op>, cp: usize, whom: Op) -> usize {
 
 fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &mut Out) {
     let mut mem = [0u8; MEM_SIZE];
-    let mut input = input.chars();
+    let mut input = input.bytes();
 
     let mut cp = 0;  // code pointer
     let mut dp = 0;  // data pointer

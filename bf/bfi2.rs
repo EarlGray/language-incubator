@@ -1,13 +1,8 @@
-#![feature(io)]   // to allow `input.chars()`:
-
 use std::env;
 use std::fs::File;
 
 use std::io;
 use std::io::prelude::*;
-
-#[allow(unused_imports)]
-use std::io::Write;
 
 use std::num::Wrapping;
 
@@ -81,7 +76,7 @@ macro_rules! trace_op {
 
 fn interpret<In: io::Read, Out: io::Write>(prog: &Vec<Op>, input: In, output: &mut Out) {
     let mut mem = [0u8; MEM_SIZE];
-    let mut input = input.chars();
+    let mut input = input.bytes();
     let mut trace = [0u64; 8];
 
     let mut cp = 0;  // code pointer
