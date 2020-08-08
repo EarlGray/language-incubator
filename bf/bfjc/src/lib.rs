@@ -16,6 +16,8 @@ use std::process::exit;
 use std::fs::File;
 use std::mem;
 
+use libc::c_void;
+
 
 pub fn read_file(contents: &mut String) {
     let mut stderr = io::stderr();
@@ -40,32 +42,24 @@ pub extern fn bf_print(c: u8) {
     print!("{}", c as char);
 }
 
-pub extern fn bf_input(ctx: *mut libc::c_void) -> u8 {
-    // https://stackoverflow.com/a/42587849/621719
-    // I have no idea what I'm doing.
-    let closure: &mut &mut dyn FnMut() -> u8 = unsafe { mem::transmute(ctx) };
-    closure()
+pub extern fn bf_input(ctx: *mut c_void) -> u8 {
+    let stdin: &mut io::Stdin = unsafe { mem::transmute(ctx) };
+    let mut buf = [0; 1];
+    stdin.lock().read_exact(&mut buf).unwrap();
+    buf[0]
 }
 
 pub fn execute<L: jit::Compiler>(contents: &str, lang: &mut L) {
     eprintln!("bf::run(): running!");
 
-    let putchar = bf_print as *mut libc::c_void;
+    let putchar = bf_print as *mut c_void;
     lang.set_putchar(putchar);
     eprintln!("  putchar\t = *0x{:x}", putchar as usize);
 
-    /*
-    let stdin = io::stdin();
-    let input_cb = move || {
-        let mut buf = [0u8; 1];
-        stdin.lock().read_exact(&mut buf).unwrap();
-        buf[0]
-    };
-    let input_cb_ptr = &mut input_cb as *mut &mut dyn FnMut() -> u8;
-    let getchar = bf_input as *mut libc::c_void;
-    lang.set_getchar(getchar, input_cb_ptr as *mut libc::c_void);
-    eprintln!("  getchar\t = *0x{:x}", getchar as usize);
-    // */
+    let mut stdin = io::stdin();
+    let stdinptr: *mut c_void = unsafe { mem::transmute(&mut stdin) };
+    lang.set_getchar(bf_input as *mut c_void, stdinptr);
+    eprintln!("  getchar\t = *0x{:x}", bf_input as usize);
 
     // assume up to 16 bytes per Op:
     let pages = jit::Pages::from(contents.len() * 16);

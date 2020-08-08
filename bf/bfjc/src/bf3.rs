@@ -127,13 +127,13 @@ impl jit::Compiler for Impl {
                 Op::Add(n) => {
                     // addb $n, (%rbp, %rbx)
                     exe.emit(&[0x80, 0x44, 0x1d, 0x00, *n as u8]);
-                },
+                }
                 Op::Move(n) => {
                     // add $n, %rbx
                     exe.emit(&[0x48, 0x81, 0xc3]);
                     exe.emit_u32(*n as u32);
                     // TODO: check if %rbx is in bounds
-                },
+                }
                 Op::Print => {
                     // movb (%rbp, %rbx), %al
                     exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
@@ -144,7 +144,19 @@ impl jit::Compiler for Impl {
                     exe.emit_u64(self.putchar as u64);
                     // call *%rax
                     exe.emit(&[0xff, 0xd0]);
-                },
+                }
+                Op::Read => {
+                    // movabs $ctx, %rdi
+                    exe.emit(&[0x48, 0xbf]);
+                    exe.emit_u64(self.getchar_ctx as u64);
+                    // movabs $getchar, %rax
+                    exe.emit(&[0x48, 0xb8]);
+                    exe.emit_u64(self.getchar as u64);
+                    // call *%rax
+                    exe.emit(&[0xff, 0xd0]);
+                    // movb %al, (%rbp, %rbx)
+                    exe.emit(&[0x88, 0x44, 0x1d, 0x00]);
+                }
                 Op::Begin(_end) => {
                     // movb (%rbp, %rbx), %al
                     exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
@@ -156,7 +168,7 @@ impl jit::Compiler for Impl {
                     // remember the address just behind the intruction
                     let addr = exe.current_position();
                     loop_addrs.push(addr);
-                },
+                }
                 Op::End(_begin) => {
                     // movb (%rbp, %rbx), %al
                     exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
@@ -170,8 +182,7 @@ impl jit::Compiler for Impl {
                     exe.emit_u32((0 - offset as i32) as u32);
                     // backfill the begin jump:
                     exe.at(begin - 4).emit_u32(offset);
-                },
-                _ => panic!("TODO: bf3::compile({:?})", op)
+                }
             }
         }
 
