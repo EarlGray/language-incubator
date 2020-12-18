@@ -119,6 +119,7 @@ enum Expr {
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     Call(Box<Expr>, Vec<Box<Expr>>),
+    Array(Vec<Box<Expr>>),
 }
 
 enum BinOp { Add }
@@ -128,6 +129,13 @@ impl Expr {
         let jexpr_ty = json_get_str(jexpr, "type")?;
 
         let expr = match jexpr_ty {
+            "ArrayExpression" => {
+                let jelements = json_get_array(jexpr, "elements")?;
+                let elements: Result<Vec<Box<Expr>>, ParseError> = jelements.iter()
+                    .map(|j| Expr::from_json(j).map(|e| Box::new(e)))
+                    .collect();
+                Expr::Array(elements?)
+            }
             "BinaryExpression" => {
                 let jleft = json_get(jexpr, "left")?;
                 let left = Expr::from_json(&jleft)?;
@@ -151,8 +159,7 @@ impl Expr {
 
                 let jarguments = json_get_array(jexpr, "arguments")?;
                 let arguments: Result<Vec<Box<Expr>>, ParseError> = jarguments.iter()
-                    .map(|j| Expr::from_json(j)
-                    .map(|e| Box::new(e)))
+                    .map(|j| Expr::from_json(j).map(|e| Box::new(e)))
                     .collect();
 
                 Expr::Call(Box::new(callee), arguments?)
@@ -193,6 +200,14 @@ impl Expr {
             }
             Expr::Call(_callee, _arguments) => {
                 panic!("TODO: Expr::Call");
+            }
+            Expr::Array(elements) => {
+                let mut arr = vec![];
+                for elem in elements.iter() {
+                    let value = elem.interpret(state)?;
+                    arr.push(value.0);
+                }
+                Ok(JSValue(JSON::Array(arr)))
             }
         }
     }
