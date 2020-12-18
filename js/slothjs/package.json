@@ -4,8 +4,8 @@
   "description": "a naive Javascript interpreter",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js /dev/stdin | cargo run",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js /dev/stdin | cargo run -q",
+    "test": "cargo test"
   },
   "author": "",
   "license": "ISC",
