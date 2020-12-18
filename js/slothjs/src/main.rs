@@ -6,8 +6,11 @@ use serde_json::Value as JSON;
 use serde_json::json;
 
 
+const UNDEFINED: JSValue = JSValue(JSON::Null);
+
 #[derive(Debug)]
 enum ParseError<'a> {
+    ShouldBeBool{ value: &'a JSON },
     ShouldBeString{ value: &'a JSON },
     ShouldBeArray{ value: &'a JSON },
     //ShouldBeObject{ value: &'a JSON },
@@ -30,6 +33,14 @@ struct JSValue(JSON);
 fn json_get<'a>(json: &'a JSON, property: &'static str) -> Result<&'a JSON, ParseError<'a>> {
     json.get(property)
         .ok_or(ParseError::ObjectWithout{ attr: property, value: json })
+}
+
+fn json_get_bool<'a>(
+    json: &'a JSON,
+    property: &'static str
+) -> Result<bool, ParseError<'a>> {
+    let jbool = json_get(json, property)?;
+    jbool.as_bool().ok_or(ParseError::ShouldBeBool{ value: jbool })
 }
 
 fn json_get_str<'a>(
@@ -105,7 +116,7 @@ impl Program {
         let mut runtime = RuntimeState{
             variables: HashMap::new(),
         };
-        let mut result = JSValue(JSON::Null);
+        let mut result = UNDEFINED;
         for stmt in self.body.iter() {
             result = stmt.interpret(&mut runtime)?;
         }
@@ -120,6 +131,7 @@ enum Expr {
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     Call(Box<Expr>, Vec<Box<Expr>>),
     Array(Vec<Box<Expr>>),
+    Member(Box<Expr>, Box<Expr>, bool),
 }
 
 enum BinOp { Add }
@@ -172,6 +184,16 @@ impl Expr {
                 let jval = json_get(jexpr, "value")?;
                 Expr::Literal(JSValue(jval.clone().take()))
             }
+            "MemberExpression" => {
+                let computed = json_get_bool(jexpr, "computed")?;
+
+                let jobject = json_get(jexpr, "object")?;
+                let object = Expr::from_json(jobject)?;
+
+                let jproperty = json_get(jexpr, "property")?;
+                let property = Expr::from_json(jproperty)?;
+                Expr::Member(Box::new(object), Box::new(property), computed)
+            }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr, ty: jexpr_ty}),
         };
@@ -208,6 +230,28 @@ impl Expr {
                     arr.push(value.0);
                 }
                 Ok(JSValue(JSON::Array(arr)))
+            }
+            Expr::Member(objexpr, propexpr, computed) => {
+                let object = objexpr.interpret(state)?;
+                let property = if *computed {
+                    propexpr.interpret(state)?
+                } else {
+                    match &**propexpr {
+                        Expr::Identifier(name) => JSValue(JSON::String(name.clone())),
+                        _ => panic!("Member(computed=false) property is not an identifier")
+                    }
+                };
+                if let Some(arr) = object.0.as_array() {
+                    match property.0.as_i64() {
+                        Some(index) => {
+                            let j = arr.get(index as usize).unwrap_or(&UNDEFINED.0).clone();
+                            Ok(JSValue(j))
+                        }
+                        None => Ok(UNDEFINED),
+                    }
+                } else {
+                    Ok(UNDEFINED)
+                }
             }
         }
     }
@@ -297,7 +341,7 @@ impl Interpretable for VariableDeclaration {
                 state.set_identifier(&decl.name, value)?;
             }
         }
-        Ok(JSValue(JSON::Null))
+        Ok(UNDEFINED)
     }
 }
 
@@ -309,8 +353,7 @@ struct RuntimeState {
 
 impl RuntimeState {
     fn declare_identifier(&mut self, name: String) -> Result<(), Exception> {
-        let undefined = JSValue(JSON::Null);    // not quite, but works for now
-        self.variables.entry(name).or_insert(undefined);
+        self.variables.entry(name).or_insert(UNDEFINED);
         Ok(())
     }
 
