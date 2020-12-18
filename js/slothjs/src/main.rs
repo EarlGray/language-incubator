@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use serde_json::Value as JSON;
 use serde_json::json;
 
+#[cfg(test)]
+mod test;
 
-const UNDEFINED: JSValue = JSValue(JSON::Null);
 
 #[derive(Debug)]
 enum ParseError<'a> {
@@ -15,21 +16,131 @@ enum ParseError<'a> {
     ShouldBeArray{ value: &'a JSON },
     //ShouldBeObject{ value: &'a JSON },
     ObjectWithout{ attr: &'static str, value: &'a JSON},
-    UnexpectedValue{ value: &'a JSON, want: &'static str },
+    UnexpectedValue{ want: &'static str, value: &'a JSON },
     UnknownType{ ty: &'a str, value: &'a JSON },
 }
 
 #[derive(Debug)]
 enum Exception {
+    SyntaxError,
     ReferenceError(String),
 }
 
-#[derive(Debug, Clone)]
+
+/*
+ *  JSValue: "type" "system"
+ */
+
+#[derive(Debug, Clone, PartialEq)]
 struct JSValue(JSON);
+
+const UNDEFINED: JSValue = JSValue(JSON::Null);
+
+
+type JSNumber = f64;
+
+/*
+#[derive(Debug, Clone)]
+enum JSValue {
+    Null,
+    Undefined,
+    Number(JSNumber),
+    Str(String),
+}
+*/
+
+impl JSValue {
+    fn stringify(&self) -> String {
+        match &self.0 {
+            JSON::Null => "null".to_string(),
+            JSON::Number(n) => n.to_string(),
+            JSON::Bool(b) => b.to_string(),
+            JSON::String(_s) => {
+                let mut s = String::new();
+                s.push_str(&self.0.to_string());
+                s
+            }
+            JSON::Array(a) => {
+                let body = a.iter()
+                    .map(|v| JSValue(v.clone()).stringify())
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                let mut s = String::new();
+                s.push_str("[");
+                s.push_str(&body);
+                s.push_str("]");
+                s
+            }
+            JSON::Object(obj) => {
+                let mut s = String::new();
+                let mut empty = true;
+                s.push('{');
+                for (key, jval) in obj.iter() {
+                    s.push(' ');
+                    if is_valid_identifier(&key) {
+                        s.push_str(key);
+                    } else {
+                        let jkey = JSON::String(key.to_string());
+                        let skey = JSValue(jkey).stringify();
+                        s.push_str(&skey);
+                    }
+                    s.push_str(": ");
+                    let val = JSValue(jval.clone()).stringify();
+                    s.push_str(&val);
+                    s.push(',');
+                    empty = false;
+                }
+                if !empty { s.pop(); s.push(' '); }
+                s.push('}');
+                s
+            }
+        }
+    }
+    /*
+    fn from_json(json: &JSON) -> JSValue {
+        match json {
+        }
+    }
+
+
+    fn as_number(&self) -> Option<JSNumber> {
+    }
+    */
+}
+
+impl From<JSON> for JSValue {
+    fn from(json: JSON) -> Self { JSValue(json) }
+}
+
+impl From<JSNumber> for JSValue {
+    fn from(number: JSNumber) -> Self { JSValue(json!(number)) }
+}
+
+impl From<i64> for JSValue {
+    fn from(number: i64) -> Self { JSValue(json!(number)) }
+}
+
+impl From<String> for JSValue {
+    fn from(s: String) -> Self { JSValue(json!(s)) }
+}
+
 
 /*
  *  JSON helpers
  */
+
+fn is_valid_identifier(s: &str) -> bool {
+    let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
+
+    let mut it = s.chars();
+    if let Some(c) = it.next() {
+        is_start(c) && it.all(|c| is_start(c) || c.is_numeric())
+    } else {
+        false
+    }
+}
+
 fn json_get<'a>(json: &'a JSON, property: &'static str) -> Result<&'a JSON, ParseError<'a>> {
     json.get(property)
         .ok_or(ParseError::ObjectWithout{ attr: property, value: json })
@@ -84,57 +195,24 @@ trait ASTNode: Interpretable {
     fn from_json(value: &JSON) -> Result<Box<Self>, ParseError>;
 }
 
-struct Program {
-    body: Vec<Box<dyn Interpretable>>,
-}
-
-impl Program {
-    fn from_json(json: &JSON) -> Result<Box<Self>, ParseError> {
-        json_expect_str(json, "type", "Program")?;
-
-        // parse body
-        let jbody = json_get_array(json, "body")?;
-
-        let mut body = Vec::new();
-        for jstmt in jbody.iter() {
-            let ty = json_get_str(jstmt, "type")?;
-            let stmt: Box<dyn Interpretable> = match ty {
-                ExpressionStatement::TYPE_ID =>
-                    ExpressionStatement::from_json(jstmt)?,
-                VariableDeclaration::TYPE_ID =>
-                    VariableDeclaration::from_json(jstmt)?,
-                _ =>
-                    return Err(ParseError::UnknownType{ value: jstmt, ty})
-            };
-            body.push(stmt);
-        }
-
-        Ok(Box::new(Program { body }))
-    }
-
-    fn interpret(&self) -> Result<JSValue, Exception> {
-        let mut runtime = RuntimeState{
-            variables: HashMap::new(),
-        };
-        let mut result = UNDEFINED;
-        for stmt in self.body.iter() {
-            result = stmt.interpret(&mut runtime)?;
-        }
-        Ok(result)
-    }
-}
 
 // ==============================================
+enum ObjectKey {
+    Computed(Expr),
+    Identifier(String),
+}
+
 enum Expr {
     Literal(JSValue),
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     Call(Box<Expr>, Vec<Box<Expr>>),
     Array(Vec<Box<Expr>>),
+    Object(Vec<(ObjectKey, Box<Expr>)>),
     Member(Box<Expr>, Box<Expr>, bool),
 }
 
-enum BinOp { Add }
+enum BinOp { Add, KindaEqual }
 
 impl Expr {
     fn from_json(jexpr: &JSON) -> Result<Expr, ParseError> {
@@ -158,9 +236,10 @@ impl Expr {
                 let opstr = json_get_str(jexpr, "operator")?;
                 let op = match opstr {
                     "+" => BinOp::Add,
+                    "==" => BinOp::KindaEqual,
                     _ => return Err(ParseError::UnexpectedValue{
                         value: jexpr.get("operator").unwrap(),
-                        want: "+|"
+                        want: "+|=="
                     }),
                 };
                 Expr::BinaryOp(Box::new(left), op, Box::new(right))
@@ -182,7 +261,7 @@ impl Expr {
             }
             "Literal" => {
                 let jval = json_get(jexpr, "value")?;
-                Expr::Literal(JSValue(jval.clone().take()))
+                Expr::Literal(JSValue::from(jval.clone()))
             }
             "MemberExpression" => {
                 let computed = json_get_bool(jexpr, "computed")?;
@@ -193,6 +272,41 @@ impl Expr {
                 let jproperty = json_get(jexpr, "property")?;
                 let property = Expr::from_json(jproperty)?;
                 Expr::Member(Box::new(object), Box::new(property), computed)
+            }
+            "ObjectExpression" => {
+                let jproperties = json_get_array(jexpr, "properties")?;
+
+                let mut properties = vec![];
+                for jprop in jproperties.iter() {
+                    json_expect_str(jprop, "type", "Property")?;
+
+                    let jkey = json_get(jprop, "key")?;
+                    let keyexpr = Expr::from_json(jkey)?;
+                    let key = if json_get_bool(jprop, "computed")? {
+                        ObjectKey::Computed(keyexpr)
+                    } else {
+                        match keyexpr {
+                            Expr::Identifier(ident) =>
+                                ObjectKey::Identifier(ident),
+                            Expr::Literal(jval) =>
+                                match jval.0.as_str() {
+                                    Some(val) => ObjectKey::Identifier(val.to_string()),
+                                    None => ObjectKey::Identifier(jval.stringify()),
+                                }
+                            _ =>
+                                return Err(ParseError::UnexpectedValue{
+                                    want: "Identifier|Literal",
+                                    value: jprop,
+                                })
+                        }
+                    };
+
+                    let jvalue = json_get(jprop, "value")?;
+                    let value = Expr::from_json(jvalue)?;
+
+                    properties.push((key, Box::new(value)));
+                }
+                Expr::Object(properties)
             }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr, ty: jexpr_ty}),
@@ -213,10 +327,13 @@ impl Expr {
                     BinOp::Add => {
                         if let Some(lnum) = lval.0.as_f64() {
                             if let Some(rnum) = rval.0.as_f64() {
-                                return Ok(JSValue(json!(lnum + rnum)));
+                                return Ok(JSValue::from(lnum + rnum));
                             }
                         }
                         panic!("TODO: adding non-numbers");
+                    }
+                    BinOp::KindaEqual => {
+                        Ok(JSValue::from(JSON::Bool(lval == rval)))
                     }
                 }
             }
@@ -229,7 +346,7 @@ impl Expr {
                     let value = elem.interpret(state)?;
                     arr.push(value.0);
                 }
-                Ok(JSValue(JSON::Array(arr)))
+                Ok(JSValue::from(JSON::Array(arr)))
             }
             Expr::Member(objexpr, propexpr, computed) => {
                 let object = objexpr.interpret(state)?;
@@ -237,7 +354,7 @@ impl Expr {
                     propexpr.interpret(state)?
                 } else {
                     match &**propexpr {
-                        Expr::Identifier(name) => JSValue(JSON::String(name.clone())),
+                        Expr::Identifier(name) => JSValue::from(name.clone()),
                         _ => panic!("Member(computed=false) property is not an identifier")
                     }
                 };
@@ -245,13 +362,29 @@ impl Expr {
                     match property.0.as_i64() {
                         Some(index) => {
                             let j = arr.get(index as usize).unwrap_or(&UNDEFINED.0).clone();
-                            Ok(JSValue(j))
+                            Ok(JSValue::from(j))
                         }
                         None => Ok(UNDEFINED),
                     }
                 } else {
                     Ok(UNDEFINED)
                 }
+            }
+            Expr::Object(properties) => {
+                let mut object = json!({});
+                for (key, valexpr) in properties.iter() {
+                    let keyname = match key {
+                        ObjectKey::Identifier(ident) =>
+                            ident.clone(),
+                        ObjectKey::Computed(expr) => {
+                            let result = expr.interpret(state)?;
+                            result.stringify()
+                        }
+                    };
+                    let value = valexpr.interpret(state)?;
+                    object[keyname] = value.0;
+                }
+                Ok(JSValue::from(object))
             }
         }
     }
@@ -288,7 +421,7 @@ struct VariableDeclarator {
 enum DeclarationKind { Var, Let, Const }
 
 struct VariableDeclaration {
-    kind: DeclarationKind,
+    _kind: DeclarationKind,
     declarations: Vec<VariableDeclarator>,
 }
 
@@ -328,7 +461,7 @@ impl ASTNode for VariableDeclaration {
 
             declarations.push(VariableDeclarator{ name, init });
         }
-        Ok(Box::new(VariableDeclaration{ kind, declarations }))
+        Ok(Box::new(VariableDeclaration{ _kind: kind, declarations }))
     }
 }
 
@@ -342,6 +475,49 @@ impl Interpretable for VariableDeclaration {
             }
         }
         Ok(UNDEFINED)
+    }
+}
+
+// ==============================================
+
+struct Program {
+    body: Vec<Box<dyn Interpretable>>,
+}
+
+impl Program {
+    fn from_json(json: &JSON) -> Result<Box<Self>, ParseError> {
+        json_expect_str(json, "type", "Program")?;
+
+        // parse body
+        let jbody = json_get_array(json, "body")?;
+
+        let mut body = Vec::new();
+        for jstmt in jbody.iter() {
+            let ty = json_get_str(jstmt, "type")?;
+            let stmt: Box<dyn Interpretable> = match ty {
+                ExpressionStatement::TYPE_ID =>
+                    ExpressionStatement::from_json(jstmt)?,
+                VariableDeclaration::TYPE_ID =>
+                    VariableDeclaration::from_json(jstmt)?,
+                _ =>
+                    return Err(ParseError::UnknownType{ value: jstmt, ty})
+            };
+            body.push(stmt);
+        }
+
+        Ok(Box::new(Program { body }))
+    }
+
+    fn interpret(&self) -> Result<JSValue, Exception> {
+        let mut runtime = RuntimeState{
+            variables: HashMap::new(),
+        };
+
+        let mut result = UNDEFINED;
+        for stmt in self.body.iter() {
+            result = stmt.interpret(&mut runtime)?;
+        }
+        Ok(result)
     }
 }
 
@@ -397,9 +573,6 @@ fn main() {
             .unwrap_or_else(|e| die("Interpretation error", e, 3));
 
         // TODO: JSON output, optionally
-        let output = serde_json::to_string(&result.0)
-            .unwrap_or_else(|e| die("Result serialization error", e, 4));
-
-        println!("{}", output);
+        println!("{}", result.stringify());
     }
 }
