@@ -50,7 +50,13 @@ enum JSValue {
 */
 
 impl JSValue {
-    fn stringify(&self) -> String {
+    /// to_string() makes a string representation of the value
+    /// ```
+    /// JSValue::from("1").to_string()    // "\"1\""
+    /// JSValue::from(1).to_string()      // "1"
+    /// JSValue::from(json!([1, 2])).to_string()   // "[1,2]"
+    /// ```
+    fn to_string(&self) -> String {
         match &self.0 {
             JSON::Null => "null".to_string(),
             JSON::Number(n) => n.to_string(),
@@ -62,7 +68,7 @@ impl JSValue {
             }
             JSON::Array(a) => {
                 let body = a.iter()
-                    .map(|v| JSValue(v.clone()).stringify())
+                    .map(|v| JSValue(v.clone()).to_string())
                     .collect::<Vec<String>>()
                     .join(",");
 
@@ -81,12 +87,11 @@ impl JSValue {
                     if is_valid_identifier(&key) {
                         s.push_str(key);
                     } else {
-                        let jkey = JSON::String(key.to_string());
-                        let skey = JSValue(jkey).stringify();
+                        let skey = JSValue(json!(key)).to_string();
                         s.push_str(&skey);
                     }
                     s.push_str(": ");
-                    let val = JSValue(jval.clone()).stringify();
+                    let val = JSValue(jval.clone()).to_string();
                     s.push_str(&val);
                     s.push(',');
                     empty = false;
@@ -97,6 +102,38 @@ impl JSValue {
             }
         }
     }
+
+    /// stringify() corresponds to .toString() in JavaScript
+    fn stringify(&self) -> String {
+        if let Some(s) = self.0.as_str() {
+            return s.to_string();
+        }
+        if let Some(a) = self.0.as_array() {
+            return a.iter()
+                    .map(|v| JSValue(v.clone()).to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+        }
+        if self.0.is_object() {
+            return "[object Object]".to_string();
+        }
+        return self.to_string();
+    }
+
+    fn numberify(&self) -> Option<JSNumber> {
+        if self.0.is_null() {
+            Some(0.0)
+        } else if let Some(b) = self.0.as_bool() {
+            Some(if b { 1.0 } else { 0.0 })
+        } else if let Some(n) = self.0.as_f64() {
+            Some(n)
+        } else if let Some(s) = self.0.as_str() {
+            s.parse::<JSNumber>().ok()
+        } else {
+            None
+        }
+    }
+
     /*
     fn from_json(json: &JSON) -> JSValue {
         match json {
@@ -107,6 +144,14 @@ impl JSValue {
     fn as_number(&self) -> Option<JSNumber> {
     }
     */
+}
+
+#[test]
+fn test_numberify() {
+}
+
+#[test]
+fn test_boolify() {
 }
 
 impl From<JSON> for JSValue {
@@ -123,6 +168,10 @@ impl From<i64> for JSValue {
 
 impl From<String> for JSValue {
     fn from(s: String) -> Self { JSValue(json!(s)) }
+}
+
+impl From<&str> for JSValue {
+    fn from(s: &str) -> Self { JSValue(json!(s.to_string())) }
 }
 
 
@@ -257,7 +306,10 @@ impl Expr {
             }
             "Identifier" => {
                 let name = json_get_str(jexpr, "name")?;
-                Expr::Identifier(name.to_string())
+                match name {
+                    "undefined" => Expr::Literal(UNDEFINED),
+                    _ => Expr::Identifier(name.to_string())
+                }
             }
             "Literal" => {
                 let jval = json_get(jexpr, "value")?;
@@ -291,7 +343,7 @@ impl Expr {
                             Expr::Literal(jval) =>
                                 match jval.0.as_str() {
                                     Some(val) => ObjectKey::Identifier(val.to_string()),
-                                    None => ObjectKey::Identifier(jval.stringify()),
+                                    None => ObjectKey::Identifier(jval.to_string()),
                                 }
                             _ =>
                                 return Err(ParseError::UnexpectedValue{
@@ -325,12 +377,16 @@ impl Expr {
                 let rval = rexpr.interpret(state)?;
                 match op {
                     BinOp::Add => {
-                        if let Some(lnum) = lval.0.as_f64() {
-                            if let Some(rnum) = rval.0.as_f64() {
-                                return Ok(JSValue::from(lnum + rnum));
+                        if !(lval.0.is_string() || rval.0.is_string()) {
+                            if let Some(lnum) = lval.numberify() {
+                                if let Some(rnum) = rval.numberify() {
+                                    return Ok(JSValue::from(lnum + rnum));
+                                }
                             }
                         }
-                        panic!("TODO: adding non-numbers");
+                        let lvalstr = lval.stringify();
+                        let rvalstr = rval.stringify();
+                        return Ok(JSValue::from(lvalstr + &rvalstr));
                     }
                     BinOp::KindaEqual => {
                         Ok(JSValue::from(JSON::Bool(lval == rval)))
@@ -366,6 +422,10 @@ impl Expr {
                         }
                         None => Ok(UNDEFINED),
                     }
+                } else if let Some(obj) = object.0.as_object() {
+                    let prop = property.stringify();
+                    let j = obj.get(&prop).unwrap_or(&UNDEFINED.0).clone();
+                    Ok(JSValue::from(j))
                 } else {
                     Ok(UNDEFINED)
                 }
@@ -573,6 +633,6 @@ fn main() {
             .unwrap_or_else(|e| die("Interpretation error", e, 3));
 
         // TODO: JSON output, optionally
-        println!("{}", result.stringify());
+        println!("{}", result.to_string());
     }
 }

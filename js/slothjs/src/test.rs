@@ -35,12 +35,19 @@ fn eval(input: &str) -> JSValue {
     run_interpreter(input).unwrap()
 }
 
+fn evalbool(input: &str) -> bool {
+    eval(input).0.as_bool().unwrap()
+}
+
+
 #[test]
 fn test_literals() {
     assert_eq!( eval("null"),       UNDEFINED);
     assert_eq!( eval("true"),       JSValue::from(json!(true)));
     assert_eq!( eval("42"),         JSValue::from(42));
     assert_eq!( eval("[]"),         JSValue::from(json!([])));
+    //assert_eq!( eval("+5"),         JSValue::from(5));
+    //assert_eq!( eval("+'5'"),       JSValue::from(5));
 
     assert_eq!(
         eval("\"hello \\\"world\\\"\""),
@@ -51,10 +58,48 @@ fn test_literals() {
         eval("var a = {one:1, two:2}; a"),
         JSValue::from(json!({"one": 1, "two": 2}))
     );
+
+    assert_eq!(
+        eval("let x = 'one'; let o = {[x]: 1}; o.one"),
+        JSValue::from(1)
+    );
+
+    assert_eq!( eval("var undefined = 5; undefined"), UNDEFINED );
+    assert_eq!( eval("var NaN = 5; NaN"), JSValue::from(5) );
 }
 
 #[test]
 fn test_binary_operations() {
-    assert_eq!( eval("2 + 2"),      JSValue::from(4.0) );
-    assert_eq!( eval("2 == 2"),     JSValue::from(json!(true)) );
+    // O_o
+    assert_eq!( eval("2 + 2"),          JSValue::from(4.0) );
+    assert_eq!( eval("'1' + '2'"),      JSValue::from("12") );
+    assert_eq!( eval("[1] + [2,3]"),    JSValue::from("12,3") );
+    assert_eq!( eval("[1,2] + null"),   JSValue::from("1,2null") );
+    assert_eq!( eval("null + null"),    JSValue::from(0.0) );
+    assert_eq!( eval("true + null"),    JSValue::from(1.0) );
+
+    // o_O
+    assert!( evalbool("2 == 2") );
+    assert!( !evalbool("2 == 3") );
+    //assert!( evalbool("'2' == 2") );
+    assert!( !evalbool("0 == null") );
+    //assert!( evalbool("0 == false") );
+    //assert!( evalbool("0 == []") );
+    //assert!( !evalbool("[] == []") );
+    //assert!( !evalbool("0 == {}") );
+    assert!( evalbool("null == null") );
+    assert!( evalbool("null == undefined") );
 }
+
+#[test]
+fn test_member_expression() {
+    assert_eq!( eval("['zero', 'one', 'two'][2]"),  JSValue::from("two"));
+    assert_eq!( eval("let o = {one: 1}; o.one"),    JSValue::from(1));
+    assert_eq!( eval("let o = {'o e': 1}; o['o e']"),    JSValue::from(1));
+    assert_eq!(
+        eval("let x = 'one'; let o = {[x]: 1}; o"),
+        JSValue(json!({"one": 1}))
+    );
+}
+
+#[test] fn test_scratch() { }
