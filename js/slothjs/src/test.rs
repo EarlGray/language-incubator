@@ -1,7 +1,13 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::convert::TryFrom;
 
-use crate::*;
+use serde_json::json;
+
+use crate::ast::Program;
+use crate::value::{JSValue, UNDEFINED};
+use crate::error::{Exception, ParseError};
+use crate::interpret::{Interpretable, RuntimeState};
 
 const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
 
@@ -25,10 +31,11 @@ fn run_interpreter(input: &str) -> Result<JSValue, Exception> {
     let out = std::str::from_utf8(&output.stdout)
         .unwrap_or("");
     let json = serde_json::from_str(out)
-        .map_err(|_| Exception::SyntaxError)?;
-    let program = Program::from_json(&json)
-        .map_err(|_| Exception::SyntaxError)?;
-    program.interpret()
+        .map_err(|err| Exception::SyntaxError(ParseError::InvalidJSON{ err }))?;
+    let program = Program::try_from(&json)
+        .map_err(|e| Exception::SyntaxError(e))?;
+    let mut state = RuntimeState::new();
+    program.interpret(&mut state)
 }
 
 fn eval(input: &str) -> JSValue {
