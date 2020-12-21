@@ -122,6 +122,23 @@ impl TryFrom<&JSON> for Expr {
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
                 Expr::Array(elements?)
             }
+            "AssignmentExpression" => {
+                let jright = json_get(jexpr, "right")?;
+                let right = Expr::try_from(jright)?;
+
+                let jleft = json_get(jexpr, "left")?;
+                let left = Expr::try_from(jleft)?;
+
+                let jop = json_get_str(jexpr, "operator")?;
+                let op = match jop {
+                    "=" => AssignOp::Equal,
+                    _ => return Err(ParseError::UnexpectedValue{
+                        want: "=",
+                        value: jexpr.get("operator").unwrap().clone()
+                    }),
+                };
+                Expr::Assign(Box::new(left), op, Box::new(right))
+            }
             "BinaryExpression" => {
                 let jleft = json_get(jexpr, "left")?;
                 let left = Expr::try_from(jleft)?;
@@ -131,8 +148,8 @@ impl TryFrom<&JSON> for Expr {
 
                 let opstr = json_get_str(jexpr, "operator")?;
                 let op = match opstr {
-                    "+" => BinOp::Add,
-                    "==" => BinOp::KindaEqual,
+                    "+" => BinOp::Plus,
+                    "==" => BinOp::EqEq,
                     _ => return Err(ParseError::UnexpectedValue{
                         want: "+|==",
                         value: jexpr.get("operator").unwrap().clone(),

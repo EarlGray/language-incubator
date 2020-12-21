@@ -109,4 +109,20 @@ fn test_member_expression() {
     );
 }
 
+#[test]
+fn test_assignment() {
+    assert_eq!( eval("var a = 1; a = 2; a"),            JSValue::from(2));
+    //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
+    //assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSValue::from(2));
+}
+
+#[test]
+fn test_blocks() {
+    assert_eq!( eval(r#"
+        var a = 1, b = 2;
+        { a = 10; b = 20 };
+        a + b
+    "#), JSValue::from(30.0));
+}
+
 #[test] fn test_scratch() { }

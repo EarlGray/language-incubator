@@ -19,8 +19,8 @@ impl RuntimeState {
         RuntimeState{ variables }
     }
 
-    fn declare_identifier(&mut self, name: String) -> Result<(), Exception> {
-        self.variables.entry(name).or_insert(UNDEFINED);
+    fn declare_identifier(&mut self, name: &str) -> Result<(), Exception> {
+        self.variables.entry(name.to_string()).or_insert(UNDEFINED);
         Ok(())
     }
 
@@ -91,7 +91,7 @@ impl Interpretable for ExpressionStatement {
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
         for decl in self.declarations.iter() {
-            state.declare_identifier(decl.name.clone())?;
+            state.declare_identifier(&decl.name)?;
             if let Some(init) = &decl.init {
                 let value = init.interpret(state)?;
                 state.set_identifier(&decl.name, value)?;
@@ -112,7 +112,7 @@ impl Interpretable for Expr {
                 let lval = lexpr.interpret(state)?;
                 let rval = rexpr.interpret(state)?;
                 match op {
-                    BinOp::Add => {
+                    BinOp::Plus => {
                         if !(lval.0.is_string() || rval.0.is_string()) {
                             if let Some(lnum) = lval.numberify() {
                                 if let Some(rnum) = rval.numberify() {
@@ -124,7 +124,7 @@ impl Interpretable for Expr {
                         let rvalstr = rval.stringify();
                         return Ok(JSValue::from(lvalstr + &rvalstr));
                     }
-                    BinOp::KindaEqual => {
+                    BinOp::EqEq => {
                         Ok(JSValue::from(JSON::Bool(lval == rval)))
                     }
                 }
@@ -181,6 +181,24 @@ impl Interpretable for Expr {
                     object[keyname] = value.0;
                 }
                 Ok(JSValue::from(object))
+            }
+            Expr::Assign(leftexpr, op, rightexpr) => {
+                let value = rightexpr.interpret(state)?;
+                match op {
+                    AssignOp::Equal => {
+                        match &**leftexpr {
+                            Expr::Identifier(ident) => {
+                                state.declare_identifier(&ident)?;
+                                println!("var {}", ident);
+                                state.set_identifier(&ident, value.clone())?;
+                            }
+                            _ => return Err(Exception::ReferenceError(
+                                format!("Invalid left-hand side in assignment: {:?}", leftexpr)
+                            )),
+                        }
+                    }
+                };
+                Ok(value)
             }
         }
     }

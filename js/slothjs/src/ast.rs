@@ -16,6 +16,7 @@ pub enum Statement {
 }
 
 // ==============================================
+#[derive(Debug)]
 pub enum Expr {
     Literal(JSValue),
     Identifier(String),
@@ -24,13 +25,21 @@ pub enum Expr {
     Array(Vec<Box<Expr>>),
     Object(Vec<(ObjectKey, Box<Expr>)>),
     Member(Box<Expr>, Box<Expr>, bool),
+    Assign(Box<Expr>, AssignOp, Box<Expr>),
 }
 
+#[derive(Debug)]
 pub enum BinOp {
-    Add,
-    KindaEqual
+    Plus,
+    EqEq,
 }
 
+#[derive(Debug)]
+pub enum AssignOp {
+    Equal,
+}
+
+#[derive(Debug)]
 pub enum ObjectKey {
     Computed(Expr),
     Identifier(String),
