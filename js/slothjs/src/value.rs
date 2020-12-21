@@ -1,30 +1,6 @@
 use serde_json::json;
 
 
-/*
- *  JSValue: "type" "system"
- */
-
-pub type JSON = serde_json::Value;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct JSValue(pub JSON);
-
-pub const UNDEFINED: JSValue = JSValue(JSON::Null);
-
-
-pub type JSNumber = f64;
-
-/*
-#[derive(Debug, Clone)]
-enum JSValue {
-    Null,
-    Undefined,
-    Number(JSNumber),
-    Str(String),
-}
-*/
-
 fn is_valid_identifier(s: &str) -> bool {
     let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
 
@@ -36,7 +12,22 @@ fn is_valid_identifier(s: &str) -> bool {
     }
 }
 
+
+/*
+ *  JSValue: "type" "system"
+ */
+
+pub type JSON = serde_json::Value;
+
+pub type JSNumber = f64;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct JSValue(pub JSON);
+
+
 impl JSValue {
+    pub const UNDEFINED: JSValue = JSValue(JSON::Null);
+
     /// to_string() makes a string representation of the value
     /// ```
     /// JSValue::from("1").to_string()    // "\"1\""
@@ -121,17 +112,17 @@ impl JSValue {
         }
     }
 
-    /*
-    fn from_json(json: &JSON) -> JSValue {
-        match json {
+    pub fn boolify(&self) -> bool {
+        if let Some(s) = self.0.as_str() {
+            return s.len() > 0;
         }
+        if let Some(n) = self.numberify() {
+            return n != 0.0;
+        }
+        return true;
     }
-
-
-    fn as_number(&self) -> Option<JSNumber> {
-    }
-    */
 }
+
 
 impl From<JSON> for JSValue {
     fn from(json: JSON) -> Self { JSValue(json) }
@@ -159,5 +150,18 @@ fn test_numberify() {
 
 #[test]
 fn test_boolify() {
+    // true
+    assert!( JSValue::from(json!(true)).boolify() );
+    assert!( JSValue::from(1).boolify() );
+    assert!( JSValue::from("0").boolify() );
+    assert!( JSValue::from(json!({})).boolify() );
+    assert!( JSValue::from(json!([])).boolify() );
+
+    // false
+    assert!( !JSValue::from(json!(false)).boolify() );
+    assert!( !JSValue::from(0).boolify() );
+    assert!( !JSValue::from(f64::NAN).boolify() );
+    assert!( !JSValue::from("").boolify() );
+    assert!( !JSValue::from(json!(null)).boolify() );
 }
 

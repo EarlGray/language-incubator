@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::json;
 
-use crate::value::{JSON, JSValue, UNDEFINED};
+use crate::value::{JSON, JSValue};
 use crate::error::Exception;
 use crate::ast::*;      // yes, EVERYTHING
 
@@ -20,7 +20,7 @@ impl RuntimeState {
     }
 
     fn declare_identifier(&mut self, name: &str) -> Result<(), Exception> {
-        self.variables.entry(name.to_string()).or_insert(UNDEFINED);
+        self.variables.entry(name.to_string()).or_insert(JSValue::UNDEFINED);
         Ok(())
     }
 
@@ -49,7 +49,7 @@ pub trait Interpretable {
 
 impl Interpretable for Program {
     fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let mut result = UNDEFINED;
+        let mut result = JSValue::UNDEFINED;
         for stmt in self.body.iter() {
             result = stmt.interpret(state)?;
         }
@@ -62,9 +62,10 @@ impl Interpretable for Program {
 impl Interpretable for Statement {
     fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
         match self {
-            Statement::Empty                        => Ok(UNDEFINED),
-            Statement::Expression(stmt)             => stmt.interpret(state),
+            Statement::Empty                        => Ok(JSValue::UNDEFINED),
+            Statement::Expr(stmt)                   => stmt.interpret(state),
             Statement::Block(stmt)                  => stmt.interpret(state),
+            Statement::If(stmt)                     => stmt.interpret(state),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(state),
         }
     }
@@ -78,7 +79,21 @@ impl Interpretable for BlockStatement {
         for stmt in self.body.iter() {
             stmt.interpret(state)?;
         }
-        Ok(UNDEFINED)
+        Ok(JSValue::UNDEFINED)
+    }
+}
+
+impl Interpretable for IfStatement {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+        let jbool = self.test.interpret(state)?;
+        let cond = jbool.boolify();
+        if cond {
+            self.consequent.interpret(state)
+        } else if let Some(else_stmt) = self.alternate.as_ref() {
+            else_stmt.interpret(state)
+        } else {
+            Ok(JSValue::UNDEFINED)
+        }
     }
 }
 
@@ -97,7 +112,7 @@ impl Interpretable for VariableDeclaration {
                 state.set_identifier(&decl.name, value)?;
             }
         }
-        Ok(UNDEFINED)
+        Ok(JSValue::UNDEFINED)
     }
 }
 
@@ -153,17 +168,21 @@ impl Interpretable for Expr {
                 if let Some(arr) = object.0.as_array() {
                     match property.0.as_i64() {
                         Some(index) => {
-                            let j = arr.get(index as usize).unwrap_or(&UNDEFINED.0).clone();
+                            let j = arr.get(index as usize)
+                                .map(|j| JSValue::from(j.clone()))
+                                .unwrap_or(JSValue::UNDEFINED);
                             Ok(JSValue::from(j))
                         }
-                        None => Ok(UNDEFINED),
+                        None => Ok(JSValue::UNDEFINED),
                     }
                 } else if let Some(obj) = object.0.as_object() {
                     let prop = property.stringify();
-                    let j = obj.get(&prop).unwrap_or(&UNDEFINED.0).clone();
-                    Ok(JSValue::from(j))
+                    let j = obj.get(&prop)
+                        .map(|j| JSValue::from(j.clone()))
+                        .unwrap_or(JSValue::UNDEFINED);
+                    Ok(j)
                 } else {
-                    Ok(UNDEFINED)
+                    Ok(JSValue::UNDEFINED)
                 }
             }
             Expr::Object(properties) => {
@@ -184,6 +203,7 @@ impl Interpretable for Expr {
             }
             Expr::Assign(leftexpr, op, rightexpr) => {
                 let value = rightexpr.interpret(state)?;
+                // TODO: leftexpr.interpret_mut(state)
                 match op {
                     AssignOp::Equal => {
                         match &**leftexpr {

@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::ast::Program;
-use crate::value::{JSValue, UNDEFINED};
+use crate::value::JSValue;
 use crate::error::{Exception, ParseError};
 use crate::interpret::{Interpretable, RuntimeState};
 
@@ -49,7 +49,7 @@ fn evalbool(input: &str) -> bool {
 
 #[test]
 fn test_literals() {
-    assert_eq!( eval("null"),       UNDEFINED);
+    assert_eq!( eval("null"),       JSValue::UNDEFINED);
     assert_eq!( eval("true"),       JSValue::from(json!(true)));
     assert_eq!( eval("42"),         JSValue::from(42));
     assert_eq!( eval("[]"),         JSValue::from(json!([])));
@@ -71,7 +71,7 @@ fn test_literals() {
         JSValue::from(1)
     );
 
-    assert_eq!( eval("var undefined = 5; undefined"), UNDEFINED );
+    assert_eq!( eval("var undefined = 5; undefined"), JSValue::UNDEFINED );
     assert_eq!( eval("var NaN = 5; NaN"), JSValue::from(5) );
 }
 
@@ -123,6 +123,12 @@ fn test_blocks() {
         { a = 10; b = 20 };
         a + b
     "#), JSValue::from(30.0));
+}
+
+#[test]
+fn test_conditionals() {
+    assert_eq!( eval("var a; if (a = 1) a = 2; else a = 3; a"), JSValue::from(2) );
+    assert_eq!( eval("var a = 1; if (null) { a = 2; }; a"), JSValue::from(1) );
 }
 
 #[test] fn test_scratch() { }

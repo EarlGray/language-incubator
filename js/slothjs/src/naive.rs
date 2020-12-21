@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::ast::*;  // yes, EVERYTHING.
 use crate::error::ParseError;
-use crate::value::{JSON, JSValue, UNDEFINED};
+use crate::value::{JSON, JSValue};
 
 
 /*
@@ -78,14 +78,17 @@ impl TryFrom<&JSON> for Statement {
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
         let typ = json_get_str(json, "type")?;
         match typ {
-            "EmptyStatement" =>
-                Ok(Statement::Empty),
-            "ExpressionStatement" => Ok(Statement::Expression(
-                ExpressionStatement::try_from(json)?
-            )),
             "BlockStatement" => Ok(Statement::Block(
                 BlockStatement::try_from(json)?
             )),
+            "EmptyStatement" =>
+                Ok(Statement::Empty),
+            "ExpressionStatement" => Ok(Statement::Expr(
+                ExpressionStatement::try_from(json)?
+            )),
+            "IfStatement" => Ok(Statement::If(Box::new({
+                IfStatement::try_from(json)?
+            }))),
             "VariableDeclaration" => Ok(Statement::VariableDeclaration(
                 VariableDeclaration::try_from(json)?
             )),
@@ -107,6 +110,79 @@ impl TryFrom<&JSON> for BlockStatement {
         Ok(BlockStatement{ body })
     }
 }
+
+impl TryFrom<&JSON> for IfStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "IfStatement")?;
+
+        let jtest = json_get(value, "test")?;
+        let test = Expr::try_from(jtest)?;
+
+        let jthen = json_get(value, "consequent")?;
+        let consequent = Statement::try_from(jthen)?;
+
+        let alternate = value.get("alternate").and_then(|jelse| {
+            Statement::try_from(jelse).ok()
+        });
+
+        Ok(IfStatement{ test, consequent, alternate })
+    }
+}
+
+impl TryFrom<&JSON> for VariableDeclaration {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "VariableDeclaration")?;
+
+        let kind = match json_get_str(value, "kind")? {
+            "const" => DeclarationKind::Const,
+            "let" => DeclarationKind::Let,
+            "var" => DeclarationKind::Var,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "const|let|var",
+                value: value.get("kind").unwrap().clone(),
+            }),
+        };
+        let jdeclarations = json_get_array(value, "declarations")?;
+
+        let mut declarations = vec![];
+        for decl in jdeclarations.iter() {
+            json_expect_str(decl, "type", "VariableDeclarator")?;
+
+            let jid = json_get(decl, "id")?;
+            json_expect_str(jid, "type", "Identifier")?;
+            let name = json_get_str(jid, "name")?.to_string();
+
+            let jinit = json_get(decl, "init")?;
+            let init = match jinit {
+                JSON::Null => None,
+                _ => {
+                    let expr = Expr::try_from(jinit)?;
+                    Some(Box::new(expr))
+                }
+            };
+
+            declarations.push(VariableDeclarator{ name, init });
+        }
+        Ok(VariableDeclaration{ _kind: kind, declarations })
+    }
+}
+
+impl TryFrom<&JSON> for ExpressionStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "ExpressionStatement")?;
+
+        let jexpr = json_get(value, "expression")?;
+        let expression = Expr::try_from(jexpr)?;
+        Ok(ExpressionStatement { expression })
+    }
+}
+
 
 impl TryFrom<&JSON> for Expr {
     type Error = ParseError<JSON>;
@@ -171,7 +247,7 @@ impl TryFrom<&JSON> for Expr {
             "Identifier" => {
                 let name = json_get_str(jexpr, "name")?;
                 match name {
-                    "undefined" => Expr::Literal(UNDEFINED),
+                    "undefined" => Expr::Literal(JSValue::UNDEFINED),
                     _ => Expr::Identifier(name.to_string())
                 }
             }
@@ -231,55 +307,3 @@ impl TryFrom<&JSON> for Expr {
     }
 }
 
-impl TryFrom<&JSON> for ExpressionStatement {
-    type Error = ParseError<JSON>;
-
-    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "ExpressionStatement")?;
-
-        let jexpr = json_get(value, "expression")?;
-        let expression = Expr::try_from(jexpr)?;
-        Ok(ExpressionStatement { expression })
-    }
-}
-
-
-impl TryFrom<&JSON> for VariableDeclaration {
-    type Error = ParseError<JSON>;
-
-    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "VariableDeclaration")?;
-
-        let kind = match json_get_str(value, "kind")? {
-            "const" => DeclarationKind::Const,
-            "let" => DeclarationKind::Let,
-            "var" => DeclarationKind::Var,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "const|let|var",
-                value: value.get("kind").unwrap().clone(),
-            }),
-        };
-        let jdeclarations = json_get_array(value, "declarations")?;
-
-        let mut declarations = vec![];
-        for decl in jdeclarations.iter() {
-            json_expect_str(decl, "type", "VariableDeclarator")?;
-
-            let jid = json_get(decl, "id")?;
-            json_expect_str(jid, "type", "Identifier")?;
-            let name = json_get_str(jid, "name")?.to_string();
-
-            let jinit = json_get(decl, "init")?;
-            let init = match jinit {
-                JSON::Null => None,
-                _ => {
-                    let expr = Expr::try_from(jinit)?;
-                    Some(Box::new(expr))
-                }
-            };
-
-            declarations.push(VariableDeclarator{ name, init });
-        }
-        Ok(VariableDeclaration{ _kind: kind, declarations })
-    }
-}

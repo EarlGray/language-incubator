@@ -9,7 +9,8 @@ pub struct Program {
 pub enum Statement {
     Empty,
     Block(BlockStatement),
-    Expression(ExpressionStatement),
+    Expr(ExpressionStatement),
+    If(Box<IfStatement>),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -69,3 +70,8 @@ pub struct BlockStatement {
 }
 
 // ==============================================
+pub struct IfStatement {
+    pub test: Expr,
+    pub consequent: Statement,
+    pub alternate: Option<Statement>,
+}
