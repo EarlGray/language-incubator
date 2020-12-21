@@ -62,7 +62,9 @@ impl Interpretable for Program {
 impl Interpretable for Statement {
     fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
         match self {
+            Statement::Empty                        => Ok(UNDEFINED),
             Statement::Expression(stmt)             => stmt.interpret(state),
+            Statement::Block(stmt)                  => stmt.interpret(state),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(state),
         }
     }
@@ -70,6 +72,15 @@ impl Interpretable for Statement {
 
 
 // ==============================================
+
+impl Interpretable for BlockStatement {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+        for stmt in self.body.iter() {
+            stmt.interpret(state)?;
+        }
+        Ok(UNDEFINED)
+    }
+}
 
 impl Interpretable for ExpressionStatement {
     fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {

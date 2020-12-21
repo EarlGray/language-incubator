@@ -7,7 +7,11 @@ pub struct Program {
 
 // ==============================================
 pub enum Statement {
+    Empty,
+    Block(BlockStatement),
     Expression(ExpressionStatement),
+
+    // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
 }
 
@@ -50,3 +54,9 @@ pub struct VariableDeclaration {
     pub declarations: Vec<VariableDeclarator>,
 }
 
+// ==============================================
+pub struct BlockStatement {
+    pub body: Vec<Statement>,
+}
+
+// ==============================================

@@ -78,14 +78,33 @@ impl TryFrom<&JSON> for Statement {
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
         let typ = json_get_str(json, "type")?;
         match typ {
+            "EmptyStatement" =>
+                Ok(Statement::Empty),
             "ExpressionStatement" => Ok(Statement::Expression(
                 ExpressionStatement::try_from(json)?
+            )),
+            "BlockStatement" => Ok(Statement::Block(
+                BlockStatement::try_from(json)?
             )),
             "VariableDeclaration" => Ok(Statement::VariableDeclaration(
                 VariableDeclaration::try_from(json)?
             )),
             _ => Err(ParseError::UnknownType{ value: json.clone() }),
         }
+    }
+}
+
+impl TryFrom<&JSON> for BlockStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(json: &JSON) -> Result<Self, Self::Error> {
+        let jbody = json_get_array(json, "body")?;
+        let mut body = vec![];
+        for jstmt in jbody.iter() {
+            let stmt = Statement::try_from(jstmt)?;
+            body.push(stmt);
+        }
+        Ok(BlockStatement{ body })
     }
 }
 
