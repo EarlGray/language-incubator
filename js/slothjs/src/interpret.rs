@@ -220,6 +220,15 @@ impl Interpretable for Expr {
                 };
                 Ok(value)
             }
+            Expr::Conditional(condexpr, thenexpr, elseexpr) => {
+                let cond = condexpr.interpret(state)?;
+                let value = if cond.boolify() {
+                    thenexpr.interpret(state)?
+                } else {
+                    elseexpr.interpret(state)?
+                };
+                Ok(value)
+            }
         }
     }
 }

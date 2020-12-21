@@ -27,6 +27,7 @@ pub enum Expr {
     Object(Vec<(ObjectKey, Box<Expr>)>),
     Member(Box<Expr>, Box<Expr>, bool),
     Assign(Box<Expr>, AssignOp, Box<Expr>),
+    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]

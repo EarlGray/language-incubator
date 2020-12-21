@@ -127,6 +127,9 @@ fn test_blocks() {
 
 #[test]
 fn test_conditionals() {
+    assert!( evalbool("'0' ? true : false"));
+    assert!( !evalbool("0 ? true : false"));
+
     assert_eq!( eval("var a; if (a = 1) a = 2; else a = 3; a"), JSValue::from(2) );
     assert_eq!( eval("var a = 1; if (null) { a = 2; }; a"), JSValue::from(1) );
 }

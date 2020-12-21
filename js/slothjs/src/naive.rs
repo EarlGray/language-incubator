@@ -244,6 +244,18 @@ impl TryFrom<&JSON> for Expr {
 
                 Expr::Call(Box::new(callee), arguments?)
             }
+            "ConditionalExpression" => {
+                let jtest = json_get(jexpr, "test")?;
+                let condexpr = Expr::try_from(jtest)?;
+
+                let jthen = json_get(jexpr, "consequent")?;
+                let thenexpr = Expr::try_from(jthen)?;
+
+                let jelse = json_get(jexpr, "alternate")?;
+                let elseexpr = Expr::try_from(jelse)?;
+
+                Expr::Conditional(Box::new(condexpr), Box::new(thenexpr), Box::new(elseexpr))
+            }
             "Identifier" => {
                 let name = json_get_str(jexpr, "name")?;
                 match name {
