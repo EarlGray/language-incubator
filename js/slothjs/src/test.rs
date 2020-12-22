@@ -50,8 +50,10 @@ fn evalbool(input: &str) -> bool {
 #[test]
 fn test_literals() {
     assert_eq!( eval("null"),       JSValue::UNDEFINED);
-    assert_eq!( eval("true"),       JSValue::from(json!(true)));
+    assert_eq!( eval("true"),       JSValue::from(true));
     assert_eq!( eval("42"),         JSValue::from(42));
+    assert_eq!( eval("0x2a"),       JSValue::from(42));
+    assert_eq!( eval("052"),        JSValue::from(42));
     assert_eq!( eval("[]"),         JSValue::from(json!([])));
     //assert_eq!( eval("+5"),         JSValue::from(5));
     //assert_eq!( eval("+'5'"),       JSValue::from(5));
@@ -98,6 +100,36 @@ fn test_binary_operations() {
     assert!( evalbool("null == undefined") );
     //assert!( !evalbool("NaN == NaN") );
 
+    /*
+    assert!( !evalbool("2 != 2") );
+    assert!( evalbool("2 != 3") );
+    assert!( !evalbool("'2' != 2") );
+    assert!( evalbool("0 != null") );
+    assert!( !evalbool("0 != false") );
+    assert!( !evalbool("0 != []") );
+    assert!( evalbool("[] != []") );
+    assert!( evalbool("0 != {}") );
+    assert!( !evalbool("null != null") );
+    assert!( !evalbool("null != undefined") );
+    assert!( evalbool("NaN != NaN") );
+    */
+
+    /*
+    assert!( evalbool("2 === 2") );
+    assert!( !evalbool("2 === 3") );
+    assert!( !evalbool("'2' === 2") );
+    assert!( !evalbool("0 === null") );
+    assert!( !evalbool("0 === false") );
+    assert!( !evalbool("0 == []") );
+    assert!( !evalbool("[] === []") );
+    assert!( !evalbool("0 === {}") );
+    assert!( evalbool("null === null") );
+    assert!( !evalbool("null === undefined") );
+    assert!( !evalbool("NaN === NaN") );
+
+    assert!( evalbool("2 !== 3") );
+    */
+
     assert!( !evalbool("'a' < 'a'") );
     assert!( evalbool("1 < 2") );
     assert!( !evalbool("'113' < 13") );
@@ -113,7 +145,66 @@ fn test_binary_operations() {
     //assert!( !evalbool("undefined < NaN") );
     //assert!( !evalbool("undefined < 1") );
 
-    //assert!( !evalbool("undefined <= undefined") );
+    /*
+    assert!( !evalbool("'a' > 'a'") );
+    assert!( !evalbool("1 > 2") );
+    assert!( evalbool("'113' > 13") );
+    assert!( !evalbool("'0' > '00'") );
+    assert!( !evalbool("'0' > 0") );
+    assert!( !evalbool("'a' > 'b'") );
+    assert!( evalbool("'aa' > 'a'") );
+    assert!( !evalbool("null > 1") );
+    */
+
+    /*
+    assert!( evalbool("1 <= 2") );
+    assert!( !evalbool("2 <= 1") );
+    assert!( evalbool("2 <= 2") );
+    assert!( !evalbool("undefined <= undefined") );
+    */
+
+    /*
+    assert!( evalbool("1 in [1, 2, 3]") );
+    assert!( !evalbool("0 in [1, 2, 3]") );
+
+    assert!( evalbool("{} instanceof Object") );
+    assert_eq!( eval("5 - 3"), JSValue::from(2) );
+    assert!( evalbool("isNaN('a' - 3)"));
+
+    assert_eq!( eval("3 * 2"), JSValue::from(6) );
+    assert_eq!( eval("3 * null"), JSValue::from(0) );
+
+    assert_eq!( eval("6 / 3"), JSValue::from(2) );
+
+    assert_eq!( eval("143 % 12"), JSValue::from(11) );
+
+    assert_eq!( eval("2 ** 8"), JSValue::from(256.0));
+
+    assert_eq!( eval("6 | 9"), JSValue::from(15));
+    assert_eq!( eval("0xA0 | 8"), JSValue::from(0xA8));
+    assert_eq!( eval("5 ^ 3"), JSValue::from(6) );
+    assert_eq!( eval("0xA3 ^ 0xAC"), JSValue::from(0x0F) );
+    assert_eq!( eval("6 & 9"), JSValue::from(0));
+
+    assert_eq!( eval("0xA << 4"), JSValue::from(0xA0));
+    assert_eq!( eval("0xA5 >> 4"), JSValue::from(0xA));
+
+    assert_eq!( eval("0xA5 >>> 4"), JSValue::from(0xA));
+    */
+
+    /*
+    assert!( evalbool("true && true") );
+    assert!( !evalbool("true && false") );
+
+    assert_eq!( eval("1 && 2"), JSValue::from(2) );
+    assert_eq!( eval("0 && 1"), JSValue::from(0) );
+
+    assert!( evalbool("true || false") );
+    assert!( evalbool("false || false") );
+
+    assert_eq!( eval("null || 'a'"), JSValue::from("a") );
+    assert_eq!( eval("'a' || 'b'"), JSValue::from("a") );
+     */
 }
 
 #[test]
@@ -132,7 +223,29 @@ fn test_assignment() {
     assert_eq!( eval("var a = 1; a = 2; a"),            JSValue::from(2));
     //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
     //assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSValue::from(2));
+
+    /*
+    assert_eq!( eval("var a = 3; a *= a; a"),            JSValue::from(9));
+    assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
+    assert_eq!( eval("var a = 3; a /= a; a"),            JSValue::from(1));
+    assert_eq!( eval("var a = 13; a %= 8; a"),            JSValue::from(5));
+    assert_eq!( eval("var a = 1; a += 1; a"),            JSValue::from(2));
+    assert_eq!( eval("var a = 1; a -= 1; a"),            JSValue::from(0));
+    assert_eq!( eval("var a = 1; a <<= 4; a"),            JSValue::from(16));
+    assert_eq!( eval("var a = 32; a >>= 4; a"),            JSValue::from(2));
+    assert_eq!( eval("var a = 32; a >>>= 4; a"),            JSValue::from(2));
+    assert_eq!( eval("var a = 6; a &= 9; a"),            JSValue::from(0));
+    assert_eq!( eval("var a = 6; a ^= 9; a"),            JSValue::from(15));
+    assert_eq!( eval("var a = 3; a |= 6; a"),            JSValue::from(7));
+    */
 }
+
+/*
+#[test]
+fn test_sequence() {
+    assert_eq!( eval("let a = 0; a=a+2, a=a+2"), JSValue::from(6) );
+}
+*/
 
 #[test]
 fn test_blocks() {
@@ -153,7 +266,8 @@ fn test_conditionals() {
 }
 
 #[test]
-fn test_for_statements() {
+fn test_loops() {
+    // for (<init>; <test>; <update)
     assert_eq!( eval(r#"
         var a = 0;
         for (var i = 0; i < 5; i = i + 1) {
@@ -162,11 +276,101 @@ fn test_for_statements() {
         a
     "#), JSValue::from(5.0));
 
-    assert_eq!( eval(r#"
-        let a = 0;
-        for (; 0; ) a = 1;
+    assert!( evalbool(r#"
+        let a = true;
+        for (; false; ) a = false;
         a
-    "#), JSValue::from(0));
+    "#));
+
+    /*
+    // while
+    assert!( evalbool(r#"
+        let a = false;
+        while (!a) { a = true }
+        a
+    "#));
+
+    // do while
+    assert!( evalbool(r#"
+        let a = false;
+        do { a = true } while (0);
+        a
+    "#));
+
+    // break
+    assert!( evalbool(r#"
+        for (;;) break;
+        true
+    "#));
+
+    // continue
+    assert!( evalbool(r#"
+        let a = false;
+        while (!a) {
+            a = true;
+            continue;
+            a = false;
+            break;
+        }
+        a
+    "#));
+
+    // labelled break
+    assert!( evalbool(r#"
+        let a = false;
+        label: do {
+            a = true;
+            for (;;) { break label; }
+            a = false;
+        } while (0);
+        a
+    "#));
+
+    assert_eq!( eval(r#"
+        let obj = {one:1, two: 2, three: 3};
+        let sum = 0;
+        for (let prop in obj) {
+            sum = sum + obj[prop];
+        }
+        sum
+    "#), JSValue::from(6));
+     */
+}
+
+/*
+#[test]
+fn test_exceptions() {
+    assert!(evalbool(r#"
+        let a = false;
+        try {
+            throw '';
+        } catch (e) {
+            a = true;
+        }
+        a
+    "#));
+}
+
+#[test]
+fn test_functions() {
+    // FunctionExpression
+    assert!(evalbool(r#"
+        let sqr = function(x) { return x * x; };
+        sqr(12) == 144
+    "#));
+
+    // FunctionDeclaration
+    assert!(evalbool(r#"
+        function sqr(x) { return x * x; };
+        sqr(12) == 144
+    "#));
+
+    // TODO: closures and scope
+}
+*/
+
+#[test]
+fn test_objects() {
 }
 
 #[test] fn test_scratch() { }

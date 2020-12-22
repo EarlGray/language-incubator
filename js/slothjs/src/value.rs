@@ -128,6 +128,10 @@ impl From<JSON> for JSValue {
     fn from(json: JSON) -> Self { JSValue(json) }
 }
 
+impl From<bool> for JSValue {
+    fn from(b: bool) -> Self { JSValue(json!(b)) }
+}
+
 impl From<JSNumber> for JSValue {
     fn from(number: JSNumber) -> Self { JSValue(json!(number)) }
 }
