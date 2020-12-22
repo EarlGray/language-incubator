@@ -34,6 +34,7 @@ pub enum Expr {
 pub enum BinOp {
     Plus,
     EqEq,
+    Less,
 }
 
 #[derive(Debug)]

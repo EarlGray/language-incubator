@@ -226,6 +226,7 @@ impl TryFrom<&JSON> for Expr {
                 let op = match opstr {
                     "+" => BinOp::Plus,
                     "==" => BinOp::EqEq,
+                    "<" => BinOp::Less,
                     _ => return Err(ParseError::UnexpectedValue{
                         want: "+|==",
                         value: jexpr.get("operator").unwrap().clone(),

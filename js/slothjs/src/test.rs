@@ -96,6 +96,24 @@ fn test_binary_operations() {
     //assert!( !evalbool("0 == {}") );
     assert!( evalbool("null == null") );
     assert!( evalbool("null == undefined") );
+    //assert!( !evalbool("NaN == NaN") );
+
+    assert!( !evalbool("'a' < 'a'") );
+    assert!( evalbool("1 < 2") );
+    assert!( !evalbool("'113' < 13") );
+    assert!( evalbool("'0' < '00'") );
+    assert!( !evalbool("'0' < 0") );
+    assert!( evalbool("'a' < 'b'") );
+    assert!( !evalbool("'aa' < 'a'") );
+    assert!( evalbool("null < 1") );
+    //assert!( !evalbool("undefined < 1") );
+    //assert!( evalbool("[1, 1] < [2]") );
+    //assert!( !evalbool("NaN < 3") );
+    //assert!( !evalbool("NaN < NaN") );
+    //assert!( !evalbool("undefined < NaN") );
+    //assert!( !evalbool("undefined < 1") );
+
+    //assert!( !evalbool("undefined <= undefined") );
 }
 
 #[test]

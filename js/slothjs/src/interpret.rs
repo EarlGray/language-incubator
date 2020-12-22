@@ -140,7 +140,20 @@ impl Interpretable for Expr {
                         return Ok(JSValue::from(lvalstr + &rvalstr));
                     }
                     BinOp::EqEq => {
+                        // TODO: Abstract Equality Comparison
                         Ok(JSValue::from(JSON::Bool(lval == rval)))
+                    }
+                    BinOp::Less => {
+                        // TODO: Abstract Relational Comparison
+                        // TODO: toPrimitive()
+                        if let Some(lstr) = lval.0.as_str() {
+                            if let Some(rstr) = rval.0.as_str() {
+                                return Ok(JSValue::from(JSON::Bool(lstr < rstr)));
+                            }
+                        }
+                        let lnum = lval.numberify().unwrap_or(f64::NAN);
+                        let rnum = rval.numberify().unwrap_or(f64::NAN);
+                        Ok(JSValue::from(JSON::Bool(lnum < rnum)))
                     }
                 }
             }
@@ -209,7 +222,6 @@ impl Interpretable for Expr {
                         match &**leftexpr {
                             Expr::Identifier(ident) => {
                                 state.declare_identifier(&ident)?;
-                                println!("var {}", ident);
                                 state.set_identifier(&ident, value.clone())?;
                             }
                             _ => return Err(Exception::ReferenceError(
