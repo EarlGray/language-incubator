@@ -152,4 +152,21 @@ fn test_conditionals() {
     assert_eq!( eval("var a = 1; if (null) { a = 2; }; a"), JSValue::from(1) );
 }
 
+#[test]
+fn test_for_statements() {
+    assert_eq!( eval(r#"
+        var a = 0;
+        for (var i = 0; i < 5; i = i + 1) {
+            a = a + 1;
+        }
+        a
+    "#), JSValue::from(5.0));
+
+    assert_eq!( eval(r#"
+        let a = 0;
+        for (; 0; ) a = 1;
+        a
+    "#), JSValue::from(0));
+}
+
 #[test] fn test_scratch() { }

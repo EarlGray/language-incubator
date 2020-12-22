@@ -86,6 +86,28 @@ impl TryFrom<&JSON> for Statement {
             "ExpressionStatement" => Ok(Statement::Expr(
                 ExpressionStatement::try_from(json)?
             )),
+            "ForStatement" => {
+                let init = match json.get("init") {
+                    Some(jinit) if !jinit.is_null() =>
+                        Statement::try_from(jinit)?,
+                    _ => Statement::Empty,
+                };
+                let test = match json.get("test") {
+                    Some(jtest) if !jtest.is_null() =>
+                        Some(Expr::try_from(jtest)?),
+                    _ => None
+                };
+                let update = match json.get("update") {
+                    Some(jupdate) if !jupdate.is_null() =>
+                        Some(Expr::try_from(jupdate)?),
+                    _ => None,
+                };
+                let jbody = json_get(json, "body")?;
+                let body = Statement::try_from(jbody)?;
+                Ok(Statement::For(Box::new(
+                    ForStatement{ init, test, update, body }
+                )))
+            }
             "IfStatement" => Ok(Statement::If(Box::new({
                 IfStatement::try_from(json)?
             }))),

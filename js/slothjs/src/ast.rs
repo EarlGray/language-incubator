@@ -11,6 +11,7 @@ pub enum Statement {
     Block(BlockStatement),
     Expr(ExpressionStatement),
     If(Box<IfStatement>),
+    For(Box<ForStatement>),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -76,4 +77,13 @@ pub struct IfStatement {
     pub test: Expr,
     pub consequent: Statement,
     pub alternate: Option<Statement>,
+}
+
+// ==============================================
+pub struct ForStatement {
+    // Empty | VariableDeclaration | ExpressionStatement
+    pub init: Statement,
+    pub test: Option<Expr>,
+    pub update: Option<Expr>,
+    pub body: Statement,
 }

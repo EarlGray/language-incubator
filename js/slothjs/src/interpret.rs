@@ -66,6 +66,7 @@ impl Interpretable for Statement {
             Statement::Expr(stmt)                   => stmt.interpret(state),
             Statement::Block(stmt)                  => stmt.interpret(state),
             Statement::If(stmt)                     => stmt.interpret(state),
+            Statement::For(stmt)                    => stmt.interpret(state),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(state),
         }
     }
@@ -94,6 +95,30 @@ impl Interpretable for IfStatement {
         } else {
             Ok(JSValue::UNDEFINED)
         }
+    }
+}
+
+impl Interpretable for ForStatement {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+        self.init.interpret(state)?;
+        loop {
+            // test
+            let testval = match self.test.as_ref() {
+                None => true,
+                Some(testexpr) =>
+                    testexpr.interpret(state)?.boolify(),
+            };
+            if !testval { break }
+
+            // body
+            self.body.interpret(state)?;
+
+            // update
+            if let Some(updateexpr) = self.update.as_ref() {
+                updateexpr.interpret(state)?;
+            }
+        }
+        Ok(JSValue::UNDEFINED)
     }
 }
 
