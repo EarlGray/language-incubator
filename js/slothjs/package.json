@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js /dev/stdin | cargo run -q",
+    "esparse": "./node_modules/esprima/bin/esparse.js $@",
     "test": "cargo test"
   },
   "author": "",

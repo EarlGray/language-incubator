@@ -1,4 +1,4 @@
-use crate::value::JSValue;
+use crate::object::JSON;
 
 // ==============================================
 pub struct Program {
@@ -17,33 +17,7 @@ pub enum Statement {
     VariableDeclaration(VariableDeclaration),
 }
 
-// ==============================================
-#[derive(Debug)]
-pub enum Expr {
-    Literal(JSValue),
-    Identifier(String),
-    BinaryOp(Box<Expr>, BinOp, Box<Expr>),
-    Call(Box<Expr>, Vec<Box<Expr>>),
-    Array(Vec<Box<Expr>>),
-    Object(Vec<(ObjectKey, Box<Expr>)>),
-    Member(Box<Expr>, Box<Expr>, bool),
-    Assign(Box<Expr>, AssignOp, Box<Expr>),
-    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
-}
-
-#[derive(Debug)]
-pub enum BinOp {
-    Plus,
-    EqEq,
-    Less,
-}
-
-#[derive(Debug)]
-pub enum AssignOp {
-    Equal,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ObjectKey {
     Computed(Expr),
     Identifier(String),
@@ -87,3 +61,58 @@ pub struct ForStatement {
     pub update: Option<Expr>,
     pub body: Statement,
 }
+
+
+// ==============================================
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Literal(Literal),
+    Identifier(Identifier),
+    BinaryOp(BinaryExpression),
+    Call(CallExpression),
+    Array(ArrayExpression),
+    Object(ObjectExpression),
+    Member(MemberExpression),
+    Assign(AssignmentExpression),
+    Conditional(ConditionalExpression),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Literal(pub JSON);
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Identifier(pub String);
+
+#[derive(Clone, Debug)]
+pub struct BinaryExpression(pub Box<Expr>, pub BinOp, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct CallExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
+
+#[derive(Clone, Debug)]
+pub struct ArrayExpression(pub Vec<Box<Expr>>);
+
+#[derive(Clone, Debug)]
+pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expr>)>);
+
+#[derive(Clone, Debug)]
+pub struct MemberExpression(pub Box<Expr>, pub Box<Expr>, pub bool);
+
+#[derive(Clone, Debug)]
+pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub enum BinOp {
+    Plus,
+    EqEq,
+    Less,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AssignOp {
+    Equal,
+}
+

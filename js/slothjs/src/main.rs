@@ -5,7 +5,8 @@ use std::convert::TryFrom;
 use serde_json::Value as JSON;
 
 mod ast;
-mod value;
+//mod value;
+mod object;
 //mod estree;
 mod naive;
 mod error;
@@ -39,6 +40,6 @@ fn main() {
             .unwrap_or_else(|e| die("Interpretation error", e, 3));
 
         // TODO: JSON output, optionally
-        println!("{}", result.to_string());
+        println!("{}", result.to_string(&state.heap));
     }
 }

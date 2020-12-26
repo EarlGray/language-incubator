@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::ast::*;  // yes, EVERYTHING.
 use crate::error::ParseError;
-use crate::value::{JSON, JSValue};
+use crate::object::JSON;
 
 
 /*
@@ -218,7 +218,8 @@ impl TryFrom<&JSON> for Expr {
                 let elements = jelements.iter()
                     .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
-                Expr::Array(elements?)
+                let expr = ArrayExpression(elements?);
+                Expr::Array(expr)
             }
             "AssignmentExpression" => {
                 let jright = json_get(jexpr, "right")?;
@@ -235,7 +236,8 @@ impl TryFrom<&JSON> for Expr {
                         value: jexpr.get("operator").unwrap().clone()
                     }),
                 };
-                Expr::Assign(Box::new(left), op, Box::new(right))
+                let expr = AssignmentExpression(Box::new(left), op, Box::new(right));
+                Expr::Assign(expr)
             }
             "BinaryExpression" => {
                 let jleft = json_get(jexpr, "left")?;
@@ -254,7 +256,8 @@ impl TryFrom<&JSON> for Expr {
                         value: jexpr.get("operator").unwrap().clone(),
                     }),
                 };
-                Expr::BinaryOp(Box::new(left), op, Box::new(right))
+                let expr = BinaryExpression(Box::new(left), op, Box::new(right));
+                Expr::BinaryOp(expr)
             }
             "CallExpression" => {
                 let jcallee = json_get(jexpr, "callee")?;
@@ -265,7 +268,7 @@ impl TryFrom<&JSON> for Expr {
                     .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
 
-                Expr::Call(Box::new(callee), arguments?)
+                Expr::Call(CallExpression(Box::new(callee), arguments?))
             }
             "ConditionalExpression" => {
                 let jtest = json_get(jexpr, "test")?;
@@ -277,18 +280,22 @@ impl TryFrom<&JSON> for Expr {
                 let jelse = json_get(jexpr, "alternate")?;
                 let elseexpr = Expr::try_from(jelse)?;
 
-                Expr::Conditional(Box::new(condexpr), Box::new(thenexpr), Box::new(elseexpr))
+                let expr = ConditionalExpression(
+                    Box::new(condexpr),
+                    Box::new(thenexpr),
+                    Box::new(elseexpr)
+                );
+                Expr::Conditional(expr)
             }
             "Identifier" => {
                 let name = json_get_str(jexpr, "name")?;
-                match name {
-                    "undefined" => Expr::Literal(JSValue::UNDEFINED),
-                    _ => Expr::Identifier(name.to_string())
-                }
+                let expr = Identifier(name.to_string());
+                Expr::Identifier(expr)
             }
             "Literal" => {
                 let jval = json_get(jexpr, "value")?;
-                Expr::Literal(JSValue::from(jval.clone()))
+                let expr = Literal(jval.clone());
+                Expr::Literal(expr)
             }
             "MemberExpression" => {
                 let computed = json_get_bool(jexpr, "computed")?;
@@ -298,7 +305,8 @@ impl TryFrom<&JSON> for Expr {
 
                 let jproperty = json_get(jexpr, "property")?;
                 let property = Expr::try_from(jproperty)?;
-                Expr::Member(Box::new(object), Box::new(property), computed)
+                let expr = MemberExpression(Box::new(object), Box::new(property), computed);
+                Expr::Member(expr)
             }
             "ObjectExpression" => {
                 let jproperties = json_get_array(jexpr, "properties")?;
@@ -314,11 +322,11 @@ impl TryFrom<&JSON> for Expr {
                     } else {
                         match keyexpr {
                             Expr::Identifier(ident) =>
-                                ObjectKey::Identifier(ident),
+                                ObjectKey::Identifier(ident.0),
                             Expr::Literal(jval) =>
                                 match jval.0.as_str() {
                                     Some(val) => ObjectKey::Identifier(val.to_string()),
-                                    None => ObjectKey::Identifier(jval.to_string()),
+                                    None => ObjectKey::Identifier(jval.0.to_string()),
                                 }
                             _ =>
                                 return Err(ParseError::UnexpectedValue{
@@ -333,7 +341,7 @@ impl TryFrom<&JSON> for Expr {
 
                     properties.push((key, Box::new(value)));
                 }
-                Expr::Object(properties)
+                Expr::Object(ObjectExpression(properties))
             }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr.clone() }),

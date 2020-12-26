@@ -5,13 +5,13 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::ast::Program;
-use crate::value::JSValue;
+use crate::object::{JSON, JSValue};
 use crate::error::{Exception, ParseError};
 use crate::interpret::{Interpretable, RuntimeState};
 
 const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
 
-fn run_interpreter(input: &str) -> Result<JSValue, Exception> {
+fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<JSValue, Exception> {
     let mut child = Command::new(ESPARSE)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -31,61 +31,73 @@ fn run_interpreter(input: &str) -> Result<JSValue, Exception> {
     let out = std::str::from_utf8(&output.stdout)
         .unwrap_or("");
     let json = serde_json::from_str(out)
-        .map_err(|err| Exception::SyntaxError(ParseError::InvalidJSON{ err }))?;
+        .map_err(|err| {
+            let err = ParseError::InvalidJSON{ err: err.to_string() };
+            Exception::SyntaxError(err)
+        })?;
     let program = Program::try_from(&json)
         .map_err(|e| Exception::SyntaxError(e))?;
-    let mut state = RuntimeState::new();
-    program.interpret(&mut state)
+    program.interpret(state)
 }
 
-fn eval(input: &str) -> JSValue {
-    run_interpreter(input).unwrap()
+fn eval(input: &str) -> JSON {
+    let mut state = RuntimeState::new();
+    let value = run_interpreter(input, &mut state).unwrap();
+    value.to_json(&state.heap)
+}
+
+fn evalexc(input: &str) -> Exception {
+    let mut state = RuntimeState::new();
+    run_interpreter(input, &mut state).unwrap_err()
 }
 
 fn evalbool(input: &str) -> bool {
-    eval(input).0.as_bool().unwrap()
+    let mut state = RuntimeState::new();
+    let value = run_interpreter(input, &mut state).unwrap();
+    value.boolify()
 }
 
 
 #[test]
 fn test_literals() {
-    assert_eq!( eval("null"),       JSValue::UNDEFINED);
-    assert_eq!( eval("true"),       JSValue::from(true));
-    assert_eq!( eval("42"),         JSValue::from(42));
-    assert_eq!( eval("0x2a"),       JSValue::from(42));
-    assert_eq!( eval("052"),        JSValue::from(42));
-    assert_eq!( eval("[]"),         JSValue::from(json!([])));
+    assert_eq!( eval("null"),       JSON::Null);
+    assert_eq!( eval("true"),       JSON::from(true));
+    assert_eq!( eval("42"),         JSON::from(42.0));
+    assert_eq!( eval("0x2a"),       JSON::from(42.0));
+    assert_eq!( eval("052"),        JSON::from(42.0));
+    //assert_eq!( eval("[]"),         JSValue::from(json!([])));
     //assert_eq!( eval("+5"),         JSValue::from(5));
     //assert_eq!( eval("+'5'"),       JSValue::from(5));
 
     assert_eq!(
         eval("\"hello \\\"world\\\"\""),
-        JSValue::from("hello \"world\"".to_string())
+        JSON::from("hello \"world\"".to_string())
     );
 
     assert_eq!(
         eval("var a = {one:1, two:2}; a"),
-        JSValue::from(json!({"one": 1, "two": 2}))
+        json!({"one": 1.0, "two": 2.0})
     );
 
     assert_eq!(
         eval("let x = 'one'; let o = {[x]: 1}; o.one"),
-        JSValue::from(1)
+        JSON::from(1.0)
     );
 
-    assert_eq!( eval("var undefined = 5; undefined"), JSValue::UNDEFINED );
-    assert_eq!( eval("var NaN = 5; NaN"), JSValue::from(5) );
+    assert_eq!( eval("var undefined = 5; undefined"), JSON::Null );
+    assert_eq!( eval("var NaN = 5; NaN"), JSON::from(5.0) );
+
 }
 
 #[test]
 fn test_binary_operations() {
     // O_o
-    assert_eq!( eval("2 + 2"),          JSValue::from(4.0) );
-    assert_eq!( eval("'1' + '2'"),      JSValue::from("12") );
-    assert_eq!( eval("[1] + [2,3]"),    JSValue::from("12,3") );
-    assert_eq!( eval("[1,2] + null"),   JSValue::from("1,2null") );
-    assert_eq!( eval("null + null"),    JSValue::from(0.0) );
-    assert_eq!( eval("true + null"),    JSValue::from(1.0) );
+    assert_eq!( eval("2 + 2"),          JSON::from(4.0) );
+    assert_eq!( eval("'1' + '2'"),      JSON::from("12") );
+    assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
+    assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
+    assert_eq!( eval("null + null"),    JSON::from(0.0) );
+    assert_eq!( eval("true + null"),    JSON::from(1.0) );
 
     // o_O
     assert!( evalbool("2 == 2") );
@@ -209,18 +221,27 @@ fn test_binary_operations() {
 
 #[test]
 fn test_member_expression() {
-    assert_eq!( eval("['zero', 'one', 'two'][2]"),  JSValue::from("two"));
-    assert_eq!( eval("let o = {one: 1}; o.one"),    JSValue::from(1));
-    assert_eq!( eval("let o = {'o e': 1}; o['o e']"),    JSValue::from(1));
+    //assert_eq!( eval("['zero', 'one', 'two'][2]"),      JSON::from("two"));
+    assert_eq!( eval("let o = {one: 1}; o.one"),        JSON::from(1.0));
+    assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
+    assert_eq!( eval("let o = {'o e': 1}; o['o e']"),   JSON::from(1.0));
     assert_eq!(
         eval("let x = 'one'; let o = {[x]: 1}; o"),
-        JSValue(json!({"one": 1}))
+        json!({"one": 1.0})
+    );
+    assert_eq!(
+        eval("let a = {}; a.sub = {}; a.sub.one = 1; a"),
+        json!({"sub": {"one": 1.0}})
+    );
+    assert_eq!(
+        evalexc("let a = {}; a.sub.one = 1"),
+        Exception::TypeError("Cannot set property one of undefined".to_string())
     );
 }
 
 #[test]
 fn test_assignment() {
-    assert_eq!( eval("var a = 1; a = 2; a"),            JSValue::from(2));
+    assert_eq!( eval("var a = 1; a = 2; a"),            JSON::from(2.0));
     //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
     //assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSValue::from(2));
 
@@ -253,7 +274,7 @@ fn test_blocks() {
         var a = 1, b = 2;
         { a = 10; b = 20 };
         a + b
-    "#), JSValue::from(30.0));
+    "#), JSON::from(30.0));
 }
 
 #[test]
@@ -261,8 +282,14 @@ fn test_conditionals() {
     assert!( evalbool("'0' ? true : false"));
     assert!( !evalbool("0 ? true : false"));
 
-    assert_eq!( eval("var a; if (a = 1) a = 2; else a = 3; a"), JSValue::from(2) );
-    assert_eq!( eval("var a = 1; if (null) { a = 2; }; a"), JSValue::from(1) );
+    assert_eq!(
+        eval("var a; if (a = 1) a = 2; else a = 3; a"),
+        JSON::from(2.0)
+    );
+    assert_eq!(
+        eval("var a = 1; if (null) { a = 2; }; a"),
+        JSON::from(1.0)
+    );
 }
 
 #[test]
@@ -274,7 +301,7 @@ fn test_loops() {
             a = a + 1;
         }
         a
-    "#), JSValue::from(5.0));
+    "#), JSON::from(5.0));
 
     assert!( evalbool(r#"
         let a = true;
