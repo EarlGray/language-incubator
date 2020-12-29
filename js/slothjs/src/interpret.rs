@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 //use crate::object;
-use crate::object::{JSObject, JSRef, JSValue, Heap, Place};
+use crate::object::{JSObject, JSValue, Heap, Interpreted};
 use crate::error::Exception;
 use crate::ast::*;      // yes, EVERYTHING
 
@@ -10,76 +10,32 @@ use crate::ast::*;      // yes, EVERYTHING
 
 pub struct RuntimeState {
     pub heap: Heap,
-
-    pub global_object: JSRef,
 }
 
 impl RuntimeState {
     pub fn new() -> Self {
-        let mut heap = Heap::new();
-        let global_object = heap.new_object();
-        RuntimeState{ heap, global_object }
+        RuntimeState{ heap: Heap::new() }
     }
 
-    fn get_global(&self) -> &JSObject {
-        match self.heap.get(self.global_object) {
-            JSValue::Object(global) => global,
-            _ => panic!("global is not an object"),
-        }
-    }
-
-    /*
-    fn get_global_mut(&mut self) -> &mut JSObject {
-        match self.heap.get_mut(self.global_object) {
-            JSValue::Object(global) => global,
-            _ => panic!("global is not an object"),
-        }
-    }
-    */
-
-    fn declare_var(&mut self, name: &str, init: Option<JSValue>) -> Result<(), Exception> {
-        let value = init.unwrap_or(JSValue::Undefined);
-        self.set_identifier(name, value)
-    }
-
-    fn set_identifier(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        let propref = self.heap.property_or_create(self.global_object, name)
-            .expect("Global is not an object");
-        *self.heap.get_mut(propref) = value;
+    fn declare_var(&mut self, name: &str, init: Option<Interpreted>) -> Result<(), Exception> {
+        let value = init.unwrap_or(Interpreted::VOID);
+        self.heap.property_assign(Heap::GLOBAL, name, &value)?;
         Ok(())
-    }
-
-    fn lookup_identifier(&self, name: &str) -> Result<JSRef, Exception> {
-        let global = self.get_global();
-        global.property_ref(name)
-            .ok_or(Exception::ReferenceError(name.to_string()))
     }
 }
 
 // ==============================================
 
 pub trait Interpretable {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception>;
-}
-
-pub trait InterpretableMut {
-    fn interpret_mut(&self, state: &mut RuntimeState) -> Result<Place, Exception>;
-
-    /*
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let objref = self.interpret_mut(state)?;
-        let value = state.heap.get(objref).clone();
-        Ok(value)
-    }
-    */
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception>;
 }
 
 
 // ==============================================
 
 impl Interpretable for Program {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let mut result = JSValue::Undefined;
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let mut result = Interpreted::VOID;
         for stmt in self.body.iter() {
             result = stmt.interpret(state)?;
         }
@@ -90,9 +46,9 @@ impl Interpretable for Program {
 // ==============================================
 
 impl Interpretable for Statement {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         match self {
-            Statement::Empty                        => Ok(JSValue::Undefined),
+            Statement::Empty                        => Ok(Interpreted::VOID),
             Statement::Expr(stmt)                   => stmt.interpret(state),
             Statement::Block(stmt)                  => stmt.interpret(state),
             Statement::If(stmt)                     => stmt.interpret(state),
@@ -106,37 +62,39 @@ impl Interpretable for Statement {
 // ==============================================
 
 impl Interpretable for BlockStatement {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         for stmt in self.body.iter() {
             stmt.interpret(state)?;
         }
-        Ok(JSValue::Undefined)
+        Ok(Interpreted::VOID)
     }
 }
 
 impl Interpretable for IfStatement {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let jbool = self.test.interpret(state)?;
-        let cond = jbool.boolify();
-        if cond {
+        let cond = jbool.to_value(&state.heap)?;
+        if cond.boolify() {
             self.consequent.interpret(state)
         } else if let Some(else_stmt) = self.alternate.as_ref() {
             else_stmt.interpret(state)
         } else {
-            Ok(JSValue::Undefined)
+            Ok(Interpreted::VOID)
         }
     }
 }
 
 impl Interpretable for ForStatement {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         self.init.interpret(state)?;
         loop {
             // test
             let testval = match self.test.as_ref() {
                 None => true,
-                Some(testexpr) =>
-                    testexpr.interpret(state)?.boolify(),
+                Some(testexpr) => {
+                    let result = testexpr.interpret(state)?;
+                    result.to_value(&state.heap)?.boolify()
+                }
             };
             if !testval { break }
 
@@ -148,31 +106,34 @@ impl Interpretable for ForStatement {
                 updateexpr.interpret(state)?;
             }
         }
-        Ok(JSValue::Undefined)
+        Ok(Interpreted::VOID)
     }
 }
 
 impl Interpretable for ExpressionStatement {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        self.expression.interpret(state)
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let result = self.expression.interpret(state)?;
+        let value = result.to_value(&state.heap)?;
+        Ok(Interpreted::Value(value))
     }
 }
 
 impl Interpretable for VariableDeclaration {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
             let mut init = None;
             if let Some(initexpr) = decl.init.as_ref() {
-                init = Some(initexpr.interpret(state)?);
+                let result = initexpr.interpret(state)?;
+                init = Some(result);
             };
             state.declare_var(&decl.name, init)?;
         }
-        Ok(JSValue::Undefined)
+        Ok(Interpreted::VOID)
     }
 }
 
 impl Interpretable for Expr {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         match self {
             Expr::Literal(expr) =>              expr.interpret(state),
             Expr::Identifier(expr) =>           expr.interpret(state),
@@ -187,92 +148,89 @@ impl Interpretable for Expr {
     }
 }
 
-impl InterpretableMut for Expr {
-    fn interpret_mut(&self, state: &mut RuntimeState) -> Result<Place, Exception> {
-        match self {
-            Expr::Identifier(expr) =>       expr.interpret_mut(state),
-            Expr::Assign(expr) =>           expr.interpret_mut(state),
-            Expr::Member(expr) =>           expr.interpret_mut(state),
-            _ => {
-                let msg = format!("Invalid left-hand side: {:?}", self);
-                Err(Exception::ReferenceError(msg))
-            }
-        }
-    }
-}
 
 impl Interpretable for Literal {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        if let Ok(value) = JSValue::try_from(&self.0) {
-            Ok(value)
-        } else {
-            let object = state.heap.object_from_json(&self.0);
-            Ok(object)
-        }
-    }
-}
-
-impl InterpretableMut for Identifier {
-    fn interpret_mut(&self, state: &mut RuntimeState) -> Result<Place, Exception> {
-        state.lookup_identifier(&self.0).map(|href| Place::Ref(href))
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let value = JSValue::try_from(&self.0).unwrap_or_else(|_|
+            state.heap.object_from_json(&self.0)
+        );
+        Ok(Interpreted::Value(value))
     }
 }
 
 impl Interpretable for Identifier {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, _state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         if self.0 == "undefined" {
-            return Ok(JSValue::Undefined);
+            return Ok(Interpreted::Value(JSValue::Undefined));
         }
-        let place = self.interpret_mut(state)?;
-        Ok(state.heap.place(place).clone())
+        let name = self.0.clone();
+        let globalref = Interpreted::Ref(Heap::GLOBAL);
+        Ok(Interpreted::Member{of: Box::new(globalref), name })
+    }
+}
+
+impl Interpretable for ConditionalExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let ConditionalExpression(condexpr, thenexpr, elseexpr) = self;
+        let cond = condexpr.interpret(state)?.to_value(&state.heap)?;
+        if cond.boolify() {
+            thenexpr.interpret(state)
+        } else {
+            elseexpr.interpret(state)
+        }
     }
 }
 
 impl Interpretable for BinaryExpression {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let BinaryExpression(lexpr, op, rexpr) = self;
-        let lval = lexpr.interpret(state)?;
-        let rval = rexpr.interpret(state)?;
+        let lval = lexpr.interpret(state)?.to_value(&state.heap)?;
+        let rval = rexpr.interpret(state)?.to_value(&state.heap)?;
         match op {
             BinOp::Plus => {
                 if !(lval.is_string() || rval.is_string()) {
                     if let Some(lnum) = lval.numberify() {
                         if let Some(rnum) = rval.numberify() {
-                            return Ok(JSValue::from(lnum + rnum));
+                            return Ok(Interpreted::Value(JSValue::from(lnum + rnum)));
                         }
                     }
                 }
                 let lvalstr = lval.stringify(&state.heap);
                 let rvalstr = rval.stringify(&state.heap);
-                return Ok(JSValue::from(lvalstr + &rvalstr));
+                let result = JSValue::from(lvalstr + &rvalstr);
+                return Ok(Interpreted::Value(result));
             }
             BinOp::EqEq => {
                 // TODO: Abstract Equality Comparison
-                Ok(JSValue::from(lval == rval))
+                let result = JSValue::from(lval == rval);
+                Ok(Interpreted::Value(result))
             }
             BinOp::Less => {
                 // TODO: Abstract Relational Comparison
                 // TODO: toPrimitive()
                 if let JSValue::String(lstr) = lval.clone() {
                     if let JSValue::String(rstr) = rval.clone() {
-                        return Ok(JSValue::from(lstr < rstr));
+                        let result = JSValue::from(lstr < rstr);
+                        return Ok(Interpreted::Value(result));
                     }
                 };
                 let lnum = lval.numberify().unwrap_or(f64::NAN);
                 let rnum = rval.numberify().unwrap_or(f64::NAN);
-                Ok(JSValue::from(lnum < rnum))
+                let result = JSValue::from(lnum < rnum);
+                Ok(Interpreted::Value(result))
             }
         }
     }
 }
 
-impl InterpretableMut for MemberExpression {
-    fn interpret_mut(&self, state: &mut RuntimeState) -> Result<Place, Exception> {
+impl Interpretable for MemberExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let MemberExpression(objexpr, propexpr, computed) = self;
 
         // compute the name of the property:
         let propname = if *computed {
-            propexpr.interpret(state)?.stringify(&state.heap)
+            let propval = propexpr.interpret(state)?.to_value(&state.heap)?;
+            propval.stringify(&state.heap)
         } else {
             match &**propexpr {
                 Expr::Identifier(name) => name.0.clone(),
@@ -281,35 +239,30 @@ impl InterpretableMut for MemberExpression {
         };
 
         // get the object reference for member computation:
-        let objref = match objexpr.interpret_mut(state)? {
-            Place::Ref(objref) => objref,
-            Place::ObjectMember{..} => {
-                let err = format!("Cannot set property {} of undefined", propname);
-                return Err(Exception::TypeError(err))
+        let objresult = objexpr.interpret(state)?;
+        let objref = objresult.to_ref(&state.heap).map_err(|_| {
+            let err = format!("Cannot set property {} of undefined", propname);
+            Exception::TypeError(err)
+        })?;
+
+        let object = state.heap.get(objref).to_object().map_err(|_| {
+            let err = format!("Cannot set property {} of undefined", propname);
+            Exception::TypeError(err)
+        })?;
+
+        let result = match object.property_ref(&propname) {
+            Some(propref) => Interpreted::Ref(propref),
+            None => Interpreted::Member{
+                of: Box::new(Interpreted::Ref(objref)),
+                name: propname.to_string()
             }
         };
-
-        if let JSValue::Object(object) = state.heap.get(objref) {
-            match object.property_ref(&propname) {
-                Some(propref) => Ok(Place::Ref(propref)),
-                None => Ok(Place::ObjectMember{ objref, member: propname })
-            }
-        } else {
-            let err = format!("Cannot set property {} of undefined", propname);
-            Err(Exception::TypeError(err))
-        }
-    }
-}
-
-impl Interpretable for MemberExpression {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let mut place = self.interpret_mut(state)?;
-        Ok(state.heap.place_mut(&mut place).clone())
+        Ok(result)
     }
 }
 
 impl Interpretable for ObjectExpression {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let mut object = JSObject::new();
 
         for (key, valexpr) in self.0.iter() {
@@ -317,51 +270,41 @@ impl Interpretable for ObjectExpression {
                 ObjectKey::Identifier(ident) =>
                     ident.clone(),
                 ObjectKey::Computed(expr) => {
-                    let result = expr.interpret(state)?;
+                    let result = expr.interpret(state)?.to_value(&state.heap)?;
                     result.stringify(&mut state.heap)
                 }
             };
-            let value = valexpr.interpret(state)?;
-
-            let propref = state.heap.allocate(value);
+            let valresult = valexpr.interpret(state)?;
+            let propref = valresult.to_ref_or_allocate(&mut state.heap)?;
             object.set_property(&keyname, propref);
         }
 
-        Ok(JSValue::Object(object))
-    }
-}
-
-impl InterpretableMut for AssignmentExpression {
-    fn interpret_mut(&self, state: &mut RuntimeState) -> Result<Place, Exception> {
-        let AssignmentExpression(leftexpr, op, rightexpr) = self;
-        let value = rightexpr.interpret(state)?;
-        let mut place = leftexpr.interpret_mut(state)?;
-        match op {
-            AssignOp::Equal => {
-                *state.heap.place_mut(&mut place) = value;
-            }
-        };
-        Ok(place)
+        let object = JSValue::Object(object);
+        Ok(Interpreted::Value(object))
     }
 }
 
 impl Interpretable for AssignmentExpression {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let place = self.interpret_mut(state)?;
-        Ok(state.heap.place(place).clone())
-    }
-}
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let AssignmentExpression(leftexpr, op, valexpr) = self;
 
-
-impl Interpretable for ConditionalExpression {
-    fn interpret(&self, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-        let ConditionalExpression(condexpr, thenexpr, elseexpr) = self;
-        let cond = condexpr.interpret(state)?;
-        let value = if cond.boolify() {
-            thenexpr.interpret(state)?
-        } else {
-            elseexpr.interpret(state)?
+        let value = valexpr.interpret(state)?;
+        let assignee = leftexpr.interpret(state)?;
+        match assignee {
+            Interpreted::Member{of, name} => {
+                let objref = of.to_ref_or_allocate(&mut state.heap)?;
+                state.heap.property_assign(objref, &name, &value)?;
+            }
+            Interpreted::Ref(href) => {
+                *state.heap.get_mut(href) = value.to_value(&state.heap)?;
+            }
+            _ => {
+                let msg = format!("Invalid left hand side: {:?}", &value);
+                return Err(Exception::TypeError(msg));
+            }
         };
+
         Ok(value)
     }
 }
+

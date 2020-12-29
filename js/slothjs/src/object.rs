@@ -3,6 +3,8 @@ use std::convert::TryFrom;
 
 use serde_json::json;
 
+use crate::error::Exception;
+
 pub type JSON = serde_json::Value;
 
 pub type JSNumber = f64;
@@ -51,8 +53,8 @@ impl JSValue {
                         s.push_str(&skey);
                     }
                     s.push_str(": ");
-                    let val = match property.descriptor {
-                        Descriptor::Data(heapref) => {
+                    let val = match property.content {
+                        Content::Data(heapref) => {
                             let value = heap.get(heapref);
                             value.to_string(heap)
                         }
@@ -68,6 +70,27 @@ impl JSValue {
         }
     }
 
+    pub fn to_object(&self) -> Result<&JSObject, Exception> {
+        if let JSValue::Object(object) = self {
+            Ok(object)
+        } else {
+            /* TODO: wrap a primitive with an object */
+            let msg = format!("Expected an object, found a primitive value: {:?}", self);
+            Err(Exception::ReferenceError(msg))
+        }
+    }
+
+    pub fn to_object_mut(&mut self) -> Result<&mut JSObject, Exception> {
+        if let JSValue::Object(object) = self {
+            Ok(object)
+        } else {
+            /* TODO: wrap a primitive with an object? */
+            let msg = format!("Expected an object, found a primitive value: {:?}", self);
+            Err(Exception::ReferenceError(msg))
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn to_json(&self, heap: &Heap) -> JSON {
         match self {
             JSValue::Undefined | JSValue::Null => JSON::Null,
@@ -81,8 +104,8 @@ impl JSValue {
                         continue
                     }
 
-                    match property.descriptor {
-                        Descriptor::Data(propref) => {
+                    match property.content {
+                        Content::Data(propref) => {
                             let value = heap.get(propref);
                             let jvalue = value.to_json(heap);
                             json[key] = jvalue;
@@ -202,7 +225,6 @@ fn test_boolify() {
     assert!( JSValue::from(true).boolify() );
     assert!( JSValue::from(1).boolify() );
     assert!( JSValue::from("0").boolify() );
-    //assert!( JSValue::from(json!({})).boolify() );
     //assert!( JSValue::from(json!([])).boolify() );
 
     // false
@@ -228,11 +250,14 @@ fn is_valid_identifier(s: &str) -> bool {
 pub struct Heap(Vec<JSValue>);
 
 impl Heap {
-    pub const UNDEFINED: JSRef = JSRef(0);
+    //pub const UNDEFINED: JSRef = JSRef(0);
+    pub const GLOBAL: JSRef = JSRef(1);
 
     pub fn new() -> Self {
+        let global = JSObject::new();
         let heap = vec![
-            JSValue::Undefined,
+            /* [Heap::UNDEFINED] = */ JSValue::Undefined,
+            /* [Heap::GLOBAL]    = */ JSValue::Object(global),
         ];
         Heap(heap)
     }
@@ -251,61 +276,45 @@ impl Heap {
         self.0.get_mut(jsref.0).unwrap()
     }
 
-    pub fn property_or_create(&mut self, objref: JSRef, name: &str) -> Option<JSRef> {
-        match self.get(objref) {
-            JSValue::Object(object) => {
-                if let Some(property) = object.properties.get(name) {
-                    match property.descriptor {
-                        Descriptor::Data(propref) => Some(propref),
-                    }
-                } else {
-                    let propref = self.allocate(JSValue::Undefined);
-                    if let JSValue::Object(object) = self.get_mut(objref) {
-                        object.set_property(name, propref);
-                        Some(propref)
-                    } else {
-                        unreachable!()
-                    }
-                }
+    pub fn property_or_create(&mut self, objref: JSRef, name: &str) -> Result<JSRef, Exception> {
+        let object = self.get(objref).to_object()?;
+        if let Some(property) = object.properties.get(name) {
+            match property.content {
+                Content::Data(propref) => Ok(propref),
             }
-            _ => None,
+        } else {
+            let propref = self.allocate(JSValue::Undefined);
+            let object = self.get_mut(objref).to_object_mut()?;
+            object.set_property(name, propref);
+            Ok(propref)
         }
     }
 
+    pub fn property_assign(&mut self, objref: JSRef, name: &str, what: &Interpreted) -> Result<(), Exception> {
+        if let Ok(valref) = what.to_ref(self) {
+            if let JSValue::Object{..} = self.get(valref) {
+                let object = self.get_mut(objref).to_object_mut()?;
+                object.set_property(&name, valref);
+                return Ok(());
+            }
+        }
+        let propref = self.property_or_create(objref, &name)?;
+        let value = what.to_value(self)?;
+        *self.get_mut(propref) = value.clone();
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     pub fn get_property(&self, object: &JSObject, name: &str) -> Option<&JSValue> {
         object.property_ref(name).map(|propref| self.get(propref))
     }
 
-    pub fn place(&self, place: Place) -> &JSValue {
-        let href = match place {
-            Place::Ref(heapref) => heapref,
-            Place::ObjectMember{..} => Heap::UNDEFINED,
-        };
-        self.get(href)
-    }
-
-    fn reify_place(&mut self, place: &Place) -> Place {
-        match place {
-            Place::ObjectMember{objref, member} => Place::Ref(
-                self.property_or_create(*objref, member)
-                    .expect("failed to create a property")
-            ),
-            _ => place.clone(),
-        }
-    }
-
-    pub fn place_mut(&mut self, place: &mut Place) -> &mut JSValue {
-        *place = self.reify_place(place);
-        match place {
-            Place::Ref(heapref) => self.get_mut(heapref.clone()),
-            _ => panic!("{:?} is not reified", place)
-        }
-    }
-
+    /*
     pub fn new_object(&mut self) -> JSRef {
         let object = JSObject::new();
         self.allocate(JSValue::Object(object))
     }
+    */
 
     pub fn object_from_json(&mut self, json: &JSON) -> JSValue {
         if let Some(obj) = json.as_object() {
@@ -328,12 +337,66 @@ impl Heap {
 pub struct JSRef(usize);
 
 #[derive(Debug, Clone)]
-pub enum Place {
-    /// A heap reference that already exists
+pub enum Interpreted {
+    /// An object member; might not exist yet.
+    Member{ of: Box<Interpreted>, name: String },
+
+    /// A heap reference
     Ref(JSRef),
 
-    /// A potential object member that does not exist yet.
-    ObjectMember{ objref: JSRef, member: String }
+    /// An off-heap value
+    Value(JSValue),
+}
+
+impl Interpreted {
+    pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
+
+    pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
+        let value = match self {
+            Interpreted::Ref(href) =>
+                heap.get(*href).clone(),
+            Interpreted::Value(value) =>
+                value.clone(),
+            Interpreted::Member{of, name} => {
+                let objref = of.to_ref(heap)?;
+                let object = heap.get(objref).to_object()?;
+                match object.property_ref(&name) {
+                    Some(propref) => heap.get(propref).clone(),
+                    None => JSValue::Undefined,
+                }
+            }
+        };
+        Ok(value)
+    }
+
+    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
+        match self {
+            Interpreted::Ref(href) => Ok(*href),
+            Interpreted::Member{of, name} => {
+                let objref = of.to_ref(heap)?;
+                let object = heap.get(objref).to_object()?;
+                object.property_ref(name).ok_or_else(|| {
+                    let msg = format!("Cannot get proprety {} of undefined", name);
+                    Exception::TypeError(msg)
+                })
+            }
+            _ => {
+                let msg = format!("to_ref(): {:?}", self);
+                Err(Exception::ReferenceError(msg))
+            }
+        }
+    }
+
+    pub fn to_ref_or_allocate(&self, heap: &mut Heap) -> Result<JSRef, Exception> {
+        match self {
+            Interpreted::Ref(href) => Ok(*href),
+            Interpreted::Value(value) => Ok(heap.allocate(value.clone())),
+            Interpreted::Member{of, name} => {
+                let objref = of.to_ref(heap)?;
+                heap.property_or_create(objref, &name)
+            }
+        }
+    }
 }
 
 /// Javascript objects
@@ -354,8 +417,8 @@ impl JSObject {
 
     pub fn property_ref(&self, name: &str) -> Option<JSRef> {
         self.properties.get(name).map(|prop|
-            match prop.descriptor {
-                Descriptor::Data(href) => href
+            match prop.content {
+                Content::Data(href) => href
             }
         )
     }
@@ -368,7 +431,7 @@ pub struct Property {
     pub writable: bool,
     pub configurable: bool,
 
-    pub descriptor: Descriptor,
+    pub content: Content,
 }
 
 impl Property {
@@ -377,10 +440,11 @@ impl Property {
             enumerable: true,
             writable: true,
             configurable: true,
-            descriptor: Descriptor::Data(heapref),
+            content: Content::Data(heapref),
         }
     }
 
+    #[allow(dead_code)]
     pub fn readonly(&mut self) -> &mut Self {
         self.writable = false;
         self
@@ -388,7 +452,7 @@ impl Property {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Descriptor {
+pub enum Content {
     Data(JSRef),
     /*
     pub Accesssor{

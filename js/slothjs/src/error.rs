@@ -1,6 +1,6 @@
 use crate::object::JSON;
 
-
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum ParseError<V> {
     InvalidJSON{ err: String },
@@ -13,6 +13,7 @@ pub enum ParseError<V> {
     UnknownType{ value: V },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxError(ParseError<JSON>),

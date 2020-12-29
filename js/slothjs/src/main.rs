@@ -40,6 +40,7 @@ fn main() {
             .unwrap_or_else(|e| die("Interpretation error", e, 3));
 
         // TODO: JSON output, optionally
-        println!("{}", result.to_string(&state.heap));
+        let value = result.to_value(&state.heap).unwrap();
+        println!("{}", value.to_string(&state.heap));
     }
 }

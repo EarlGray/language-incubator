@@ -5,13 +5,13 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::ast::Program;
-use crate::object::{JSON, JSValue};
+use crate::object::{JSON, JSValue, Interpreted};
 use crate::error::{Exception, ParseError};
 use crate::interpret::{Interpretable, RuntimeState};
 
 const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
 
-fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
     let mut child = Command::new(ESPARSE)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -40,10 +40,20 @@ fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<JSValue, Exc
     program.interpret(state)
 }
 
+fn interpret(input: &str, state: &mut RuntimeState) -> Result<JSValue, Exception> {
+    let result = run_interpreter(input, state)?;
+    result.to_value(&state.heap)
+}
+
 fn eval(input: &str) -> JSON {
     let mut state = RuntimeState::new();
-    let value = run_interpreter(input, &mut state).unwrap();
-    value.to_json(&state.heap)
+    match interpret(input, &mut state) {
+        Ok(value) => value.to_json(&state.heap),
+        Err(e) => {
+            let msg = format!("{:?}", e);
+            json!({"error": msg})
+        }
+    }
 }
 
 fn evalexc(input: &str) -> Exception {
@@ -53,8 +63,13 @@ fn evalexc(input: &str) -> Exception {
 
 fn evalbool(input: &str) -> bool {
     let mut state = RuntimeState::new();
-    let value = run_interpreter(input, &mut state).unwrap();
-    value.boolify()
+    match interpret(input, &mut state) {
+        Ok(value) => value.boolify(),
+        Err(e) => {
+            let msg = format!("{:?}", e);
+            panic!(msg)
+        }
+    }
 }
 
 
@@ -94,8 +109,8 @@ fn test_binary_operations() {
     // O_o
     assert_eq!( eval("2 + 2"),          JSON::from(4.0) );
     assert_eq!( eval("'1' + '2'"),      JSON::from("12") );
-    assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
-    assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
+    //assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
+    //assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
     assert_eq!( eval("null + null"),    JSON::from(0.0) );
     assert_eq!( eval("true + null"),    JSON::from(1.0) );
 
@@ -242,9 +257,6 @@ fn test_member_expression() {
 #[test]
 fn test_assignment() {
     assert_eq!( eval("var a = 1; a = 2; a"),            JSON::from(2.0));
-    //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
-    //assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSValue::from(2));
-
     /*
     assert_eq!( eval("var a = 3; a *= a; a"),            JSValue::from(9));
     assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
@@ -281,6 +293,7 @@ fn test_blocks() {
 fn test_conditionals() {
     assert!( evalbool("'0' ? true : false"));
     assert!( !evalbool("0 ? true : false"));
+    assert!( evalbool("({} ? true : false)") );
 
     assert_eq!(
         eval("var a; if (a = 1) a = 2; else a = 3; a"),
@@ -381,16 +394,16 @@ fn test_exceptions() {
 #[test]
 fn test_functions() {
     // FunctionExpression
-    assert!(evalbool(r#"
+    assert_eq!(evalbool(r#"
         let sqr = function(x) { return x * x; };
-        sqr(12) == 144
-    "#));
+        sqr(12)
+    "#), JSON::from(144.0));
 
     // FunctionDeclaration
-    assert!(evalbool(r#"
+    assert_eq!(evalbool(r#"
         function sqr(x) { return x * x; };
-        sqr(12) == 144
-    "#));
+        sqr(12)
+    "#), JSON::from(144.0));
 
     // TODO: closures and scope
 }
@@ -398,6 +411,22 @@ fn test_functions() {
 
 #[test]
 fn test_objects() {
+    //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
+    assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSON::from(2.0));
+    assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
+
+    assert_eq!(
+        eval("var a = {}, b = {}; a.b = b; b.one = 1; a"),
+        json!({"b": {"one": 1.0}})
+    );
+    assert_eq!(
+        eval("var a = {b: 2}; var b = a.b; b = 1; a.b"),
+        JSON::from(2.0)
+    );
+    assert_eq!(
+        eval("var a = {b: {}}; var b = a.b; b.one = 1; a.b.one"),
+        JSON::from(1.0)
+    );
 }
 
 #[test] fn test_scratch() { }
