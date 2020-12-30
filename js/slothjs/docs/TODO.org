@@ -1,0 +1,68 @@
+* DONE [2020-12-21 Mon] BlockStatement
+* DONE [2020-12-21 Mon] IfStatement
+* DONE [2020-12-21 Mon] ConditinalExpression
+* DONE [2020-12-22 Tue] ForStatement
+* DONE [2020-12-26 Sat] mutable values and assignment
+* TODO rewrite the =Heap= to be =Vec<JSObject>=
+* TODO make it a library
+* TODO a repl executable
+* TODO move tests to =test/=
+* TODO =let= variables, block scope
+* TODO =const= values
+* TODO BinaryExpression
+** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
+** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
+** TODO ~===~
+** TODO ~+~ between all types
+* TODO AssignmentExpression
+** DONE [2020-12-21 Mon] ~=~
+** TODO ~+=~
+* TODO SwitchStatement
+* TODO UpdateExpression
+* TODO WhileStatement
+* TODO DoWhileStatement
+* TODO BreakStatement, ContinueStatement
+* TODO UnaryExpression
+** TODO =typeof=
+** TODO =delete=
+** TODO =-=
+** TODO =+=
+* TODO user exceptions
+** TODO =try=, =catch=, =finally=
+** TODO stacktraces with source locations
+** TODO =throw=
+** TODO =Error= objects
+* TODO ForInExpression
+* TODO =Symbol= primitive
+* TODO builtin =Object=
+* TODO builtin =Function=
+* TODO builtin =Array=
+* TODO builtin =JSON=
+* TODO builtin functions
+** TODO =parseInt=
+** TODO =eval=
+** TODO =isNaN=
+* TODO ArrayExpression
+* TODO assignment support for array members
+* TODO builtin =console=
+* TODO builtin primitive wrappers
+** TODO =Number=
+** TODO =String=
+** TODO =Boolean=
+* TODO builtin functions
+** TODO CallExpression
+* TODO user functions
+** TODO FunctionExpression
+*** TODO =arguments=
+*** TODO function scope
+*** TODO closures
+** TODO ReturnExpression
+** TODO FunctionDeclaration
+* TODO user objects
+** TODO prototype chain
+** TODO ThisExpression
+** TODO NewExpression
+** TODO properties, =get=, =set=
+
+* TODO the endgoal: be able to run Esprima internally
+* TODO =eval=
