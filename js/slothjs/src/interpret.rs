@@ -201,9 +201,8 @@ impl Interpretable for BinaryExpression {
                 return Ok(Interpreted::Value(result));
             }
             BinOp::EqEq => {
-                // TODO: Abstract Equality Comparison
-                let result = JSValue::from(lval == rval);
-                Ok(Interpreted::Value(result))
+                let result = lval.loose_eq(&rval);
+                Ok(Interpreted::Value(JSValue::Bool(result)))
             }
             BinOp::Less => {
                 // TODO: Abstract Relational Comparison

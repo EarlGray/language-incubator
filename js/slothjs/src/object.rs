@@ -171,6 +171,30 @@ impl JSValue {
                 }
         }
     }
+
+    /// Abstract Equality Comparison:
+    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_
+    pub fn loose_eq(&self, other: &JSValue) -> bool {
+        let lval = if self == &JSValue::Undefined { &JSValue::Null } else { self };
+        let rval = if other == &JSValue::Undefined { &JSValue::Null } else { other };
+        match (&lval, &rval) {
+            (JSValue::Null, JSValue::Null) => true,
+            (JSValue::Null, _) | (_, JSValue::Null) => false,
+            (JSValue::Number(_), JSValue::Number(_))
+                | (JSValue::String(_), JSValue::String(_))
+                | (JSValue::Bool(_), JSValue::Bool(_))
+                | (JSValue::Object(_), JSValue::Object(_)) =>
+                (self == other),
+            _ => {
+                if let Some(lnum) = self.numberify() {
+                    if let Some(rnum) = self.numberify() {
+                        return (lnum == rnum);
+                    }
+                }
+                return false;
+            }
+        }
+    }
 }
 
 impl From<bool> for JSValue {
