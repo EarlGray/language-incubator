@@ -5,12 +5,12 @@ use std::convert::TryFrom;
 use serde_json::Value as JSON;
 
 mod ast;
-//mod value;
 mod object;
-//mod estree;
 mod naive;
 mod error;
 mod interpret;
+mod function;
+mod builtin;
 #[cfg(test)]
 mod test;
 

@@ -407,6 +407,17 @@ fn test_functions() {
 
     // TODO: closures and scope
 }
+
+#[test]
+fn test_typeof() {
+    assert_eq!( eval("typeof undefined"),   JSON::from("undefined"));
+    assert_eq!( eval("typeof 1"),           JSON::from("number"));
+    assert_eq!( eval("typeof ''"),          JSON::from("string"));
+
+    assert_eq!( eval("typeof {}"),          JSON::from("object"));
+    assert_eq!( eval("typeof []"),          JSON::from("object"));
+    assert_eq!( eval("typeof null"),        JSON::from("object"));
+}
 */
 
 #[test]

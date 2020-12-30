@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::error::Exception;
+use crate::builtin;
 
 pub type JSON = serde_json::Value;
 
@@ -188,7 +189,7 @@ impl JSValue {
             _ => {
                 if let Some(lnum) = self.numberify() {
                     if let Some(rnum) = self.numberify() {
-                        return (lnum == rnum);
+                        return lnum == rnum;
                     }
                 }
                 return false;
@@ -278,12 +279,13 @@ impl Heap {
     pub const GLOBAL: JSRef = JSRef(1);
 
     pub fn new() -> Self {
-        let global = JSObject::new();
-        let heap = vec![
-            /* [Heap::UNDEFINED] = */ JSValue::Undefined,
-            /* [Heap::GLOBAL]    = */ JSValue::Object(global),
-        ];
-        Heap(heap)
+        let mut heap = Heap(vec![]);
+        heap.0.push(JSValue::Undefined);                /* [Heap::UNDEFINED] */
+        heap.0.push(JSValue::Object(JSObject::new()));  /* [Heap::GLOBAL] */
+
+        builtin::init(&mut heap)
+            .expect("failed to initialize builtin objects");
+        heap
     }
 
     pub fn allocate(&mut self, value: JSValue) -> JSRef {
