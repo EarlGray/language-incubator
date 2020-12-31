@@ -23,12 +23,24 @@ pub enum JSValue {
 }
 
 impl JSValue {
-    /// to_string() makes a human-readable string representation of the value
+    /// to_string() makes a human-readable string representation of the value:
     /// ```
-    /// JSValue::from("1").to_string()    // "\"1\""
-    /// JSValue::from(1).to_string()      // "1"
-    /// JSValue::from(json!([1, 2])).to_string()   // "[1,2]"
-    /// JSValue::from(json!({"one": 1, "two": 2})).to_string()  // "{ one: 1, two: 2}"
+    /// # use serde_json::json;
+    /// # use slothjs::object::JSValue;
+    /// # use slothjs::interpret::RuntimeState;
+    /// # let mut state = RuntimeState::new();
+    /// # let heap = &mut state.heap;
+    /// assert_eq!( JSValue::from("1").to_string(heap), "\"1\"" );
+    /// assert_eq!( JSValue::from(1).to_string(heap),    "1" );
+    /// ```
+    /// ```ignore
+    /// let json_object = json!({"one": 1, "two": 2});
+    /// let example_object = heap.object_from_json(&json_object);
+    /// assert_eq!( example_object.to_string(heap), "{ one: 1, two: 2 }");
+    ///
+    /// let json_array = json!([1, 2]);
+    /// let example_array = heap.object_from_json(&json_array);
+    /// assert_eq!( example_array.to_string(heap), "[1,2]" );
     /// ```
     pub fn to_string(&self, heap: &Heap) -> String {
         match self {
@@ -36,7 +48,8 @@ impl JSValue {
             JSValue::Null => "null".to_string(),
             JSValue::Bool(b) => b.to_string(),
             JSValue::Number(n) => n.to_string(),
-            JSValue::String(s) => s.clone(),
+            JSValue::String(s) =>
+                JSON::from(s.as_str()).to_string(),
             JSValue::Object(object) => {
                 let mut s = String::new();
                 let mut empty = true;
@@ -133,14 +146,6 @@ impl JSValue {
             JSValue::String(s) => s.clone(),
             JSValue::Object(_obj) =>
                 "[object Object]".to_string(),
-        /*
-        if let Some(a) = self.0.as_array() {
-            return a.iter()
-                    .map(|v| JSValue(v.clone()).to_string())
-                    .collect::<Vec<String>>()
-                    .join(",");
-        }
-        */
             _ => self.to_string(heap),
         }
     }
@@ -316,7 +321,11 @@ impl Heap {
         }
     }
 
-    pub fn property_assign(&mut self, objref: JSRef, name: &str, what: &Interpreted) -> Result<(), Exception> {
+    pub fn property_assign(
+        &mut self,
+        objref: JSRef,
+        name: &str, what: &Interpreted
+    ) -> Result<(), Exception> {
         if let Ok(valref) = what.to_ref(self) {
             if let JSValue::Object{..} = self.get(valref) {
                 let object = self.get_mut(objref).to_object_mut()?;
@@ -481,7 +490,7 @@ impl Property {
 pub enum Content {
     Data(JSRef),
     /*
-    pub Accesssor{
+    Accesssor{
         get: Option<Callable>,
         set: Option<Callable>,
     },

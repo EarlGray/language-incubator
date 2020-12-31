@@ -9,10 +9,11 @@ use crate::object::{JSON, JSValue, Interpreted};
 use crate::error::{Exception, ParseError};
 use crate::interpret::{Interpretable, RuntimeState};
 
-const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
+const ESPARSE: &str = "./node_modules/.bin/esparse";
 
 fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
     let mut child = Command::new(ESPARSE)
+        .arg("--loc")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

@@ -4,7 +4,7 @@
 * DONE [2020-12-22 Tue] ForStatement
 * DONE [2020-12-26 Sat] mutable values and assignment
 * TODO rewrite the =Heap= to be =Vec<JSObject>=
-* TODO make it a library
+* DONE [2020-12-31 Thu] make it a library
 * TODO a repl executable
 * TODO move tests to =test/=
 * TODO =let= variables, block scope
