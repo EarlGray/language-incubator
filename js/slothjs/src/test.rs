@@ -393,7 +393,23 @@ fn test_exceptions() {
 }
 
 #[test]
+fn test_typeof() {
+    assert_eq!( eval("typeof undefined"),   JSON::from("undefined"));
+    assert_eq!( eval("typeof 1"),           JSON::from("number"));
+    assert_eq!( eval("typeof ''"),          JSON::from("string"));
+
+    assert_eq!( eval("typeof {}"),          JSON::from("object"));
+    assert_eq!( eval("typeof []"),          JSON::from("object"));
+    assert_eq!( eval("typeof null"),        JSON::from("object"));
+}
+*/
+
+#[test]
 fn test_functions() {
+    // CallExpression for builtin functions
+    assert_eq!( eval("parseInt('42')"),     JSON::from(42.0));
+
+    /*
     // FunctionExpression
     assert_eq!(evalbool(r#"
         let sqr = function(x) { return x * x; };
@@ -405,21 +421,16 @@ fn test_functions() {
         function sqr(x) { return x * x; };
         sqr(12)
     "#), JSON::from(144.0));
+    */
 
     // TODO: closures and scope
 }
 
 #[test]
-fn test_typeof() {
-    assert_eq!( eval("typeof undefined"),   JSON::from("undefined"));
-    assert_eq!( eval("typeof 1"),           JSON::from("number"));
-    assert_eq!( eval("typeof ''"),          JSON::from("string"));
-
-    assert_eq!( eval("typeof {}"),          JSON::from("object"));
-    assert_eq!( eval("typeof []"),          JSON::from("object"));
-    assert_eq!( eval("typeof null"),        JSON::from("object"));
+fn test_global_methods() {
+    // parseInt
+    assert_eq!( eval("parseInt('42')"),     JSON::from(42.0));
 }
-*/
 
 #[test]
 fn test_objects() {

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-//use crate::object;
-use crate::object::{JSObject, JSValue, Heap, Interpreted};
+use crate::object;
+use crate::object::{JSValue, Heap, Interpreted};
 use crate::error::Exception;
 use crate::ast::*;      // yes, EVERYTHING
 
@@ -138,7 +138,7 @@ impl Interpretable for Expr {
             Expr::Literal(expr) =>              expr.interpret(state),
             Expr::Identifier(expr) =>           expr.interpret(state),
             Expr::BinaryOp(expr) =>             expr.interpret(state),
-            Expr::Call(_expr) =>                todo!(),
+            Expr::Call(expr) =>                 expr.interpret(state),
             Expr::Array(_expr) =>               todo!(),
             Expr::Member(expr) =>               expr.interpret(state),
             Expr::Object(expr) =>               expr.interpret(state),
@@ -164,8 +164,11 @@ impl Interpretable for Identifier {
             return Ok(Interpreted::Value(JSValue::Undefined));
         }
         let name = self.0.clone();
-        let globalref = Interpreted::Ref(Heap::GLOBAL);
-        Ok(Interpreted::Member{of: Box::new(globalref), name })
+
+        Ok(Interpreted::Member{
+            of: Box::new(Interpreted::Ref(Heap::GLOBAL)),
+            name
+        })
     }
 }
 
@@ -262,7 +265,7 @@ impl Interpretable for MemberExpression {
 
 impl Interpretable for ObjectExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        let mut object = JSObject::new();
+        let mut object = object::JSObject::new();
 
         for (key, valexpr) in self.0.iter() {
             let keyname = match key {
@@ -307,3 +310,47 @@ impl Interpretable for AssignmentExpression {
     }
 }
 
+impl Interpretable for CallExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let CallExpression(callee_expr, arguments_expr) = self;
+
+        let callee = callee_expr.interpret(state)?;
+
+        let (this_ref, method_name) = match callee {
+            Interpreted::Ref(_func_ref) =>
+                todo!(),
+            Interpreted::Member{ of, name } => {
+                let this_ref = of.to_ref(&state.heap)?;
+                (this_ref, name.clone())
+            }
+            Interpreted::Value(value) => {
+                let msg = format!("{:?} is not a function", value);
+                return Err(Exception::TypeError(msg));
+            }
+        };
+
+        let mut arguments = vec![];
+        for argexpr in arguments_expr.iter() {
+            let arg = argexpr.interpret(state)?;
+            arguments.push(arg);
+        }
+
+        let this_object = state.heap.get(this_ref).to_object()?;
+        let property = match this_object.properties.get(&method_name) {
+            Some(prop) => prop,
+            None => {
+                let msg = format!("{:?}.{} is not a function", callee_expr, &method_name);
+                return Err(Exception::TypeError(msg));
+            }
+        };
+        match property.content {
+            object::Content::Data(_) => {
+                let msg = format!("{:?}.{} is not a function", callee_expr, &method_name);
+                return Err(Exception::TypeError(msg));
+            }
+            object::Content::NativeFunction(func) => {
+                func(this_ref, method_name, arguments, &mut state.heap)
+            }
+        }
+    }
+}

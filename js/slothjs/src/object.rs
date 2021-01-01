@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt;
 
 use serde_json::json;
 
@@ -72,6 +73,9 @@ impl JSValue {
                             let value = heap.get(heapref);
                             value.to_string(heap)
                         }
+                        Content::NativeFunction(func) => {
+                            format!("*{:x}", func_ptr(func))
+                        }
                     };
                     s.push_str(&val);
                     s.push(',');
@@ -124,6 +128,7 @@ impl JSValue {
                             let jvalue = value.to_json(heap);
                             json[key] = jvalue;
                         }
+                        Content::NativeFunction(_) => (),
                     }
                 }
                 json
@@ -310,15 +315,14 @@ impl Heap {
     pub fn property_or_create(&mut self, objref: JSRef, name: &str) -> Result<JSRef, Exception> {
         let object = self.get(objref).to_object()?;
         if let Some(property) = object.properties.get(name) {
-            match property.content {
-                Content::Data(propref) => Ok(propref),
+            if let Content::Data(propref) = property.content {
+                return Ok(propref);
             }
-        } else {
-            let propref = self.allocate(JSValue::Undefined);
-            let object = self.get_mut(objref).to_object_mut()?;
-            object.set_property(name, propref);
-            Ok(propref)
         }
+        let propref = self.allocate(JSValue::Undefined);
+        let object = self.get_mut(objref).to_object_mut()?;
+        object.set_property(name, propref);
+        Ok(propref)
     }
 
     pub fn property_assign(
@@ -451,9 +455,10 @@ impl JSObject {
     }
 
     pub fn property_ref(&self, name: &str) -> Option<JSRef> {
-        self.properties.get(name).map(|prop|
+        self.properties.get(name).and_then(|prop|
             match prop.content {
-                Content::Data(href) => href
+                Content::Data(href) => Some(href),
+                Content::NativeFunction(_) => None,
             }
         )
     }
@@ -486,13 +491,50 @@ impl Property {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+pub type NativeFunction = fn(
+    this_ref: JSRef,
+    method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap,
+) -> Result<Interpreted, Exception>;
+
+fn func_ptr(func: NativeFunction) -> usize {
+    func as *const () as usize
+}
+
+#[derive(Clone)]
 pub enum Content {
     Data(JSRef),
+    NativeFunction(NativeFunction),
     /*
     Accesssor{
         get: Option<Callable>,
         set: Option<Callable>,
     },
     */
+}
+
+impl PartialEq for Content {
+    fn eq(&self, other: &Content) -> bool {
+        match (self, other) {
+            (Content::Data(dit), Content::Data(dat)) =>
+                dit == dat,
+            (Content::NativeFunction(dit), Content::NativeFunction(dat)) =>
+                func_ptr(*dit) == func_ptr(*dat),
+            _ => false
+        }
+    }
+}
+
+impl fmt::Debug for Content {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Content::Data(heapref) => {
+                write!(f, "Content::Data({:?})", heapref)
+            }
+            Content::NativeFunction(func) => {
+                write!(f, "Content::NativeFunction(*{:x})", func_ptr(*func))
+            }
+        }
+    }
 }
