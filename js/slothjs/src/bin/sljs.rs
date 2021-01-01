@@ -23,6 +23,10 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
+use atty::Stream;
+
+use slothjs::error::{Exception, ParseError};
+use slothjs::object::{JSON, JSValue};
 use slothjs::ast::Program;
 use slothjs::interpret::{
     Interpretable,
@@ -109,28 +113,110 @@ fn run_esprima(esparse_path: &Path, input: &str) -> io::Result<(String, String)>
     Ok((stdout, stderr))
 }
 
-fn main() -> io::Result<()> {
-    // TODO: REPL mode
-    let esparse_path = prepare_temporary_directory()?;
+enum EvalError {
+    /// Esprima was not able to produce AST JSON
+    Syntax(io::Error),
 
+    /// JSON from Esprima cannot be parsed by serde_json
+    JSON(serde_json::Error),
+
+    /// slothjs parser failed to read Esprima JSON structure
+    Parser(ParseError<JSON>),
+
+    /// A run-time exception thrown by the interpreter
+    Exception(Exception),
+
+    /// Interpreted value cannot be serialized back to JSON
+    Value(Exception),
+}
+
+fn evaluate_input(esparse_path: &Path, input: &str, state: &mut RuntimeState) -> Result<JSValue, EvalError> {
+    let (stdout, _stderr) = run_esprima(esparse_path, input)
+        .map_err(|e| EvalError::Syntax(e))?;
+    let json = serde_json::from_str(&stdout)
+        .map_err(|e| EvalError::JSON(e))?;
+    let ast = Program::try_from(&json)
+        .map_err(|e| EvalError::Parser(e))?;
+
+    let result = ast.interpret(state)
+        .map_err(|e| EvalError::Exception(e))?;
+
+    result.to_value(&state.heap)
+        .map_err(|e| EvalError::Value(e))
+}
+
+#[allow(unreachable_code)]
+fn batch_main(esparse_path: &Path) -> io::Result<()> {
     let mut input  = String::new();
     io::stdin().lock().read_to_string(&mut input)?;
 
-    let (stdout, _stderr) = run_esprima(&esparse_path, &input)
-        .unwrap_or_else(|e| die_io("Syntax error", e, 1) );
-    let json = serde_json::from_str(&stdout)
-        .unwrap_or_else(|e| die("JSON error", e, 2) );
-    let ast = Program::try_from(&json)
-        .unwrap_or_else(|e| die("Parser error", e, 3) );
-
     let mut state = RuntimeState::new();
-    let result = ast.interpret(&mut state)
-        .unwrap_or_else(|e| die("Error", e, 4));
-
-    let value = result.to_value(&state.heap)
-        .unwrap_or_else(|e| die("Value error", e, 5));
+    let value = evaluate_input(esparse_path, &input, &mut state).map_err(|e| {
+        match e {
+            EvalError::Syntax(e) => die_io("SyntaxError", e, 1),
+            EvalError::JSON(e) => die("JSONError", e, 2),
+            EvalError::Parser(e) => die("ParseError", e, 3),
+            EvalError::Exception(e) => die("Exception", e, 4),
+            EvalError::Value(e) => die("ValueError", e, 5),
+        };
+        io::Error::from(io::ErrorKind::Other)
+    })?;
     let output = value.to_string(&state.heap);
     println!("{}", output);
 
     Ok(())
+}
+
+fn repl_main(esparse_path: &Path) -> io::Result<()> {
+    let mut state = RuntimeState::new();
+
+    let stdin = io::stdin();
+    let mut input_iter = stdin.lock().lines();
+
+    loop {
+        // prompt
+        print!("sljs> ");
+        io::stdout().flush().unwrap();
+
+        // get input
+        let input = input_iter.next();
+        if input.is_none() {
+            break;
+        }
+        let input = input.unwrap().unwrap();
+
+        // evaluate
+        match evaluate_input(esparse_path, &input, &mut state) {
+            Ok(value) => {
+                let output = value.to_string(&state.heap);
+                println!("{}", output);
+            },
+            Err(EvalError::Syntax(err)) => {
+                eprintln!("SyntaxError: {:?}", err.kind());
+                eprintln!("{}", err.get_ref().unwrap());
+            }
+            Err(EvalError::JSON(e)) =>
+                die("JSONError", e, 2),
+            Err(EvalError::Parser(e)) => {
+                eprintln!("ParseError: {:?}", e);
+            }
+            Err(EvalError::Exception(e)) => {
+                eprintln!("Exception: {:?}", e);
+            }
+            Err(EvalError::Value(e)) =>
+                die("ValueError", e, 5),
+        };
+    }
+
+    Ok(())
+}
+
+fn main() -> io::Result<()> {
+    let esparse_path = prepare_temporary_directory()?;
+
+    if atty::is(Stream::Stdin) {
+        repl_main(&esparse_path)
+    } else {
+        batch_main(&esparse_path)
+    }
 }

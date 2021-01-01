@@ -6,6 +6,7 @@ edition = "2018"
 default-run = "sljs"
 
 [dependencies]
-either = "1.6.1"
+atty = "0.2"        # TODO: make this binary-only somehow
+#either = "1.6.1"
 serde = "1.0"
 serde_json = "1.0"
