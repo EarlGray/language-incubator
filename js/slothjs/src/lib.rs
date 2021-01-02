@@ -1,6 +1,6 @@
 pub mod ast;
 pub mod object;
-mod naive;
+mod parse;
 pub mod error;
 pub mod interpret;
 mod function;
