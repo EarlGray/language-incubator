@@ -255,12 +255,13 @@ fn test_member_expression() {
 fn test_assignment() {
     assert_eq!( eval("var a = 1; a = 2; a"),            JSON::from(2.0));
     assert_eq!( eval("a = b = 1; a + b"),               JSON::from(2.0));
+    assert_eq!( eval("var a = 1; a += 1; a"),           JSON::from(2.0));
+    assert_eq!( eval("var a = 1; a += 1"),              JSON::from(2.0));
     /*
     assert_eq!( eval("var a = 3; a *= a; a"),            JSValue::from(9));
     assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
     assert_eq!( eval("var a = 3; a /= a; a"),            JSValue::from(1));
     assert_eq!( eval("var a = 13; a %= 8; a"),            JSValue::from(5));
-    assert_eq!( eval("var a = 1; a += 1; a"),            JSValue::from(2));
     assert_eq!( eval("var a = 1; a -= 1; a"),            JSValue::from(0));
     assert_eq!( eval("var a = 1; a <<= 4; a"),            JSValue::from(16));
     assert_eq!( eval("var a = 32; a >>= 4; a"),            JSValue::from(2));
@@ -278,6 +279,9 @@ fn test_scope() {
         .kind_eq(&Exception::ReferenceNotFound(String::new()))
     );
     assert!( evalexc("a = a + 1")
+        .kind_eq(&Exception::ReferenceNotFound(String::from("a")))
+    );
+    assert!( evalexc("a += 1")
         .kind_eq(&Exception::ReferenceNotFound(String::from("a")))
     );
 }
@@ -319,7 +323,7 @@ fn test_loops() {
     // for (<init>; <test>; <update)
     assert_eq!( eval(r#"
         var a = 0;
-        for (var i = 0; i < 5; i = i + 1) {
+        for (var i = 0; i < 5; i += 1) {
             a = a + 1;
         }
         a

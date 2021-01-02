@@ -104,7 +104,7 @@ pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
 #[derive(Clone, Debug)]
 pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
     Plus,
     EqEq,
@@ -113,7 +113,4 @@ pub enum BinOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum AssignOp {
-    Equal,
-}
-
+pub struct AssignOp(pub Option<BinOp>);

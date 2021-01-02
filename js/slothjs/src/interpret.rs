@@ -283,39 +283,40 @@ impl Interpretable for ObjectExpression {
 
 impl Interpretable for AssignmentExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        let AssignmentExpression(leftexpr, op, valexpr) = self;
+        let AssignmentExpression(leftexpr, AssignOp(modop), valexpr) = self;
 
-        // this must go before a possible declare_var()
+        // this must happen before a possible declare_var()
         let value = valexpr.interpret(state)?;
 
-        if let Expr::Identifier(name) = leftexpr.as_ref() {
-            // `a = 1` should create a variable;
-            // `a.one = 1` without `a` should fail.
-            state.declare_var(&name.0, None)?;
-        };
+        if modop.is_none() {
+            if let Expr::Identifier(name) = leftexpr.as_ref() {
+                // `a = 1` should create a variable;
+                // `a.one = 1` without `a` should fail.
+                state.declare_var(&name.0, None)?;
+            }
+        }
         let assignee = leftexpr.interpret(state)?;
-
         match assignee {
-            Interpreted::Member{of, name} => {
-                match op {
-                    AssignOp::Equal => Ok(()),
-                    // _ => Err()
-                }?;
+            Interpreted::Member{of, name} if modop.is_none() => {
                 let objref = of.to_ref(&state.heap)?;
                 state.heap.property_assign(objref, &name, &value)?;
+                Ok(value)
             }
             Interpreted::Ref(href) => {
-                let value = match op {
-                    AssignOp::Equal => value.to_value(&state.heap)?
+                let objvalue = state.heap.get(href);
+                let value = value.to_value(&state.heap)?;
+                let value = match modop {
+                    None => value,
+                    Some(BinOp::Plus) =>
+                        JSValue::plus(objvalue, &value, &state.heap),
+                    Some(op) =>
+                        panic!(format!("Binary operation {:?} cannot be used in assignment", op))
                 };
-                *state.heap.get_mut(href) = value;
+                *state.heap.get_mut(href) = value.clone();
+                Ok(Interpreted::Value(value))
             }
-            _ => {
-                return Err(Exception::TypeErrorCannotAssign(assignee));
-            }
-        };
-
-        Ok(value)
+            _ => Err(Exception::TypeErrorCannotAssign(assignee))
+        }
     }
 }
 

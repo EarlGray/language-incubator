@@ -229,14 +229,15 @@ impl TryFrom<&JSON> for Expr {
                 let left = Expr::try_from(jleft)?;
 
                 let jop = json_get_str(jexpr, "operator")?;
-                let op = match jop {
-                    "=" => AssignOp::Equal,
+                let modop = match jop {
+                    "=" => None,
+                    "+=" => Some(BinOp::Plus),
                     _ => return Err(ParseError::UnexpectedValue{
-                        want: "=",
+                        want: "= | +=",
                         value: jexpr.get("operator").unwrap().clone()
                     }),
                 };
-                let expr = AssignmentExpression(Box::new(left), op, Box::new(right));
+                let expr = AssignmentExpression(Box::new(left), AssignOp(modop), Box::new(right));
                 Expr::Assign(expr)
             }
             "BinaryExpression" => {

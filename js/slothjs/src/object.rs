@@ -352,7 +352,8 @@ impl Heap {
     pub fn property_assign(
         &mut self,
         objref: JSRef,
-        name: &str, what: &Interpreted
+        name: &str,
+        what: &Interpreted
     ) -> Result<(), Exception> {
         if let Ok(valref) = what.to_ref(self) {
             if let JSValue::Object{..} = self.get(valref) {

@@ -16,7 +16,12 @@
 ** TODO ~+~ between all types
 * TODO AssignmentExpression
 ** DONE [2020-12-21 Mon] ~=~
-** TODO ~+=~
+** DONE [2021-01-02 Sat] ~+=~
+** TODO ~-=~
+** TODO ~*=~
+** TODO ~/=~
+** TODO ~&=~
+** TODO ~|=~
 * TODO SwitchStatement
 * TODO UpdateExpression
 * TODO WhileStatement
