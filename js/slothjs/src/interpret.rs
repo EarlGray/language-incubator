@@ -22,6 +22,21 @@ impl RuntimeState {
         self.heap.property_assign(Heap::GLOBAL, name, &value)?;
         Ok(())
     }
+
+    fn lookup_var(&mut self, name: &str) -> Option<Interpreted> {
+        let global_object = self.heap.get(Heap::GLOBAL).to_object().unwrap();
+        global_object.properties.get(name).map(|prop|
+            match prop.content {
+                object::Content::Data(dataref) =>
+                    Interpreted::Ref(dataref),
+                object::Content::NativeFunction(_) =>
+                    Interpreted::Member{
+                        of: Box::new(Interpreted::Ref(Heap::GLOBAL)),
+                        name: name.to_string()
+                    },
+            }
+        )
+    }
 }
 
 // ==============================================
@@ -159,16 +174,13 @@ impl Interpretable for Literal {
 }
 
 impl Interpretable for Identifier {
-    fn interpret(&self, _state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        if self.0 == "undefined" {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let name = &self.0;
+        if name == "undefined" {
             return Ok(Interpreted::Value(JSValue::Undefined));
-        }
-        let name = self.0.clone();
-
-        Ok(Interpreted::Member{
-            of: Box::new(Interpreted::Ref(Heap::GLOBAL)),
-            name
-        })
+        };
+        state.lookup_var(name)
+            .ok_or(Exception::ReferenceNotFound(name.to_string()))
     }
 }
 
@@ -189,39 +201,13 @@ impl Interpretable for BinaryExpression {
         let BinaryExpression(lexpr, op, rexpr) = self;
         let lval = lexpr.interpret(state)?.to_value(&state.heap)?;
         let rval = rexpr.interpret(state)?.to_value(&state.heap)?;
-        match op {
-            BinOp::Plus => {
-                if !(lval.is_string() || rval.is_string()) {
-                    if let Some(lnum) = lval.numberify() {
-                        if let Some(rnum) = rval.numberify() {
-                            return Ok(Interpreted::Value(JSValue::from(lnum + rnum)));
-                        }
-                    }
-                }
-                let lvalstr = lval.stringify(&state.heap);
-                let rvalstr = rval.stringify(&state.heap);
-                let result = JSValue::from(lvalstr + &rvalstr);
-                return Ok(Interpreted::Value(result));
-            }
-            BinOp::EqEq => {
-                let result = lval.loose_eq(&rval);
-                Ok(Interpreted::Value(JSValue::Bool(result)))
-            }
-            BinOp::Less => {
-                // TODO: Abstract Relational Comparison
-                // TODO: toPrimitive()
-                if let JSValue::String(lstr) = lval.clone() {
-                    if let JSValue::String(rstr) = rval.clone() {
-                        let result = JSValue::from(lstr < rstr);
-                        return Ok(Interpreted::Value(result));
-                    }
-                };
-                let lnum = lval.numberify().unwrap_or(f64::NAN);
-                let rnum = rval.numberify().unwrap_or(f64::NAN);
-                let result = JSValue::from(lnum < rnum);
-                Ok(Interpreted::Value(result))
-            }
-        }
+        let result = match op {
+            BinOp::EqEq => JSValue::from(lval.loose_eq(&rval)),
+            BinOp::NotEq => JSValue::from(!lval.loose_eq(&rval)),
+            BinOp::Plus => JSValue::plus(&lval, &rval, &state.heap),
+            BinOp::Less => JSValue::less(&lval, &rval, &state.heap),
+        };
+        Ok(Interpreted::Value(result))
     }
 }
 
@@ -243,14 +229,12 @@ impl Interpretable for MemberExpression {
         // get the object reference for member computation:
         let objresult = objexpr.interpret(state)?;
         let objref = objresult.to_ref(&state.heap).map_err(|_| {
-            let err = format!("Cannot set property {} of undefined", propname);
-            Exception::TypeError(err)
+            Exception::ReferenceNotAnObject(objresult.clone())
         })?;
 
-        let object = state.heap.get(objref).to_object().map_err(|_| {
-            let err = format!("Cannot set property {} of undefined", propname);
-            Exception::TypeError(err)
-        })?;
+        let object = state.heap.get(objref).to_object().map_err(|_|
+            Exception::ReferenceNotAnObject(objresult.clone())
+        )?;
 
         let result = match object.property_ref(&propname) {
             Some(propref) => Interpreted::Ref(propref),
@@ -278,7 +262,7 @@ impl Interpretable for ObjectExpression {
             };
             let valresult = valexpr.interpret(state)?;
             let propref = valresult.to_ref_or_allocate(&mut state.heap)?;
-            object.set_property(&keyname, propref);
+            object.set_property_ref(&keyname, propref);
         }
 
         let object = JSValue::Object(object);
@@ -291,18 +275,23 @@ impl Interpretable for AssignmentExpression {
         let AssignmentExpression(leftexpr, op, valexpr) = self;
 
         let value = valexpr.interpret(state)?;
+
+        if let Expr::Identifier(name) = leftexpr.as_ref() {
+            // `a = 1` should create a variable;
+            // `a.one = 1` without `a` should fail.
+            state.declare_var(&name.0, None)?;
+        };
         let assignee = leftexpr.interpret(state)?;
         match assignee {
             Interpreted::Member{of, name} => {
-                let objref = of.to_ref_or_allocate(&mut state.heap)?;
+                let objref = of.to_ref(&state.heap)?;
                 state.heap.property_assign(objref, &name, &value)?;
             }
             Interpreted::Ref(href) => {
                 *state.heap.get_mut(href) = value.to_value(&state.heap)?;
             }
             _ => {
-                let msg = format!("Invalid left hand side: {:?}", &value);
-                return Err(Exception::TypeError(msg));
+                return Err(Exception::TypeErrorCannotAssign(assignee));
             }
         };
 
@@ -316,17 +305,15 @@ impl Interpretable for CallExpression {
 
         let callee = callee_expr.interpret(state)?;
 
-        let (this_ref, method_name) = match callee {
+        let (this_ref, method_name) = match &callee {
             Interpreted::Ref(_func_ref) =>
                 todo!(),
             Interpreted::Member{ of, name } => {
                 let this_ref = of.to_ref(&state.heap)?;
                 (this_ref, name.clone())
             }
-            Interpreted::Value(value) => {
-                let msg = format!("{:?} is not a function", value);
-                return Err(Exception::TypeError(msg));
-            }
+            Interpreted::Value(_) =>
+                return Err(Exception::TypeErrorNotCallable(callee.clone()))
         };
 
         let mut arguments = vec![];
@@ -336,21 +323,12 @@ impl Interpretable for CallExpression {
         }
 
         let this_object = state.heap.get(this_ref).to_object()?;
-        let property = match this_object.properties.get(&method_name) {
-            Some(prop) => prop,
-            None => {
-                let msg = format!("{:?}.{} is not a function", callee_expr, &method_name);
-                return Err(Exception::TypeError(msg));
-            }
+        let property = this_object.properties.get(&method_name)
+            .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?;
+        let func = match property.content {
+            object::Content::NativeFunction(func) => func,
+            _ => return Err(Exception::TypeErrorNotCallable(callee.clone()))
         };
-        match property.content {
-            object::Content::Data(_) => {
-                let msg = format!("{:?}.{} is not a function", callee_expr, &method_name);
-                return Err(Exception::TypeError(msg));
-            }
-            object::Content::NativeFunction(func) => {
-                func(this_ref, method_name, arguments, &mut state.heap)
-            }
-        }
+        func(this_ref, method_name, arguments, &mut state.heap)
     }
 }

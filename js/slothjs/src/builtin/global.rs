@@ -25,8 +25,6 @@ fn parse_int(
  *  init
  */
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
-    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
-    
     // TODO: detect circular references in JSValue::to_string()
     //   to avoid stack overflow on trying to display `global` in REPL.
     // The `global` self-reference:
@@ -39,7 +37,12 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
         enumerable: true,
         content: object::Content::NativeFunction(parse_int),
     };
+    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
     global_object.properties.insert("parseInt".to_string(), parse_int_prop);
+
+    // NaN
+    let nan = Interpreted::Value(JSValue::Number(f64::NAN));
+    heap.property_assign(Heap::GLOBAL, "NaN", &nan)?;
 
     Ok(())
 }

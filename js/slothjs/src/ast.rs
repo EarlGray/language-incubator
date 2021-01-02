@@ -108,6 +108,7 @@ pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 pub enum BinOp {
     Plus,
     EqEq,
+    NotEq,
     Less,
 }
 

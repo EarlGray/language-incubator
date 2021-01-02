@@ -118,31 +118,32 @@ fn test_binary_operations() {
     // o_O
     assert!( evalbool("2 == 2") );
     assert!( !evalbool("2 == 3") );
-    //assert!( evalbool("'2' == 2") );
+    assert!( evalbool("'2' == 2") );
     assert!( !evalbool("0 == null") );
-    //assert!( evalbool("0 == false") );
+    assert!( evalbool("0 == false") );
     //assert!( evalbool("0 == []") );
     //assert!( !evalbool("[] == []") );
     //assert!( !evalbool("0 == {}") );
+    //assert!( !evalbool("{} == {}") );
+    //assert!( evalbool("var a = {}; a == a") );
     assert!( evalbool("null == null") );
     assert!( evalbool("null == undefined") );
-    //assert!( !evalbool("NaN == NaN") );
+    assert!( !evalbool("NaN == NaN") );
 
-    /*
     assert!( !evalbool("2 != 2") );
     assert!( evalbool("2 != 3") );
     assert!( !evalbool("'2' != 2") );
     assert!( evalbool("0 != null") );
     assert!( !evalbool("0 != false") );
-    assert!( !evalbool("0 != []") );
-    assert!( evalbool("[] != []") );
-    assert!( evalbool("0 != {}") );
+    //assert!( !evalbool("0 != []") );
+    //assert!( evalbool("[] != []") );
+    //assert!( evalbool("0 != {}") );
     assert!( !evalbool("null != null") );
     assert!( !evalbool("null != undefined") );
     assert!( evalbool("NaN != NaN") );
-    */
 
     /*
+    assert!( evalbool("2 !== 3") );
     assert!( evalbool("2 === 2") );
     assert!( !evalbool("2 === 3") );
     assert!( !evalbool("'2' === 2") );
@@ -154,8 +155,6 @@ fn test_binary_operations() {
     assert!( evalbool("null === null") );
     assert!( !evalbool("null === undefined") );
     assert!( !evalbool("NaN === NaN") );
-
-    assert!( evalbool("2 !== 3") );
     */
 
     assert!( !evalbool("'a' < 'a'") );
@@ -166,12 +165,11 @@ fn test_binary_operations() {
     assert!( evalbool("'a' < 'b'") );
     assert!( !evalbool("'aa' < 'a'") );
     assert!( evalbool("null < 1") );
-    //assert!( !evalbool("undefined < 1") );
+    assert!( !evalbool("undefined < 1") );
+    assert!( !evalbool("NaN < 3") );
+    assert!( !evalbool("NaN < NaN") );
+    assert!( !evalbool("undefined < NaN") );
     //assert!( evalbool("[1, 1] < [2]") );
-    //assert!( !evalbool("NaN < 3") );
-    //assert!( !evalbool("NaN < NaN") );
-    //assert!( !evalbool("undefined < NaN") );
-    //assert!( !evalbool("undefined < 1") );
 
     /*
     assert!( !evalbool("'a' > 'a'") );
@@ -249,15 +247,15 @@ fn test_member_expression() {
         eval("let a = {}; a.sub = {}; a.sub.one = 1; a"),
         json!({"sub": {"one": 1.0}})
     );
-    assert_eq!(
-        evalexc("let a = {}; a.sub.one = 1"),
-        Exception::TypeError("Cannot set property one of undefined".to_string())
+    assert!( evalexc("let a = {}; a.sub.one = 1")
+        .kind_eq(&Exception::ReferenceNotAnObject(Interpreted::VOID))
     );
 }
 
 #[test]
 fn test_assignment() {
     assert_eq!( eval("var a = 1; a = 2; a"),            JSON::from(2.0));
+    assert_eq!( eval("a = b = 1; a + b"),               JSON::from(2.0));
     /*
     assert_eq!( eval("var a = 3; a *= a; a"),            JSValue::from(9));
     assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
@@ -272,6 +270,14 @@ fn test_assignment() {
     assert_eq!( eval("var a = 6; a ^= 9; a"),            JSValue::from(15));
     assert_eq!( eval("var a = 3; a |= 6; a"),            JSValue::from(7));
     */
+}
+
+#[test]
+fn test_scope() {
+    assert_eq!( eval("a = 1; a"),   JSON::from(1.0) );
+    assert!( evalexc("b")
+        .kind_eq(&Exception::ReferenceNotFound(String::new()))
+    );
 }
 
 /*
@@ -450,6 +456,10 @@ fn test_objects() {
         eval("var a = {b: {}}; var b = a.b; b.one = 1; a.b.one"),
         JSON::from(1.0)
     );
+
+    assert!( evalexc("a.one = 1").kind_eq(
+            &Exception::ReferenceNotFound("a".to_string())
+    ));
 }
 
 #[test] fn test_scratch() { }

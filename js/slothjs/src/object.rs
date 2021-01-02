@@ -93,8 +93,7 @@ impl JSValue {
             Ok(object)
         } else {
             /* TODO: wrap a primitive with an object */
-            let msg = format!("Expected an object, found a primitive value: {:?}", self);
-            Err(Exception::ReferenceError(msg))
+            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
         }
     }
 
@@ -103,8 +102,7 @@ impl JSValue {
             Ok(object)
         } else {
             /* TODO: wrap a primitive with an object? */
-            let msg = format!("Expected an object, found a primitive value: {:?}", self);
-            Err(Exception::ReferenceError(msg))
+            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
         }
     }
 
@@ -205,6 +203,32 @@ impl JSValue {
                 return false;
             }
         }
+    }
+
+    pub fn plus(&self, other: &JSValue, heap: &Heap) -> JSValue {
+        if !(self.is_string() || other.is_string()) {
+            if let Some(lnum) = self.numberify() {
+                if let Some(rnum) = other.numberify() {
+                    return JSValue::from(lnum + rnum);
+                }
+            }
+        }
+        let lvalstr = self.stringify(heap);
+        let rvalstr = other.stringify(heap);
+        JSValue::from(lvalstr + &rvalstr)
+    }
+
+    pub fn less(&self, other: &JSValue, _heap: &Heap) -> JSValue {
+        // TODO: Abstract Relational Comparison
+        // TODO: toPrimitive()
+        if let JSValue::String(lstr) = self {
+            if let JSValue::String(rstr) = other {
+                return JSValue::from(lstr < rstr);
+            }
+        };
+        let lnum = self.numberify().unwrap_or(f64::NAN);
+        let rnum = other.numberify().unwrap_or(f64::NAN);
+        JSValue::from(lnum < rnum)
     }
 }
 
@@ -321,7 +345,7 @@ impl Heap {
         }
         let propref = self.allocate(JSValue::Undefined);
         let object = self.get_mut(objref).to_object_mut()?;
-        object.set_property(name, propref);
+        object.set_property_ref(name, propref);
         Ok(propref)
     }
 
@@ -333,7 +357,7 @@ impl Heap {
         if let Ok(valref) = what.to_ref(self) {
             if let JSValue::Object{..} = self.get(valref) {
                 let object = self.get_mut(objref).to_object_mut()?;
-                object.set_property(&name, valref);
+                object.set_property_ref(&name, valref);
                 return Ok(());
             }
         }
@@ -343,25 +367,13 @@ impl Heap {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn get_property(&self, object: &JSObject, name: &str) -> Option<&JSValue> {
-        object.property_ref(name).map(|propref| self.get(propref))
-    }
-
-    /*
-    pub fn new_object(&mut self) -> JSRef {
-        let object = JSObject::new();
-        self.allocate(JSValue::Object(object))
-    }
-    */
-
     pub fn object_from_json(&mut self, json: &JSON) -> JSValue {
         if let Some(obj) = json.as_object() {
             let mut object = JSObject::new();
             for (key, jval) in obj.iter() {
                 let value = self.object_from_json(jval);
                 let propref = self.allocate(value);
-                object.set_property(key, propref);
+                object.set_property_ref(key, propref);
             }
             JSValue::Object(object)
         //} else if let Some(a) = json.as_array() {
@@ -375,7 +387,7 @@ impl Heap {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JSRef(usize);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Interpreted {
     /// An object member; might not exist yet.
     Member{ of: Box<Interpreted>, name: String },
@@ -414,15 +426,11 @@ impl Interpreted {
             Interpreted::Member{of, name} => {
                 let objref = of.to_ref(heap)?;
                 let object = heap.get(objref).to_object()?;
-                object.property_ref(name).ok_or_else(|| {
-                    let msg = format!("Cannot get proprety {} of undefined", name);
-                    Exception::TypeError(msg)
-                })
+                object.property_ref(name).ok_or_else(||
+                    Exception::TypeErrorGetProperty(self.clone(), name.to_string())
+                )
             }
-            _ => {
-                let msg = format!("to_ref(): {:?}", self);
-                Err(Exception::ReferenceError(msg))
-            }
+            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
         }
     }
 
@@ -450,8 +458,17 @@ impl JSObject {
         JSObject{ properties }
     }
 
-    pub fn set_property(&mut self, name: &str, propref: JSRef) {
-        self.properties.insert(name.to_string(), Property::from(propref));
+    pub fn set_property_ref(&mut self, name: &str, propref: JSRef) {
+        match self.properties.get_mut(name) {
+            Some(prop) =>
+                prop.content = Content::Data(propref),
+            None => {
+                self.properties.insert(
+                    name.to_string(),
+                    Property::from_ref(propref)
+                );
+            }
+        }
     }
 
     pub fn property_ref(&self, name: &str) -> Option<JSRef> {
@@ -475,7 +492,7 @@ pub struct Property {
 }
 
 impl Property {
-    pub fn from(heapref: JSRef) -> Property {
+    pub fn from_ref(heapref: JSRef) -> Property {
         Property {
             enumerable: true,
             writable: true,

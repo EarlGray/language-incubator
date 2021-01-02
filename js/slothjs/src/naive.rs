@@ -250,6 +250,7 @@ impl TryFrom<&JSON> for Expr {
                 let op = match opstr {
                     "+" => BinOp::Plus,
                     "==" => BinOp::EqEq,
+                    "!=" => BinOp::NotEq,
                     "<" => BinOp::Less,
                     _ => return Err(ParseError::UnexpectedValue{
                         want: "+|==",
