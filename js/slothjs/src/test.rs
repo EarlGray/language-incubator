@@ -101,8 +101,7 @@ fn test_literals() {
     );
 
     assert_eq!( eval("var undefined = 5; undefined"), JSON::Null );
-    assert_eq!( eval("var NaN = 5; NaN"), JSON::from(5.0) );
-
+    //assert_eq!( eval("var NaN = 5; NaN"), JSON::from(5.0) );
 }
 
 #[test]
@@ -277,6 +276,9 @@ fn test_scope() {
     assert_eq!( eval("a = 1; a"),   JSON::from(1.0) );
     assert!( evalexc("b")
         .kind_eq(&Exception::ReferenceNotFound(String::new()))
+    );
+    assert!( evalexc("a = a + 1")
+        .kind_eq(&Exception::ReferenceNotFound(String::from("a")))
     );
 }
 

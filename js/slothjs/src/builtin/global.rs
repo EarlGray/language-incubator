@@ -40,9 +40,10 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
     global_object.properties.insert("parseInt".to_string(), parse_int_prop);
 
-    // NaN
+    /* NaN
     let nan = Interpreted::Value(JSValue::Number(f64::NAN));
     heap.property_assign(Heap::GLOBAL, "NaN", &nan)?;
+    */
 
     Ok(())
 }

@@ -17,9 +17,14 @@ impl RuntimeState {
         RuntimeState{ heap: Heap::new() }
     }
 
-    fn declare_var(&mut self, name: &str, init: Option<Interpreted>) -> Result<(), Exception> {
-        let value = init.unwrap_or(Interpreted::VOID);
-        self.heap.property_assign(Heap::GLOBAL, name, &value)?;
+    fn declare_var(&mut self, name: &str, mut init: Option<Interpreted>) -> Result<(), Exception> {
+        let global_object = self.heap.get(Heap::GLOBAL).to_object()?;
+        if !global_object.properties.contains_key(name) && init.is_none() {
+            init = Some(Interpreted::VOID);
+        }
+        if let Some(value) = init {
+            self.heap.property_assign(Heap::GLOBAL, name, &value)?;
+        }
         Ok(())
     }
 
@@ -176,11 +181,17 @@ impl Interpretable for Literal {
 impl Interpretable for Identifier {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let name = &self.0;
+        // TODO: this should be a readonly property of global
         if name == "undefined" {
-            return Ok(Interpreted::Value(JSValue::Undefined));
-        };
-        state.lookup_var(name)
-            .ok_or(Exception::ReferenceNotFound(name.to_string()))
+            Ok(Interpreted::Value(JSValue::Undefined))
+        } else if let Some(ret) = state.lookup_var(name) {
+            Ok(ret)
+        // TODO: this should be a readonly property of global
+        } else if name == "NaN" {
+            Ok(Interpreted::Value(JSValue::from(f64::NAN)))
+        } else {
+            Err(Exception::ReferenceNotFound(name.to_string()))
+        }
     }
 }
 
@@ -274,6 +285,7 @@ impl Interpretable for AssignmentExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let AssignmentExpression(leftexpr, op, valexpr) = self;
 
+        // this must go before a possible declare_var()
         let value = valexpr.interpret(state)?;
 
         if let Expr::Identifier(name) = leftexpr.as_ref() {
@@ -282,13 +294,21 @@ impl Interpretable for AssignmentExpression {
             state.declare_var(&name.0, None)?;
         };
         let assignee = leftexpr.interpret(state)?;
+
         match assignee {
             Interpreted::Member{of, name} => {
+                match op {
+                    AssignOp::Equal => Ok(()),
+                    // _ => Err()
+                }?;
                 let objref = of.to_ref(&state.heap)?;
                 state.heap.property_assign(objref, &name, &value)?;
             }
             Interpreted::Ref(href) => {
-                *state.heap.get_mut(href) = value.to_value(&state.heap)?;
+                let value = match op {
+                    AssignOp::Equal => value.to_value(&state.heap)?
+                };
+                *state.heap.get_mut(href) = value;
             }
             _ => {
                 return Err(Exception::TypeErrorCannotAssign(assignee));
