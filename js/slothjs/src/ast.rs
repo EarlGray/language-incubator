@@ -75,6 +75,7 @@ pub enum Expr {
     Member(MemberExpression),
     Assign(AssignmentExpression),
     Conditional(ConditionalExpression),
+    Unary(UnaryExpression),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -104,6 +105,9 @@ pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
 #[derive(Clone, Debug)]
 pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 
+#[derive(Clone, Debug)]
+pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
     Plus,
@@ -114,3 +118,14 @@ pub enum BinOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssignOp(pub Option<BinOp>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnOp {
+    Exclamation,
+    Minus,
+    Plus,
+    Tilde,
+    Typeof,
+    Void,
+    //Delete,
+}

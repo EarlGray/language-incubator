@@ -155,6 +155,7 @@ impl Interpretable for Expr {
             Expr::Object(expr) =>               expr.interpret(state),
             Expr::Assign(expr) =>               expr.interpret(state),
             Expr::Conditional(expr) =>          expr.interpret(state),
+            Expr::Unary(expr) =>                expr.interpret(state),
         }
     }
 }
@@ -199,6 +200,28 @@ impl Interpretable for BinaryExpression {
             BinOp::Less => JSValue::less(&lval, &rval, &state.heap),
         };
         Ok(Interpreted::Value(result))
+    }
+}
+
+impl Interpretable for UnaryExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let UnaryExpression(op, argexpr) = self;
+        let arg = argexpr.interpret(state)?;
+        let argvalue = arg.to_value(&state.heap)?;
+        let value = match op {
+            //UnOp::Delete => JSValue::from(arg.delete(&mut state.heap).is_ok()),
+            UnOp::Exclamation => JSValue::Bool(!argvalue.boolify()),
+            UnOp::Minus => JSValue::Number(- argvalue.numberify().unwrap_or(f64::NAN)),
+            UnOp::Plus => JSValue::Number(argvalue.numberify().unwrap_or(f64::NAN)),
+            UnOp::Typeof => JSValue::from(argvalue.type_of()),
+            UnOp::Tilde => {
+                let num = argvalue.numberify().unwrap_or(f64::NAN);
+                let num = if f64::is_nan(num) { 0.0 } else { num };
+                JSValue::from(-(1.0 + num))
+            }
+            UnOp::Void => JSValue::Undefined,
+        };
+        Ok(Interpreted::Value(value))
     }
 }
 

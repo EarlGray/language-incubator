@@ -403,18 +403,64 @@ fn test_exceptions() {
         a
     "#));
 }
+*/
 
 #[test]
-fn test_typeof() {
+fn test_unary_operations() {
+    assert_eq!( eval("+1"),                 JSON::from(1.0) );
+    assert_eq!( eval("+'1'"),               JSON::from(1.0) );
+    assert_eq!( eval("+false"),             JSON::from(0.0) );
+    assert!( evalbool("let v = +{}; v != v") );         // NaN
+    assert!( evalbool("let v = +'false'; v != v") );
+
+    assert_eq!( eval("-'1'"),               JSON::from(-1.0) );
+
+    assert!( evalbool("!false") );
+    assert!( !evalbool("!true") );
+    assert!( evalbool("!0") );
+    assert!( !evalbool("!1") );
+    assert!( evalbool("!!'yes'") );
+    assert!( evalbool("!!'0'") );
+    assert!( evalbool("!!'{}'") );
+    assert!( !evalbool("!!''") );
+    assert!( evalbool("!undefined") );
+
     assert_eq!( eval("typeof undefined"),   JSON::from("undefined"));
     assert_eq!( eval("typeof 1"),           JSON::from("number"));
     assert_eq!( eval("typeof ''"),          JSON::from("string"));
-
     assert_eq!( eval("typeof {}"),          JSON::from("object"));
-    assert_eq!( eval("typeof []"),          JSON::from("object"));
     assert_eq!( eval("typeof null"),        JSON::from("object"));
+    //assert_eq!( eval("typeof []"),          JSON::from("object"));
+
+    assert_eq!( eval("~-1"),                JSON::from(0.0));
+    assert_eq!( eval("~-2"),                JSON::from(1.0));
+    assert_eq!( eval("~2"),                 JSON::from(-3.0));
+    assert_eq!( eval("~2"),                 JSON::from(-3.0));
+    assert_eq!( eval("~NaN"),               JSON::from(-1.0));
+    assert_eq!( eval("~{}"),                JSON::from(-1.0));
+    assert_eq!( eval("~~''"),                JSON::from(0.0));
+    assert_eq!( eval("~~'whut'"),            JSON::from(0.0));
+
+    assert_eq!( eval("typeof void 'nope'"), JSON::from("undefined") );
+    assert_eq!( eval("typeof void {}"),     JSON::from("undefined") );
+
+    /*
+    assert_eq!( eval("let a = {one: 1}; delete a.one; a"),   json!({}) );
+    assert!( evalbool("let a = {one: 1}; delete a.one") );
+    assert!( evalbool("let a = {one: 1}; delete a['one']") );
+    assert_eq!( eval("let a = {one: 1}; delete a.two; a"),   json!({"one": 1}) );
+    assert!( evalbool("let a = {one: 1}; delete a.two") );
+    assert!( !evalbool("delete undefined") );   // global.undefined is not configurable
+    assert!( !evalbool("var a = 1; delete a")); // vars are not configurable
+    assert!( evalbool("a = 1; delete a") );     // but these are.
+    assert!( evalbool("delete 0") );            // don't ask.
+    assert!( evalbool("delete x") );
+    // assert!( evalbool("let a = ['one', 'two']; delete a[2]") );
+    // assert!( evalbool("let a = ['one', 'two']; delete a[1]") );
+    */
+
+    //assert_eq!( eval("let a = {one: 1}; delete a.one; a"),  json!({}) );
 }
-*/
 
 #[test]
 fn test_functions() {

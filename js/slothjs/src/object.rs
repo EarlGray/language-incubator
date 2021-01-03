@@ -181,6 +181,16 @@ impl JSValue {
         }
     }
 
+    pub fn type_of(&self) -> &'static str {
+        match self {
+            JSValue::Undefined => "undefined",
+            JSValue::Null | JSValue::Object(_) => "object",
+            JSValue::String(_) => "string",
+            JSValue::Number(_) => "number",
+            JSValue::Bool(_) => "boolean",
+        }
+    }
+
     /// Abstract Equality Comparison:
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_
     pub fn loose_eq(&self, other: &JSValue) -> bool {
@@ -448,6 +458,25 @@ impl Interpreted {
             }
         }
     }
+
+    /*
+    /// Corresponds to Javascript `delete` operator and all its weirdness.
+    /// Ok/Err correspond to `true`/`false` from `delete`.
+    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
+    pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
+        match self {
+            Interpreted::Member{ of, name } => {
+                let objref = of.to_ref(heap)?;
+                let object = heap.get_mut(objref).to_object_mut()?;
+                // TODO: do not remove non-configurable properties
+                // TODO: do not remove global/functions variables
+                object.properties.remove(name);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+    */
 }
 
 /// Javascript objects

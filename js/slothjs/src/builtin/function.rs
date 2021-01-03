@@ -1,3 +1,5 @@
+/// The implementation of the Function object.
+
 use crate::object::Heap;
 use crate::error::Exception;
 

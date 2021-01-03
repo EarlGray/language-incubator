@@ -1,3 +1,5 @@
+/// The implementation of the Object object
+
 use crate::error::Exception;
 use crate::object::{
     Interpreted,

@@ -345,6 +345,27 @@ impl TryFrom<&JSON> for Expr {
                 }
                 Expr::Object(ObjectExpression(properties))
             }
+            "UnaryExpression" => {
+                let jop = json_get_str(jexpr, "operator")?;
+                let op = match jop {
+                    "+" => UnOp::Plus,
+                    "-" => UnOp::Minus,
+                    "!" => UnOp::Exclamation,
+                    "~" => UnOp::Tilde,
+                    //"delete" => UnOp::Delete,
+                    "typeof" => UnOp::Typeof,
+                    "void" => UnOp::Void,
+                    _ => return Err(ParseError::UnexpectedValue{
+                        want: "+ | - | ! | ~ | typeof | void",
+                        value: jexpr.clone(),
+                    })
+                };
+
+                let jargument = json_get(jexpr, "argument")?;
+                let argument = Expr::try_from(jargument)?;
+
+                Expr::Unary(UnaryExpression(op, Box::new(argument)))
+            }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr.clone() }),
         };
