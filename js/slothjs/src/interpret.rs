@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use crate::object;
 use crate::object::{JSValue, Heap, Interpreted};
 use crate::error::Exception;
@@ -30,17 +28,10 @@ impl RuntimeState {
 
     fn lookup_var(&mut self, name: &str) -> Option<Interpreted> {
         let global_object = self.heap.get(Heap::GLOBAL).to_object().unwrap();
-        global_object.properties.get(name).map(|prop|
-            match prop.content {
-                object::Content::Data(dataref) =>
-                    Interpreted::Ref(dataref),
-                object::Content::NativeFunction(_) =>
-                    Interpreted::Member{
-                        of: Box::new(Interpreted::Ref(Heap::GLOBAL)),
-                        name: name.to_string()
-                    },
-            }
-        )
+        global_object.properties.get(name).map(|_| {
+            let of = Box::new(Interpreted::Ref(Heap::GLOBAL));
+            Interpreted::Member{ of, name: name.to_string() }
+        })
     }
 }
 
@@ -171,9 +162,7 @@ impl Interpretable for Expr {
 
 impl Interpretable for Literal {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        let value = JSValue::try_from(&self.0).unwrap_or_else(|_|
-            state.heap.object_from_json(&self.0)
-        );
+        let value = state.heap.object_from_json(&self.0);
         Ok(Interpreted::Value(value))
     }
 }
@@ -181,17 +170,8 @@ impl Interpretable for Literal {
 impl Interpretable for Identifier {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let name = &self.0;
-        // TODO: this should be a readonly property of global
-        if name == "undefined" {
-            Ok(Interpreted::Value(JSValue::Undefined))
-        } else if let Some(ret) = state.lookup_var(name) {
-            Ok(ret)
-        // TODO: this should be a readonly property of global
-        } else if name == "NaN" {
-            Ok(Interpreted::Value(JSValue::from(f64::NAN)))
-        } else {
-            Err(Exception::ReferenceNotFound(name.to_string()))
-        }
+        state.lookup_var(name)
+            .ok_or(Exception::ReferenceNotFound(name.to_string()))
     }
 }
 
@@ -288,41 +268,44 @@ impl Interpretable for AssignmentExpression {
         // this must happen before a possible declare_var()
         let value = valexpr.interpret(state)?;
 
-        if modop.is_none() {
+        if let Some(op) = modop {
+            let assignee = leftexpr.interpret(state)?;
+            let objref = assignee.to_ref(&state.heap)?;
+            let oldvalue = state.heap.get(objref);
+            let value = value.to_value(&state.heap)?;
+            let newvalue = match op {
+                BinOp::Plus => JSValue::plus(oldvalue, &value, &state.heap),
+                _ => panic!(format!("Binary operation {:?} cannot be used in assignment", op))
+            };
+            *state.heap.get_mut(objref) = newvalue.clone();
+            Ok(Interpreted::Value(newvalue))
+        } else {
             if let Expr::Identifier(name) = leftexpr.as_ref() {
                 // `a = 1` should create a variable;
                 // `a.one = 1` without `a` should fail.
                 state.declare_var(&name.0, None)?;
             }
-        }
-        let assignee = leftexpr.interpret(state)?;
-        match assignee {
-            Interpreted::Member{of, name} if modop.is_none() => {
-                let objref = of.to_ref(&state.heap)?;
-                state.heap.property_assign(objref, &name, &value)?;
-                Ok(value)
+            let assignee = leftexpr.interpret(state)?;
+            match assignee {
+                Interpreted::Member{of, name} => {
+                    let ofref = of.to_ref(&state.heap)?;
+                    state.heap.property_assign(ofref, &name, &value)?;
+                    Ok(value)
+                }
+                Interpreted::Ref(objref) => {
+                    let value = value.to_value(&state.heap)?;
+                    *state.heap.get_mut(objref) = value.clone();
+                    Ok(Interpreted::Value(value))
+                }
+                _ => return Err(Exception::TypeErrorCannotAssign(assignee))
             }
-            Interpreted::Ref(href) => {
-                let objvalue = state.heap.get(href);
-                let value = value.to_value(&state.heap)?;
-                let value = match modop {
-                    None => value,
-                    Some(BinOp::Plus) =>
-                        JSValue::plus(objvalue, &value, &state.heap),
-                    Some(op) =>
-                        panic!(format!("Binary operation {:?} cannot be used in assignment", op))
-                };
-                *state.heap.get_mut(href) = value.clone();
-                Ok(Interpreted::Value(value))
-            }
-            _ => Err(Exception::TypeErrorCannotAssign(assignee))
         }
     }
 }
 
 impl Interpretable for CallExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        let CallExpression(callee_expr, arguments_expr) = self;
+        let CallExpression(callee_expr, argument_exprs) = self;
 
         let callee = callee_expr.interpret(state)?;
 
@@ -338,18 +321,14 @@ impl Interpretable for CallExpression {
         };
 
         let mut arguments = vec![];
-        for argexpr in arguments_expr.iter() {
+        for argexpr in argument_exprs.iter() {
             let arg = argexpr.interpret(state)?;
             arguments.push(arg);
         }
 
         let this_object = state.heap.get(this_ref).to_object()?;
-        let property = this_object.properties.get(&method_name)
+        let func = this_object.property_func(&method_name)
             .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?;
-        let func = match property.content {
-            object::Content::NativeFunction(func) => func,
-            _ => return Err(Exception::TypeErrorNotCallable(callee.clone()))
-        };
         func(this_ref, method_name, arguments, &mut state.heap)
     }
 }

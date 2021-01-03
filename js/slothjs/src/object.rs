@@ -338,15 +338,15 @@ impl Heap {
 
     pub fn property_or_create(&mut self, objref: JSRef, name: &str) -> Result<JSRef, Exception> {
         let object = self.get(objref).to_object()?;
-        if let Some(property) = object.properties.get(name) {
-            if let Content::Data(propref) = property.content {
-                return Ok(propref);
+        match object.property_ref(name) {
+            Some(propref) => Ok(propref),
+            None => {
+                let propref = self.allocate(JSValue::Undefined);
+                let object = self.get_mut(objref).to_object_mut()?;
+                object.set_property_ref(name, propref);
+                Ok(propref)
             }
         }
-        let propref = self.allocate(JSValue::Undefined);
-        let object = self.get_mut(objref).to_object_mut()?;
-        object.set_property_ref(name, propref);
-        Ok(propref)
     }
 
     pub fn property_assign(
@@ -362,9 +362,12 @@ impl Heap {
                 return Ok(());
             }
         }
-        let propref = self.property_or_create(objref, &name)?;
-        let value = what.to_value(self)?;
-        *self.get_mut(propref) = value.clone();
+        let object = self.get(objref).to_object()?;
+        if object.properties.get(name).map(|prop| prop.writable).unwrap_or(true) {
+            let propref = self.property_or_create(objref, &name)?;
+            let value = what.to_value(self)?;
+            *self.get_mut(propref) = value.clone();
+        }
         Ok(())
     }
 
@@ -459,19 +462,6 @@ impl JSObject {
         JSObject{ properties }
     }
 
-    pub fn set_property_ref(&mut self, name: &str, propref: JSRef) {
-        match self.properties.get_mut(name) {
-            Some(prop) =>
-                prop.content = Content::Data(propref),
-            None => {
-                self.properties.insert(
-                    name.to_string(),
-                    Property::from_ref(propref)
-                );
-            }
-        }
-    }
-
     pub fn property_ref(&self, name: &str) -> Option<JSRef> {
         self.properties.get(name).and_then(|prop|
             match prop.content {
@@ -479,6 +469,36 @@ impl JSObject {
                 Content::NativeFunction(_) => None,
             }
         )
+    }
+
+    pub fn property_func(&self, name: &str) -> Option<NativeFunction> {
+        if let Some(prop) = self.properties.get(name) {
+            if let Content::NativeFunction(func) = prop.content {
+                return Some(func);
+            }
+        }
+        None
+    }
+
+    pub fn set_property(&mut self, name: &str, content: Content) {
+        match self.properties.get_mut(name) {
+            Some(prop) =>
+                if prop.writable {
+                    prop.content = content;
+                },
+            None => {
+                self.properties.insert( name.to_string(), Property{
+                    configurable: true,
+                    enumerable: true,
+                    writable: true,
+                    content
+                });
+            }
+        }
+    }
+
+    pub fn set_property_ref(&mut self, name: &str, propref: JSRef) {
+        self.set_property(name, Content::Data(propref))
     }
 }
 

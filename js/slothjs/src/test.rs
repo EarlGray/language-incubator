@@ -101,7 +101,7 @@ fn test_literals() {
     );
 
     assert_eq!( eval("var undefined = 5; undefined"), JSON::Null );
-    //assert_eq!( eval("var NaN = 5; NaN"), JSON::from(5.0) );
+    assert!( evalbool("var NaN = 5; NaN != NaN") );
 }
 
 #[test]

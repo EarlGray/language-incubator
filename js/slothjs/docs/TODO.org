@@ -49,6 +49,7 @@
 ** TODO =isNaN=
 * TODO ArrayExpression
 * TODO assignment support for array members
+* TODO builtin =assert= object
 * TODO builtin =console=
 * TODO builtin primitive wrappers
 ** TODO =Number=

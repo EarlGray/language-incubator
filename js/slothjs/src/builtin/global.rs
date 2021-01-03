@@ -24,26 +24,25 @@ fn parse_int(
 /*
  *  init
  */
+fn make_readonly_property(heap: &mut Heap, name: &str, value: JSValue) {
+    let valref = heap.allocate(value);
+    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut().unwrap();
+    global_object.set_property_ref(name, valref);
+    global_object.properties.get_mut(name).unwrap().writable = false;
+}
+
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
+    make_readonly_property(heap, "NaN", JSValue::Number(f64::NAN));
+    make_readonly_property(heap, "undefined", JSValue::Undefined);
+
+    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
+
+    global_object.set_property("parseInt", object::Content::NativeFunction(parse_int));
+
     // TODO: detect circular references in JSValue::to_string()
     //   to avoid stack overflow on trying to display `global` in REPL.
     // The `global` self-reference:
     //global_object.set_property("global", Heap::GLOBAL);
-
-    // parseInt:
-    let parse_int_prop = object::Property { 
-        configurable: false,
-        writable: false,
-        enumerable: true,
-        content: object::Content::NativeFunction(parse_int),
-    };
-    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
-    global_object.properties.insert("parseInt".to_string(), parse_int_prop);
-
-    /* NaN
-    let nan = Interpreted::Value(JSValue::Number(f64::NAN));
-    heap.property_assign(Heap::GLOBAL, "NaN", &nan)?;
-    */
 
     Ok(())
 }
