@@ -444,22 +444,18 @@ fn test_unary_operations() {
     assert_eq!( eval("typeof void 'nope'"), JSON::from("undefined") );
     assert_eq!( eval("typeof void {}"),     JSON::from("undefined") );
 
-    /*
     assert_eq!( eval("let a = {one: 1}; delete a.one; a"),   json!({}) );
     assert!( evalbool("let a = {one: 1}; delete a.one") );
     assert!( evalbool("let a = {one: 1}; delete a['one']") );
-    assert_eq!( eval("let a = {one: 1}; delete a.two; a"),   json!({"one": 1}) );
+    assert_eq!( eval("let a = {one: 1}; delete a.two; a"),   json!({"one": 1.0}) );
     assert!( evalbool("let a = {one: 1}; delete a.two") );
-    assert!( !evalbool("delete undefined") );   // global.undefined is not configurable
-    assert!( !evalbool("var a = 1; delete a")); // vars are not configurable
+    //assert!( !evalbool("delete undefined") );   // global.undefined is not configurable
+    //assert!( !evalbool("var a = 1; delete a")); // vars are not configurable
     assert!( evalbool("a = 1; delete a") );     // but these are.
     assert!( evalbool("delete 0") );            // don't ask.
-    assert!( evalbool("delete x") );
+    //assert!( evalbool("delete x") );
     // assert!( evalbool("let a = ['one', 'two']; delete a[2]") );
     // assert!( evalbool("let a = ['one', 'two']; delete a[1]") );
-    */
-
-    //assert_eq!( eval("let a = {one: 1}; delete a.one; a"),  json!({}) );
 }
 
 #[test]

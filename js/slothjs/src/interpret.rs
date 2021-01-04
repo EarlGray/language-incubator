@@ -209,7 +209,7 @@ impl Interpretable for UnaryExpression {
         let arg = argexpr.interpret(state)?;
         let argvalue = arg.to_value(&state.heap)?;
         let value = match op {
-            //UnOp::Delete => JSValue::from(arg.delete(&mut state.heap).is_ok()),
+            UnOp::Delete => JSValue::from(arg.delete(&mut state.heap).is_ok()),
             UnOp::Exclamation => JSValue::Bool(!argvalue.boolify()),
             UnOp::Minus => JSValue::Number(- argvalue.numberify().unwrap_or(f64::NAN)),
             UnOp::Plus => JSValue::Number(argvalue.numberify().unwrap_or(f64::NAN)),
@@ -246,16 +246,9 @@ impl Interpretable for MemberExpression {
             Exception::ReferenceNotAnObject(objresult.clone())
         })?;
 
-        let object = state.heap.get(objref).to_object().map_err(|_|
-            Exception::ReferenceNotAnObject(objresult.clone())
-        )?;
-
-        let result = match object.property_ref(&propname) {
-            Some(propref) => Interpreted::Ref(propref),
-            None => Interpreted::Member{
-                of: Box::new(Interpreted::Ref(objref)),
-                name: propname.to_string()
-            }
+        let result = Interpreted::Member{
+            of: Box::new(Interpreted::Ref(objref)),
+            name: propname.to_string()
         };
         Ok(result)
     }

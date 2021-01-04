@@ -127,5 +127,5 @@ pub enum UnOp {
     Tilde,
     Typeof,
     Void,
-    //Delete,
+    Delete,
 }

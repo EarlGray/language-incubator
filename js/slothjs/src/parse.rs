@@ -352,7 +352,7 @@ impl TryFrom<&JSON> for Expr {
                     "-" => UnOp::Minus,
                     "!" => UnOp::Exclamation,
                     "~" => UnOp::Tilde,
-                    //"delete" => UnOp::Delete,
+                    "delete" => UnOp::Delete,
                     "typeof" => UnOp::Typeof,
                     "void" => UnOp::Void,
                     _ => return Err(ParseError::UnexpectedValue{

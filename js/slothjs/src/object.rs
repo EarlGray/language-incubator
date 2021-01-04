@@ -459,7 +459,6 @@ impl Interpreted {
         }
     }
 
-    /*
     /// Corresponds to Javascript `delete` operator and all its weirdness.
     /// Ok/Err correspond to `true`/`false` from `delete`.
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
@@ -476,7 +475,6 @@ impl Interpreted {
             _ => Ok(()),
         }
     }
-    */
 }
 
 /// Javascript objects
