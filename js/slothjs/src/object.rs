@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
+use bitflags::bitflags;
 use serde_json::json;
 
 use crate::error::Exception;
@@ -319,14 +320,16 @@ fn is_valid_identifier(s: &str) -> bool {
 pub struct Heap(Vec<JSValue>);
 
 impl Heap {
-    //pub const UNDEFINED: JSRef = JSRef(0);
+    //pub const NULL: JSRef = JSRef(0);
     pub const GLOBAL: JSRef = JSRef(1);
 
     pub fn new() -> Self {
-        let mut heap = Heap(vec![]);
-        heap.0.push(JSValue::Undefined);                /* [Heap::UNDEFINED] */
-        heap.0.push(JSValue::Object(JSObject::new()));  /* [Heap::GLOBAL] */
+        let heap_vec = vec![
+            JSValue::Undefined,                /* [Heap::NULL] */
+            JSValue::Object(JSObject::new()),  /* [Heap::GLOBAL] */
+        ];
 
+        let mut heap = Heap(heap_vec);
         builtin::init(&mut heap)
             .expect("failed to initialize builtin objects");
         heap
@@ -508,6 +511,10 @@ impl JSObject {
     }
 
     pub fn set_property(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, PropertyFlags::ALL)
+    }
+
+    pub fn set_property_and_flags(&mut self, name: &str, content: Content, access: PropertyFlags){
         match self.properties.get_mut(name) {
             Some(prop) =>
                 if prop.writable {
@@ -515,9 +522,9 @@ impl JSObject {
                 },
             None => {
                 self.properties.insert( name.to_string(), Property{
-                    configurable: true,
-                    enumerable: true,
-                    writable: true,
+                    configurable: access.configurable(),
+                    enumerable: access.enumerable(),
+                    writable: access.writable(),
                     content
                 });
             }
@@ -555,6 +562,27 @@ impl Property {
         self
     }
 }
+
+
+bitflags! {
+    pub struct PropertyFlags: u8 {
+        const ENUM = 0b001;
+        const CONF = 0b010;
+        const WRITE = 0b100;
+
+        const NONE = 0b000;
+        const READONLY = Self::ENUM.bits | Self::CONF.bits;
+        const HIDDEN = Self::CONF.bits | Self::WRITE.bits;
+        const ALL = 0b111;
+    }
+}
+
+impl PropertyFlags {
+    pub fn enumerable(&self) -> bool { self.contains(PropertyFlags::ENUM) }
+    pub fn configurable(&self) -> bool { self.contains(PropertyFlags::CONF) }
+    pub fn writable(&self) -> bool { self.contains(PropertyFlags::WRITE) }
+}
+
 
 pub type NativeFunction = fn(
     this_ref: JSRef,

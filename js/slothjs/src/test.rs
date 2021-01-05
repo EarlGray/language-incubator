@@ -487,6 +487,18 @@ fn test_global_methods() {
 }
 
 #[test]
+fn test_builtin_object() {
+    assert_eq!(
+        eval("Object.getOwnPropertyDescriptor(Object, 'prototype')"),
+        json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
+    );
+    assert_eq!(
+        eval("Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')"),
+        json!({"enumerable": false, "writable": true, "configurable": true, "value": "[[native]]"})
+    );
+}
+
+#[test]
 fn test_objects() {
     //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
     assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSON::from(2.0));
