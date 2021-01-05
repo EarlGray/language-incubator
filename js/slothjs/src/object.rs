@@ -57,7 +57,7 @@ impl JSValue {
                 let mut empty = true;
                 s.push('{');
                 for (key, property) in object.properties.iter() {
-                    if !property.enumerable {
+                    if !property.enumerable() {
                         continue;
                     }
 
@@ -117,7 +117,7 @@ impl JSValue {
             JSValue::Object(object) => {
                 let mut json = json!({});
                 for (key, property) in object.properties.iter() {
-                    if !property.enumerable {
+                    if !property.enumerable() {
                         continue
                     }
 
@@ -376,7 +376,7 @@ impl Heap {
             }
         }
         let object = self.get(objref).to_object()?;
-        if object.properties.get(name).map(|prop| prop.writable).unwrap_or(true) {
+        if object.properties.get(name).map(|prop| prop.access.writable()).unwrap_or(true) {
             let propref = self.property_or_create(objref, &name)?;
             let value = what.to_value(self)?;
             *self.get_mut(propref) = value.clone();
@@ -517,16 +517,12 @@ impl JSObject {
     pub fn set_property_and_flags(&mut self, name: &str, content: Content, access: PropertyFlags){
         match self.properties.get_mut(name) {
             Some(prop) =>
-                if prop.writable {
+                if prop.access.writable() {
                     prop.content = content;
                 },
             None => {
-                self.properties.insert( name.to_string(), Property{
-                    configurable: access.configurable(),
-                    enumerable: access.enumerable(),
-                    writable: access.writable(),
-                    content
-                });
+                let prop = Property{ content, access };
+                self.properties.insert( name.to_string(), prop);
             }
         }
     }
@@ -539,28 +535,20 @@ impl JSObject {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
-    pub enumerable: bool,
-    pub writable: bool,
-    pub configurable: bool,
-
     pub content: Content,
+    pub access: PropertyFlags,
 }
 
 impl Property {
     pub fn from_ref(heapref: JSRef) -> Property {
         Property {
-            enumerable: true,
-            writable: true,
-            configurable: true,
             content: Content::Data(heapref),
+            access: PropertyFlags::ALL,
         }
     }
 
-    #[allow(dead_code)]
-    pub fn readonly(&mut self) -> &mut Self {
-        self.writable = false;
-        self
-    }
+    pub fn enumerable(&self) -> bool { self.access.enumerable() }
+    pub fn writable(&self) -> bool { self.access.writable() }
 }
 
 

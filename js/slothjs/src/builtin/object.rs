@@ -43,9 +43,9 @@ fn object_object_getOwnPropertyDescriptor(
         None => return Ok(Interpreted::VOID)
     };
 
-    let configurable = heap.allocate(JSValue::from(prop.configurable));
-    let enumerable = heap.allocate(JSValue::from(prop.enumerable));
-    let writable = heap.allocate(JSValue::from(prop.writable));
+    let configurable = heap.allocate(JSValue::from(prop.access.configurable()));
+    let enumerable = heap.allocate(JSValue::from(prop.access.enumerable()));
+    let writable = heap.allocate(JSValue::from(prop.access.writable()));
 
     let mut descriptor_object = JSObject::new();
     descriptor_object.set_property_ref("configurable", configurable);
