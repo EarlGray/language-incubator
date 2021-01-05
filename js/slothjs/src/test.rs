@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::ast::Program;
+use crate::object;
 use crate::object::{JSON, JSValue, Interpreted};
 use crate::error::{Exception, ParseError};
 use crate::interpret::{Interpretable, RuntimeState};
@@ -520,6 +521,20 @@ fn test_objects() {
     assert!( evalexc("a.one = 1").kind_eq(
             &Exception::ReferenceNotFound("a".to_string())
     ));
+}
+
+/// ```sh
+/// $ cargo -q test --lib sizes -- --nocapture
+/// ```
+#[test]
+fn test_sizes() {
+    use std::mem::size_of;
+    println!("============================");
+    println!("size_of JSRef:  \t{}", size_of::<object::JSRef>());
+    println!("size_of JSValue:\t{}", size_of::<JSValue>());
+    println!("size_of Property:\t{}", size_of::<object::Property>());
+    println!("size_of Interpreted:\t{}", size_of::<object::Interpreted>());
+    println!("============================");
 }
 
 #[test] fn test_scratch() { }
