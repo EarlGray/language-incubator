@@ -1,6 +1,6 @@
 /// The implementation of the Object object
 
-use crate::object;
+//use crate::object;
 use crate::object::{
     Content,
     Interpreted,
@@ -51,14 +51,17 @@ fn object_object_getOwnPropertyDescriptor(
     descriptor_object.set_property_ref("configurable", configurable);
     descriptor_object.set_property_ref("enumerable", enumerable);
     descriptor_object.set_property_ref("writable", writable);
-    match prop.content {
-        object::Content::Data(dataref) =>
-            descriptor_object.set_property_ref("value", dataref),
-        object::Content::NativeFunction(_func) => {
-            let dataref = heap.allocate(JSValue::from("[[native]]"));
-            descriptor_object.set_property_ref("value", dataref);
+    let dataref = match prop.content {
+        Content::Data(dataref) => dataref,
+        Content::NativeFunction(_func) => {
+            heap.allocate(JSValue::from("[[native]]"))
+        }
+        Content::Closure(closure) => {
+            let repr = format!("{:?}", closure);
+            heap.allocate(JSValue::from(repr))
         }
     };
+    descriptor_object.set_property_ref("value", dataref);
 
     let descriptor = JSValue::Object(descriptor_object);
     Ok(Interpreted::Value(descriptor))
@@ -94,7 +97,11 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
         Access::HIDDEN
     );
 
-    let object_value = JSValue::Object(object_object);
-    let wrapped_object = Interpreted::Value(object_value);
-    heap.property_assign(Heap::GLOBAL, "Object", &wrapped_object)
+    let object_ref = heap.allocate(JSValue::Object(object_object));
+    heap.global_mut().set_property_and_flags(
+        "Object",
+        Content::Data(object_ref),
+        Access::HIDDEN
+    );
+    Ok(())
 }

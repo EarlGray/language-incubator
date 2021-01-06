@@ -1,7 +1,7 @@
 use crate::error::Exception;
 use crate::object;
 use crate::object::{
-    Content::NativeFunction as Native,
+    Content,
     Heap,
     Interpreted,
     JSRef,
@@ -29,17 +29,18 @@ fn parse_int(
 fn make_readonly_property(heap: &mut Heap, name: &str, value: JSValue) {
     let valref = heap.allocate(value);
     let content = object::Content::Data(valref);
-    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut().unwrap();
-    global_object.set_property_and_flags(name, content, Access::READONLY);
+    heap.global_mut().set_property_and_flags(name, content, Access::READONLY);
 }
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     make_readonly_property(heap, "NaN", JSValue::Number(f64::NAN));
     make_readonly_property(heap, "undefined", JSValue::Undefined);
 
-    let global_object = heap.get_mut(Heap::GLOBAL).to_object_mut()?;
-
-    global_object.set_property_and_flags("parseInt", Native(parse_int), Access::HIDDEN);
+    heap.global_mut().set_property_and_flags(
+        "parseInt",
+        Content::NativeFunction(parse_int),
+        Access::HIDDEN
+    );
 
     // TODO: detect circular references in JSValue::to_string()
     //   to avoid stack overflow on trying to display `global` in REPL.

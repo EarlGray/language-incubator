@@ -6,12 +6,14 @@ pub struct Program {
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub enum Statement {
     Empty,
     Block(BlockStatement),
     Expr(ExpressionStatement),
     If(Box<IfStatement>),
     For(Box<ForStatement>),
+    Return(ReturnStatement),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -24,29 +26,35 @@ pub enum ObjectKey {
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub struct ExpressionStatement {
     pub expression: Expr,
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub struct VariableDeclarator {
     pub name: String,
     pub init: Option<Box<Expr>>,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum DeclarationKind { Var, Let, Const }
 
+#[derive(Clone, Debug)]
 pub struct VariableDeclaration {
-    pub _kind: DeclarationKind,
+    pub kind: DeclarationKind,
     pub declarations: Vec<VariableDeclarator>,
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub struct BlockStatement {
     pub body: Vec<Statement>,
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub struct IfStatement {
     pub test: Expr,
     pub consequent: Statement,
@@ -54,6 +62,7 @@ pub struct IfStatement {
 }
 
 // ==============================================
+#[derive(Clone, Debug)]
 pub struct ForStatement {
     // Empty | VariableDeclaration | ExpressionStatement
     pub init: Statement,
@@ -62,6 +71,9 @@ pub struct ForStatement {
     pub body: Statement,
 }
 
+// ==============================================
+#[derive(Clone, Debug)]
+pub struct ReturnStatement(pub Option<Expr>);
 
 // ==============================================
 #[derive(Debug, Clone)]
@@ -76,6 +88,7 @@ pub enum Expr {
     Assign(AssignmentExpression),
     Conditional(ConditionalExpression),
     Unary(UnaryExpression),
+    Function(FunctionExpression),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -107,6 +120,19 @@ pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct FunctionExpression {
+    pub id: Option<Identifier>,
+    pub params: Vec<FunctionParameter>,
+    pub body: Box<BlockStatement>,
+    pub generator: bool,
+    pub expression: bool,
+    pub is_async: bool,
+}
+
+// TODO: enum { AssignmentPattern, Identifier, BindingPattern }
+pub type FunctionParameter = Identifier;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {

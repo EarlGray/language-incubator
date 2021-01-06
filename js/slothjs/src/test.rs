@@ -464,13 +464,36 @@ fn test_functions() {
     // CallExpression for builtin functions
     assert_eq!( eval("parseInt('42')"),     JSON::from(42.0));
 
-    /*
     // FunctionExpression
-    assert_eq!(evalbool(r#"
-        let sqr = function(x) { return x * x; };
-        sqr(12)
-    "#), JSON::from(144.0));
+    assert_eq!( eval(r#"
+        let twice = function(x) { return x + x; };
+        twice(12)
+    "#), JSON::from(24.0));
 
+    assert!( evalbool(r#"
+        let func = function() { return true; return false; };
+        func()
+    "#));
+
+    assert_eq!( eval(r#"
+        let twice = function(x) { return x + x; };
+        twice(12)
+        twice('a')
+    "#), JSON::from("aa"));
+
+    assert_eq!( eval(r#"
+        let x = 1;
+        twice = function(x) { return x + x; };
+        twice(12)
+        x
+    "#), JSON::from(1.0));
+    /*
+    assert_eq!( eval(r#"
+        (function(x) { return x + x; })(12)
+    "#), JSON::from(24.0));
+     */
+
+    /*
     // FunctionDeclaration
     assert_eq!(evalbool(r#"
         function sqr(x) { return x * x; };
@@ -497,6 +520,16 @@ fn test_builtin_object() {
         eval("Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')"),
         json!({"enumerable": false, "writable": true, "configurable": true, "value": "[[native]]"})
     );
+}
+
+#[test]
+fn test_builtin_function() {
+    /*
+    assert_eq!(
+        eval("Object.getOwnPropertyDescriptor(global, 'Function')"),
+        json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
+    );
+    */
 }
 
 #[test]

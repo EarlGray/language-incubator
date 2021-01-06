@@ -86,31 +86,15 @@ impl TryFrom<&JSON> for Statement {
             "ExpressionStatement" => Ok(Statement::Expr(
                 ExpressionStatement::try_from(json)?
             )),
-            "ForStatement" => {
-                let init = match json.get("init") {
-                    Some(jinit) if !jinit.is_null() =>
-                        Statement::try_from(jinit)?,
-                    _ => Statement::Empty,
-                };
-                let test = match json.get("test") {
-                    Some(jtest) if !jtest.is_null() =>
-                        Some(Expr::try_from(jtest)?),
-                    _ => None
-                };
-                let update = match json.get("update") {
-                    Some(jupdate) if !jupdate.is_null() =>
-                        Some(Expr::try_from(jupdate)?),
-                    _ => None,
-                };
-                let jbody = json_get(json, "body")?;
-                let body = Statement::try_from(jbody)?;
-                Ok(Statement::For(Box::new(
-                    ForStatement{ init, test, update, body }
-                )))
-            }
+            "ForStatement" => Ok(Statement::For(Box::new(
+                ForStatement::try_from(json)?
+            ))),
             "IfStatement" => Ok(Statement::If(Box::new({
                 IfStatement::try_from(json)?
             }))),
+            "ReturnStatement" => Ok(Statement::Return(
+                ReturnStatement::try_from(json)?
+            )),
             "VariableDeclaration" => Ok(Statement::VariableDeclaration(
                 VariableDeclaration::try_from(json)?
             )),
@@ -153,6 +137,57 @@ impl TryFrom<&JSON> for IfStatement {
     }
 }
 
+impl TryFrom<&JSON> for ForStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(json: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(json, "type", "ForStatement")?;
+
+        let init = match json.get("init") {
+            Some(jinit) if !jinit.is_null() =>
+                Statement::try_from(jinit)?,
+            _ => Statement::Empty,
+        };
+        let test = match json.get("test") {
+            Some(jtest) if !jtest.is_null() =>
+                Some(Expr::try_from(jtest)?),
+            _ => None
+        };
+        let update = match json.get("update") {
+            Some(jupdate) if !jupdate.is_null() =>
+                Some(Expr::try_from(jupdate)?),
+            _ => None,
+        };
+        let jbody = json_get(json, "body")?;
+        let body = Statement::try_from(jbody)?;
+        Ok(ForStatement{ init, test, update, body })
+    }
+}
+
+impl TryFrom<&JSON> for ReturnStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "ReturnStatement")?;
+
+        let jargument = json_get(value, "argument")?;
+        let argument = match jargument {
+            JSON::Object(_) => {
+                let argexpr = Expr::try_from(jargument)?;
+                Some(argexpr)
+            }
+            JSON::Null => None,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "null | object",
+                value: jargument.clone(),
+            })
+        };
+
+        Ok(ReturnStatement(argument))
+    }
+}
+
+
 impl TryFrom<&JSON> for VariableDeclaration {
     type Error = ParseError<JSON>;
 
@@ -189,7 +224,7 @@ impl TryFrom<&JSON> for VariableDeclaration {
 
             declarations.push(VariableDeclarator{ name, init });
         }
-        Ok(VariableDeclaration{ _kind: kind, declarations })
+        Ok(VariableDeclaration{ kind, declarations })
     }
 }
 
@@ -222,43 +257,13 @@ impl TryFrom<&JSON> for Expr {
                 Expr::Array(expr)
             }
             "AssignmentExpression" => {
-                let jright = json_get(jexpr, "right")?;
-                let right = Expr::try_from(jright)?;
-
-                let jleft = json_get(jexpr, "left")?;
-                let left = Expr::try_from(jleft)?;
-
-                let jop = json_get_str(jexpr, "operator")?;
-                let modop = match jop {
-                    "=" => None,
-                    "+=" => Some(BinOp::Plus),
-                    _ => return Err(ParseError::UnexpectedValue{
-                        want: "= | +=",
-                        value: jexpr.get("operator").unwrap().clone()
-                    }),
-                };
-                let expr = AssignmentExpression(Box::new(left), AssignOp(modop), Box::new(right));
+                let expr = AssignmentExpression::try_from(jexpr)?;
                 Expr::Assign(expr)
             }
             "BinaryExpression" => {
-                let jleft = json_get(jexpr, "left")?;
-                let left = Expr::try_from(jleft)?;
-
-                let jright = json_get(jexpr, "right")?;
-                let right = Expr::try_from(jright)?;
-
-                let opstr = json_get_str(jexpr, "operator")?;
-                let op = match opstr {
-                    "+" => BinOp::Plus,
-                    "==" => BinOp::EqEq,
-                    "!=" => BinOp::NotEq,
-                    "<" => BinOp::Less,
-                    _ => return Err(ParseError::UnexpectedValue{
-                        want: "+|==",
-                        value: jexpr.get("operator").unwrap().clone(),
-                    }),
-                };
-                let expr = BinaryExpression(Box::new(left), op, Box::new(right));
+                /*
+                */
+                let expr = BinaryExpression::try_from(jexpr)?;
                 Expr::BinaryOp(expr)
             }
             "CallExpression" => {
@@ -289,9 +294,12 @@ impl TryFrom<&JSON> for Expr {
                 );
                 Expr::Conditional(expr)
             }
+            "FunctionExpression" => {
+                let expr = FunctionExpression::try_from(jexpr)?;
+                Expr::Function(expr)
+            }
             "Identifier" => {
-                let name = json_get_str(jexpr, "name")?;
-                let expr = Identifier(name.to_string());
+                let expr = Identifier::try_from(jexpr)?;
                 Expr::Identifier(expr)
             }
             "Literal" => {
@@ -311,60 +319,12 @@ impl TryFrom<&JSON> for Expr {
                 Expr::Member(expr)
             }
             "ObjectExpression" => {
-                let jproperties = json_get_array(jexpr, "properties")?;
-
-                let mut properties = vec![];
-                for jprop in jproperties.iter() {
-                    json_expect_str(jprop, "type", "Property")?;
-
-                    let jkey = json_get(jprop, "key")?;
-                    let keyexpr = Expr::try_from(jkey)?;
-                    let key = if json_get_bool(jprop, "computed")? {
-                        ObjectKey::Computed(keyexpr)
-                    } else {
-                        match keyexpr {
-                            Expr::Identifier(ident) =>
-                                ObjectKey::Identifier(ident.0),
-                            Expr::Literal(jval) =>
-                                match jval.0.as_str() {
-                                    Some(val) => ObjectKey::Identifier(val.to_string()),
-                                    None => ObjectKey::Identifier(jval.0.to_string()),
-                                }
-                            _ =>
-                                return Err(ParseError::UnexpectedValue{
-                                    want: "Identifier|Literal",
-                                    value: jprop.clone(),
-                                })
-                        }
-                    };
-
-                    let jvalue = json_get(jprop, "value")?;
-                    let value = Expr::try_from(jvalue)?;
-
-                    properties.push((key, Box::new(value)));
-                }
-                Expr::Object(ObjectExpression(properties))
+                let expr = ObjectExpression::try_from(jexpr)?;
+                Expr::Object(expr)
             }
             "UnaryExpression" => {
-                let jop = json_get_str(jexpr, "operator")?;
-                let op = match jop {
-                    "+" => UnOp::Plus,
-                    "-" => UnOp::Minus,
-                    "!" => UnOp::Exclamation,
-                    "~" => UnOp::Tilde,
-                    "delete" => UnOp::Delete,
-                    "typeof" => UnOp::Typeof,
-                    "void" => UnOp::Void,
-                    _ => return Err(ParseError::UnexpectedValue{
-                        want: "+ | - | ! | ~ | typeof | void",
-                        value: jexpr.clone(),
-                    })
-                };
-
-                let jargument = json_get(jexpr, "argument")?;
-                let argument = Expr::try_from(jargument)?;
-
-                Expr::Unary(UnaryExpression(op, Box::new(argument)))
+                let expr = UnaryExpression::try_from(jexpr)?;
+                Expr::Unary(expr)
             }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr.clone() }),
@@ -373,3 +333,158 @@ impl TryFrom<&JSON> for Expr {
     }
 }
 
+impl TryFrom<&JSON> for Identifier {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let name = json_get_str(jexpr, "name")?;
+        Ok(Identifier(name.to_string()))
+    }
+}
+
+impl TryFrom<&JSON> for UnaryExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jop = json_get_str(jexpr, "operator")?;
+        let op = match jop {
+            "+" => UnOp::Plus,
+            "-" => UnOp::Minus,
+            "!" => UnOp::Exclamation,
+            "~" => UnOp::Tilde,
+            "delete" => UnOp::Delete,
+            "typeof" => UnOp::Typeof,
+            "void" => UnOp::Void,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "+ | - | ! | ~ | typeof | void",
+                value: jexpr.clone(),
+            })
+        };
+
+        let jargument = json_get(jexpr, "argument")?;
+        let argument = Expr::try_from(jargument)?;
+
+        Ok(UnaryExpression(op, Box::new(argument)))
+    }
+}
+
+impl TryFrom<&JSON> for BinaryExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jleft = json_get(jexpr, "left")?;
+        let left = Expr::try_from(jleft)?;
+
+        let jright = json_get(jexpr, "right")?;
+        let right = Expr::try_from(jright)?;
+
+        let opstr = json_get_str(jexpr, "operator")?;
+        let op = match opstr {
+            "+" => BinOp::Plus,
+            "==" => BinOp::EqEq,
+            "!=" => BinOp::NotEq,
+            "<" => BinOp::Less,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "+|==",
+                value: jexpr.get("operator").unwrap().clone(),
+            }),
+        };
+        Ok(BinaryExpression( Box::new(left), op, Box::new(right) ))
+    }
+}
+
+impl TryFrom<&JSON> for AssignmentExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jright = json_get(jexpr, "right")?;
+        let right = Expr::try_from(jright)?;
+
+        let jleft = json_get(jexpr, "left")?;
+        let left = Expr::try_from(jleft)?;
+
+        let jop = json_get_str(jexpr, "operator")?;
+        let modop = match jop {
+            "=" => None,
+            "+=" => Some(BinOp::Plus),
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "= | +=",
+                value: jexpr.get("operator").unwrap().clone()
+            }),
+        };
+        Ok(AssignmentExpression(
+            Box::new(left),
+            AssignOp(modop),
+            Box::new(right)
+        ))
+    }
+}
+
+impl TryFrom<&JSON> for ObjectExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(jexpr, "type", "ObjectExpression")?;
+
+        let jproperties = json_get_array(jexpr, "properties")?;
+
+        let mut properties = vec![];
+        for jprop in jproperties.iter() {
+            json_expect_str(jprop, "type", "Property")?;
+
+            let jkey = json_get(jprop, "key")?;
+            let keyexpr = Expr::try_from(jkey)?;
+            let key = if json_get_bool(jprop, "computed")? {
+                ObjectKey::Computed(keyexpr)
+            } else {
+                match keyexpr {
+                    Expr::Identifier(ident) =>
+                        ObjectKey::Identifier(ident.0),
+                    Expr::Literal(jval) =>
+                        match jval.0.as_str() {
+                            Some(val) => ObjectKey::Identifier(val.to_string()),
+                            None => ObjectKey::Identifier(jval.0.to_string()),
+                        }
+                    _ =>
+                        return Err(ParseError::UnexpectedValue{
+                            want: "Identifier|Literal",
+                            value: jprop.clone(),
+                        })
+                }
+            };
+
+            let jvalue = json_get(jprop, "value")?;
+            let value = Expr::try_from(jvalue)?;
+
+            properties.push((key, Box::new(value)));
+        }
+        Ok(ObjectExpression(properties))
+    }
+}
+
+impl TryFrom<&JSON> for FunctionExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let id: Option<Identifier> = json_get(jexpr, "id")
+            .and_then(|jid| Identifier::try_from(jid))
+            .ok();
+
+        let jparams = json_get_array(jexpr, "params")?;
+        let params = jparams.into_iter()
+            .map(|jparam| Identifier::try_from(jparam))
+            .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
+
+        let jbody = json_get(jexpr, "body")?;
+        let body = BlockStatement::try_from(jbody)?;
+
+        Ok(FunctionExpression{
+            id,
+            params,
+            body: Box::new(body),
+            generator: json_get_bool(jexpr, "generator").unwrap_or(false),
+            expression: json_get_bool(jexpr, "expression").unwrap_or(false),
+            is_async: json_get_bool(jexpr, "async").unwrap_or(false),
+        })
+    }
+}

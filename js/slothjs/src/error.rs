@@ -25,6 +25,8 @@ pub enum Exception {
     TypeErrorGetProperty(Interpreted, String),
     TypeErrorCannotAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
+
+    JumpReturn(Interpreted),
 }
 
 impl Exception {

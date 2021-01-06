@@ -1,5 +1,13 @@
 use crate::object;
-use crate::object::{JSValue, Heap, Interpreted};
+use crate::object::{
+    Content,
+    Heap,
+    Interpreted,
+    JSObject,
+    JSRef,
+    JSValue,
+    PropertyFlags as Access,
+};
 use crate::error::Exception;
 use crate::ast::*;      // yes, EVERYTHING
 
@@ -11,27 +19,117 @@ pub struct RuntimeState {
 }
 
 impl RuntimeState {
+    const LOCAL_SCOPE: &'static str = "[[local_scope]]";
+    const SAVED_SCOPE: &'static str = "[[saved_scope]]";
+
     pub fn new() -> Self {
         RuntimeState{ heap: Heap::new() }
     }
 
-    fn declare_var(&mut self, name: &str, mut init: Option<Interpreted>) -> Result<(), Exception> {
-        let global_object = self.heap.get(Heap::GLOBAL).to_object()?;
-        if !global_object.properties.contains_key(name) && init.is_none() {
-            init = Some(Interpreted::VOID);
-        }
-        if let Some(value) = init {
-            self.heap.property_assign(Heap::GLOBAL, name, &value)?;
+    /// Return a JSRef to the current scope.
+    fn scope_ref(&self) -> JSRef {
+        self.heap.lookup_ref(&[Self::LOCAL_SCOPE]).unwrap_or(Heap::GLOBAL)
+    }
+
+    /// Return a reference to the current scope.
+    fn scope(&self) -> &JSObject {
+        let scope = self.scope_ref();
+        self.heap.object(scope)
+            .expect("current scope is not an object, something is wrong")
+    }
+
+    /// Return a mutable reference to the current scope.
+    fn scope_mut(&mut self) -> &mut JSObject {
+        let scope = self.scope_ref();
+        self.heap.object_mut(scope)
+            .expect("current scope is not an object, something is wrong")
+    }
+
+    /// Variable declaration in the current scope.
+    // NOTE: This should not try to assign an initial value.
+    fn declare_var(&mut self, kind: Option<DeclarationKind>, name: &str) -> Result<(), Exception> {
+        // TODO: let and const should be block-scoped
+        if !self.scope().properties.contains_key(name) {
+            let valueref = self.heap.allocate(JSValue::Undefined);
+            let flags = if kind.is_none() { Access::ALL } else { Access::ALL ^ Access::CONF };
+
+            self.scope_mut().set_property_and_flags(
+                name,
+                Content::Data(valueref),
+                flags,
+            );
         }
         Ok(())
     }
 
     fn lookup_var(&mut self, name: &str) -> Option<Interpreted> {
-        let global_object = self.heap.get(Heap::GLOBAL).to_object().unwrap();
-        global_object.properties.get(name).map(|_| {
+        if let Ok(local_scope) = self.heap.lookup_ref(&[Self::LOCAL_SCOPE]) {
+            let scope_object = self.heap.object(local_scope)
+                .expect("scope is not an object, something is messed up");
+
+            if scope_object.properties.contains_key(name) {
+                let of = Box::new(Interpreted::Ref(local_scope));
+                let found = Interpreted::Member{ of, name: name.to_string() };
+                return Some(found);
+            }
+        }
+
+        // TODO: lookup free variables of the current call
+
+        if self.heap.global().properties.contains_key(name) {
             let of = Box::new(Interpreted::Ref(Heap::GLOBAL));
-            Interpreted::Member{ of, name: name.to_string() }
-        })
+            Some(Interpreted::Member{ of, name: name.to_string() })
+        } else {
+            None
+        }
+    }
+
+    fn push_scope(&mut self,
+        params: Vec<Identifier>,
+        values: Vec<Interpreted>
+    ) -> Result<(), Exception> {
+        let old_scope_ref = self.scope_ref();
+
+        let mut scope_object = JSObject::new();
+        for (i, param) in params.iter().enumerate() {
+            let name = &param.0;
+            let value = values.get(i).unwrap_or(&Interpreted::VOID);
+            let paramref = value.to_ref_or_allocate(&mut self.heap)?;
+            scope_object.set_property_ref(name, paramref);
+        }
+        scope_object.set_property_and_flags(
+            Self::SAVED_SCOPE,
+            Content::Data(old_scope_ref),
+            Access::NONE
+        );
+        let new_scope_ref = self.heap.allocate(JSValue::Object(scope_object));
+
+        self.heap.global_mut().set_property_and_flags(
+            Self::LOCAL_SCOPE,
+            Content::Data(new_scope_ref),
+            Access::NONE
+        );
+        Ok(())
+    }
+
+    fn pop_scope(&mut self) -> Result<(), Exception> {
+        let this_scope_ref = self.heap.lookup_ref(&[Self::LOCAL_SCOPE])
+            .expect(".pop_scope without local scope, something is very wrong");
+        let this_scope_object = self.heap.get(this_scope_ref).to_object()?;
+        let saved_scope_ref = this_scope_object.property_ref(Self::SAVED_SCOPE)
+            .expect(".pop scope without saved scope, something is very wrong");
+
+        if saved_scope_ref == Heap::GLOBAL {
+            self.heap.global_mut().properties.remove(Self::LOCAL_SCOPE);
+        } else {
+            self.heap.global_mut().set_property_and_flags(
+                Self::LOCAL_SCOPE,
+                Content::Data(saved_scope_ref),
+                Access::NONE
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -64,6 +162,7 @@ impl Interpretable for Statement {
             Statement::Block(stmt)                  => stmt.interpret(state),
             Statement::If(stmt)                     => stmt.interpret(state),
             Statement::For(stmt)                    => stmt.interpret(state),
+            Statement::Return(stmt)                 => stmt.interpret(state),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(state),
         }
     }
@@ -129,15 +228,29 @@ impl Interpretable for ExpressionStatement {
     }
 }
 
+impl Interpretable for ReturnStatement {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let ReturnStatement(argument) = self;
+        let returned = match argument {
+            None => Interpreted::VOID,
+            Some(argexpr) => argexpr.interpret(state)?,
+        };
+        Err(Exception::JumpReturn(returned))
+    }
+}
+
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
-            let mut init = None;
-            if let Some(initexpr) = decl.init.as_ref() {
-                let result = initexpr.interpret(state)?;
-                init = Some(result);
-            };
-            state.declare_var(&decl.name, init)?;
+            let optinit = decl.init.as_ref()
+                .map(|initexpr| initexpr.interpret(state))
+                .transpose()?;
+            let name = &decl.name;
+            state.declare_var(Some(self.kind), name)?;
+            if let Some(init) = optinit {
+                let scope_ref = state.scope_ref();
+                state.heap.property_assign(scope_ref, name, &init)?;
+            }
         }
         Ok(Interpreted::VOID)
     }
@@ -156,6 +269,7 @@ impl Interpretable for Expr {
             Expr::Assign(expr) =>               expr.interpret(state),
             Expr::Conditional(expr) =>          expr.interpret(state),
             Expr::Unary(expr) =>                expr.interpret(state),
+            Expr::Function(expr) =>             expr.interpret(state),
         }
     }
 }
@@ -256,7 +370,7 @@ impl Interpretable for MemberExpression {
 
 impl Interpretable for ObjectExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        let mut object = object::JSObject::new();
+        let mut object = JSObject::new();
 
         for (key, valexpr) in self.0.iter() {
             let keyname = match key {
@@ -299,7 +413,7 @@ impl Interpretable for AssignmentExpression {
             if let Expr::Identifier(name) = leftexpr.as_ref() {
                 // `a = 1` should create a variable;
                 // `a.one = 1` without `a` should fail.
-                state.declare_var(&name.0, None)?;
+                state.declare_var(None, &name.0)?;
             }
             let assignee = leftexpr.interpret(state)?;
             match assignee {
@@ -308,12 +422,15 @@ impl Interpretable for AssignmentExpression {
                     state.heap.property_assign(ofref, &name, &value)?;
                     Ok(value)
                 }
-                Interpreted::Ref(objref) => {
+                Interpreted::Ref(_objref) => {
+                    /*
                     let value = value.to_value(&state.heap)?;
                     *state.heap.get_mut(objref) = value.clone();
                     Ok(Interpreted::Value(value))
+                    */
+                    unreachable!()
                 }
-                _ => return Err(Exception::TypeErrorCannotAssign(assignee))
+                _ => Err(Exception::TypeErrorCannotAssign(assignee))
             }
         }
     }
@@ -323,28 +440,82 @@ impl Interpretable for CallExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let CallExpression(callee_expr, argument_exprs) = self;
 
-        let callee = callee_expr.interpret(state)?;
-
-        let (this_ref, method_name) = match &callee {
-            Interpreted::Ref(_func_ref) =>
-                todo!(),
-            Interpreted::Member{ of, name } => {
-                let this_ref = of.to_ref(&state.heap)?;
-                (this_ref, name.clone())
-            }
-            Interpreted::Value(_) =>
-                return Err(Exception::TypeErrorNotCallable(callee.clone()))
-        };
-
         let mut arguments = vec![];
         for argexpr in argument_exprs.iter() {
             let arg = argexpr.interpret(state)?;
             arguments.push(arg);
         }
 
+        let callee = callee_expr.interpret(state)?;
+
+        let (this_ref, method_name) = match &callee {
+            Interpreted::Member{ of, name } => {
+                let this_ref = of.to_ref(&state.heap)?;
+                (this_ref, name.clone())
+            }
+            Interpreted::Ref(_func_ref) =>
+                todo!(),
+            Interpreted::Value(_) =>
+                return Err(Exception::TypeErrorNotCallable(callee.clone()))
+        };
+
         let this_object = state.heap.get(this_ref).to_object()?;
-        let func = this_object.property_func(&method_name)
+        let prop = this_object.properties.get(&method_name)
             .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?;
-        func(this_ref, method_name, arguments, &mut state.heap)
+        let prop = match prop.content {
+            Content::Data(function_ref) => {
+                let function_object = state.heap.get(function_ref).to_object()?;
+                // TODO: check if this is a Function
+                function_object.properties.get("[[value]]")
+                    .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?
+            }
+            _ => prop,
+        };
+        match &prop.content {
+            Content::NativeFunction(func) =>
+                func(this_ref, method_name, arguments, &mut state.heap),
+            Content::Closure(closure) => {
+                let object::Closure{ params, body, .. } = closure.clone();
+                state.push_scope(params, arguments)?;
+                let result = body.interpret(state);
+                state.pop_scope()?;
+                match result {
+                    Ok(_) => // BlockStatement result
+                        Ok(Interpreted::VOID),
+                    Err(Exception::JumpReturn(returned)) =>
+                        Ok(returned),
+                    Err(e) =>
+                        Err(e)
+                }
+            }
+            _ => Err(Exception::TypeErrorNotCallable(callee.clone()))
+        }
+    }
+}
+
+impl Interpretable for FunctionExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        // __proto__ => Function.prototype
+        let function_prototype_ref = state.heap.lookup_ref(&["Object", "prototype"])?;
+
+        let mut function_object = JSObject::new();
+        function_object.set_property_and_flags(
+            "__proto__",
+            Content::Data(function_prototype_ref),
+            Access::NONE
+        );
+
+        let closure = object::Closure {
+            id: self.id.clone(),
+            params: self.params.clone(),
+            body: self.body.clone(),
+        };
+        function_object.set_property_and_flags(
+            "[[value]]",
+            Content::Closure(closure),
+            Access::NONE
+        );
+
+        Ok(Interpreted::Value(JSValue::Object(function_object)))
     }
 }

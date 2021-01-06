@@ -6,6 +6,7 @@ use bitflags::bitflags;
 use serde_json::json;
 
 use crate::error::Exception;
+use crate::ast;
 use crate::builtin;
 
 pub type JSON = serde_json::Value;
@@ -69,13 +70,16 @@ impl JSValue {
                         s.push_str(&skey);
                     }
                     s.push_str(": ");
-                    let val = match property.content {
+                    let val = match &property.content {
                         Content::Data(heapref) => {
-                            let value = heap.get(heapref);
+                            let value = heap.get(*heapref);
                             value.to_string(heap)
                         }
                         Content::NativeFunction(func) => {
-                            format!("*{:x}", func_ptr(func))
+                            format!("*{:x}", func_ptr(*func))
+                        }
+                        Content::Closure(closure) => {
+                            format!("{:?}", closure)
                         }
                     };
                     s.push_str(&val);
@@ -89,6 +93,8 @@ impl JSValue {
         }
     }
 
+    /// to_object() tries to return the underlying object, if any.
+    /// It's useful for checking if a value is an object.
     pub fn to_object(&self) -> Result<&JSObject, Exception> {
         if let JSValue::Object(object) = self {
             Ok(object)
@@ -128,6 +134,7 @@ impl JSValue {
                             json[key] = jvalue;
                         }
                         Content::NativeFunction(_) => (),
+                        Content::Closure(_) => (),
                     }
                 }
                 json
@@ -169,6 +176,7 @@ impl JSValue {
         }
     }
 
+    /// boolify() treats everythings as a truthy value.
     pub fn boolify(&self) -> bool {
         match self {
             JSValue::Undefined | JSValue::Null => false,
@@ -320,7 +328,7 @@ fn is_valid_identifier(s: &str) -> bool {
 pub struct Heap(Vec<JSValue>);
 
 impl Heap {
-    //pub const NULL: JSRef = JSRef(0);
+    pub const NULL: JSRef = JSRef(0);
     pub const GLOBAL: JSRef = JSRef(1);
 
     pub fn new() -> Self {
@@ -333,6 +341,22 @@ impl Heap {
         builtin::init(&mut heap)
             .expect("failed to initialize builtin objects");
         heap
+    }
+
+    pub fn object(&self, objref: JSRef) -> Result<&JSObject, Exception> {
+        self.get(objref).to_object()
+    }
+
+    pub fn object_mut(&mut self, objref: JSRef) -> Result<&mut JSObject, Exception> {
+        self.get_mut(objref).to_object_mut()
+    }
+
+    pub fn global(&self) -> &JSObject {
+        self.object(Heap::GLOBAL).unwrap()
+    }
+
+    pub fn global_mut(&mut self) -> &mut JSObject {
+        self.object_mut(Heap::GLOBAL).unwrap()
     }
 
     pub fn allocate(&mut self, value: JSValue) -> JSRef {
@@ -382,6 +406,17 @@ impl Heap {
             *self.get_mut(propref) = value.clone();
         }
         Ok(())
+    }
+
+    pub fn lookup_ref(&self, property_chain: &[&str]) -> Result<JSRef, Exception> {
+        let mut objref = Heap::GLOBAL;
+        for propname in property_chain {
+            let object = self.get(objref).to_object()?;
+            objref = object.property_ref(propname).ok_or_else(||
+                Exception::TypeErrorGetProperty(Interpreted::Ref(objref), propname.to_string())
+            )?;
+        }
+        Ok(objref)
     }
 
     pub fn object_from_json(&mut self, json: &JSON) -> JSValue {
@@ -497,6 +532,7 @@ impl JSObject {
             match prop.content {
                 Content::Data(href) => Some(href),
                 Content::NativeFunction(_) => None,
+                Content::Closure(_) => None,
             }
         )
     }
@@ -514,7 +550,7 @@ impl JSObject {
         self.set_property_and_flags(name, content, PropertyFlags::ALL)
     }
 
-    pub fn set_property_and_flags(&mut self, name: &str, content: Content, access: PropertyFlags){
+    pub fn set_property_and_flags(&mut self, name: &str, content: Content, access: PropertyFlags) {
         match self.properties.get_mut(name) {
             Some(prop) =>
                 if prop.access.writable() {
@@ -572,21 +608,11 @@ impl PropertyFlags {
 }
 
 
-pub type NativeFunction = fn(
-    this_ref: JSRef,
-    method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception>;
-
-fn func_ptr(func: NativeFunction) -> usize {
-    func as *const () as usize
-}
-
 #[derive(Clone)]
 pub enum Content {
     Data(JSRef),
     NativeFunction(NativeFunction),
+    Closure(Closure),
     /*
     Accesssor{
         get: Option<Callable>,
@@ -616,6 +642,37 @@ impl fmt::Debug for Content {
             Content::NativeFunction(func) => {
                 write!(f, "Content::NativeFunction(*{:x})", func_ptr(*func))
             }
+            Content::Closure(closure) => {
+                let name = closure.id.as_ref()
+                    .map(|id| id.0.as_str())
+                    .unwrap_or("<anonymous>");
+                let param_names = closure.params.iter()
+                    .map(|id| id.0.clone())
+                    .collect::<Vec<String>>();
+                write!(f, "Content::Closure( {}(", name)?;
+                write!(f, "{}", param_names.join(", "))?;
+                write!(f, "))")
+            }
         }
     }
+}
+
+pub type NativeFunction = fn(
+    this_ref: JSRef,
+    method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap,
+) -> Result<Interpreted, Exception>;
+
+fn func_ptr(func: NativeFunction) -> usize {
+    func as *const () as usize
+}
+
+
+#[derive(Clone, Debug)]
+pub struct Closure {
+    pub id: Option<ast::Identifier>,
+    pub params: Vec<ast::Identifier>,
+    pub body: Box<ast::BlockStatement>,
+    //pub free_variables: Vec<JSRef>,
 }
