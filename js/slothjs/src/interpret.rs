@@ -505,11 +505,18 @@ impl Interpretable for FunctionExpression {
             Access::NONE
         );
 
+        let length_ref = state.heap.allocate(JSValue::Number(self.params.len() as f64));
+        function_object.set_property_and_flags(
+            "length",
+            Content::Data(length_ref),
+            Access::ALL ^ Access::CONF
+        );
+
         let closure = object::Closure {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
-            // TODO: capture free variables
+            // TODO: compute and capture free variables
         };
         function_object.set_property_and_flags(
             JSObject::VALUE,

@@ -3,6 +3,7 @@
 use crate::error::Exception;
 use crate::object::{
     Content,
+    Interpreted,
     JSObject,
     JSRef,
     JSValue,
@@ -10,6 +11,14 @@ use crate::object::{
     PropertyFlags as Access,
 };
 
+fn function_constructor(
+    _this_ref: JSRef,
+    _method_name: String,
+    _arguments: Vec<Interpreted>,
+    _heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    todo!()
+}
 
 fn make_function_prototype(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut function_proto = JSObject::new();
@@ -36,8 +45,12 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
         Content::Data(function_proto_ref),
         Access::NONE
     );
+    function_object.set_property_and_flags(
+        JSObject::VALUE,
+        Content::NativeFunction(function_constructor),
+        Access::NONE,
+    );
     let function_object_ref = heap.allocate(JSValue::Object(function_object));
-
 
     /* global.Function = ... */
     heap.global_mut().set_property_and_flags(
@@ -46,7 +59,13 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
         Access::HIDDEN
     );
 
-    /* TODO: backpatch the Object to be a Function */
+    /* Object.__proto__ = Function.prototype */
+    let the_object = heap.lookup_ref(&["Object"])?;
+    heap.object_mut(the_object)?.set_property_and_flags(
+        "__proto__",
+        Content::Data(function_proto_ref),
+        Access::NONE
+    );
 
     Ok(())
 }

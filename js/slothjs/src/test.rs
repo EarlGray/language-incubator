@@ -509,7 +509,14 @@ fn test_functions() {
         twice(12)
         x
     "#), JSON::from(1.0));
+
+    assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
     /*
+    assert_eval!(r#"
+        var gcd = function(a, b) { return (a == b ? a : (a < b ? gcd(a, b-a) : gcd(a-b, b))); };
+        gcd(12, 15)
+    "#, 3.0);
+
     assert_eq!( eval(r#"
         (function(x) { return x + x; })(12)
     "#), JSON::from(24.0));
@@ -534,6 +541,12 @@ fn test_global_methods() {
 
 #[test]
 fn test_builtin_object() {
+    // test its prototype chain
+    assert!( evalbool("Object.is(Object.__proto__, Function.prototype)") );
+    assert!( evalbool("Object.is(Object.__proto__.__proto__, Object.prototype)") );
+    assert!( evalbool("Object.is(Object.__proto__.__proto__.__proto__, null)") );
+
+    // Object.getOwnPropertyDescriptor
     assert_eq!(
         eval("Object.getOwnPropertyDescriptor(Object, 'prototype')"),
         json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
@@ -542,22 +555,30 @@ fn test_builtin_object() {
         eval("Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')"),
         json!({"enumerable": false, "writable": true, "configurable": true, "value": "[[native]]"})
     );
+
+    // Object.is
+    assert!( evalbool("Object.is(null, null)") );
+    assert!( evalbool("Object.is(undefined, undefined)") );
+    assert!( evalbool("Object.is(true, true)") );
+    assert!( !evalbool("Object.is(null, undefined)") );
+    assert!( evalbool("Object.is(NaN, NaN)") );
+    assert!( evalbool("Object.is(-0, -0)") );
+    assert!( !evalbool("Object.is(-0, +0)") );
+    assert!( !evalbool("Object.is('lol', 'lolnot')") );
+
+    assert!( evalbool("var a = {}; Object.is(a, a)") );
+    assert!( evalbool("var a = {}; var b = a; Object.is(a, b)") );
+    assert!( !evalbool("Object.is({}, {})") );
+    assert!( evalbool("Object.is(global, global)") );
 }
 
 #[test]
 fn test_builtin_function() {
-    /*
     assert_eq!(
         eval("Object.getOwnPropertyDescriptor(global, 'Function')"),
-        json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
+        json!({"writable": true, "enumerable": false, "configurable": true,  "value": {}})
     );
-    assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
-    assert_eval!(r#"
-        var gcd = function(a, b) { return (a == b ? a : (a < b ? gcd(a, b-a) : gcd(a-b, b))); };
-        gcd(12, 15)
-    "#, 3.0);
-    assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
-    */
+    //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
 }
 
 #[test]
