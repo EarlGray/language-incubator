@@ -333,7 +333,7 @@ impl Heap {
 
     pub fn new() -> Self {
         let heap_vec = vec![
-            JSValue::Undefined,                /* [Heap::NULL] */
+            JSValue::Null,                     /* [Heap::NULL] */
             JSValue::Object(JSObject::new()),  /* [Heap::GLOBAL] */
         ];
 
@@ -522,6 +522,11 @@ pub struct JSObject {
 }
 
 impl JSObject {
+    /// A property with this name is used:
+    /// - as the primitive value of a Number/Boolean/String object;
+    /// - as the function entry in a Function.
+    pub const VALUE: &'static str = "[[value]]";
+
     pub fn new() -> JSObject {
         let properties = HashMap::new();
         JSObject{ properties }

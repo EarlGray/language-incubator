@@ -22,6 +22,39 @@ fn object_proto_toString(
     Ok(Interpreted::Value(JSValue::from("TODO")))
 }
 
+fn object_proto_dbg(
+    this_ref: JSRef,
+    _method_name: String,
+    _arguments: Vec<Interpreted>,
+    heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    dbg!(this_ref);
+    dbg!(heap.object(this_ref)?);
+    Ok(Interpreted::VOID)
+}
+
+fn init_object_prototype(heap: &mut Heap) -> JSRef {
+    /* Object.prototype */
+    let mut object_proto = JSObject::new();
+    object_proto.set_property_and_flags(
+        "toString",
+        Content::NativeFunction(object_proto_toString),
+        Access::HIDDEN,
+    );
+    object_proto.set_property_and_flags(
+        "dbg",
+        Content::NativeFunction(object_proto_dbg),
+        Access::ALL ^ Access::CONF
+    );
+    object_proto.set_property_and_flags(
+        "__proto__",
+        Content::Data(Heap::NULL),
+        Access::NONE
+    );
+
+    heap.allocate(JSValue::Object(object_proto))
+}
+
 #[allow(non_snake_case)]
 fn object_object_getOwnPropertyDescriptor(
     _this_ref: JSRef,
@@ -67,19 +100,6 @@ fn object_object_getOwnPropertyDescriptor(
     Ok(Interpreted::Value(descriptor))
 }
 
-
-fn init_object_prototype(heap: &mut Heap) -> JSRef {
-    /* Object.prototype */
-    let mut object_proto = JSObject::new();
-    object_proto.set_property_and_flags(
-        "toString",
-        Content::NativeFunction(object_proto_toString),
-        Access::HIDDEN,
-    );
-
-    heap.allocate(JSValue::Object(object_proto))
-}
-
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let object_proto_ref = init_object_prototype(heap);
 
@@ -98,6 +118,13 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     );
 
     let object_ref = heap.allocate(JSValue::Object(object_object));
+
+    heap.object_mut(object_proto_ref)?.set_property_and_flags(
+        "constructor",
+        Content::Data(object_ref),
+        Access::HIDDEN
+    );
+
     heap.global_mut().set_property_and_flags(
         "Object",
         Content::Data(object_ref),

@@ -42,10 +42,12 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
         Access::HIDDEN
     );
 
-    // TODO: detect circular references in JSValue::to_string()
-    //   to avoid stack overflow on trying to display `global` in REPL.
     // The `global` self-reference:
-    //global_object.set_property("global", Heap::GLOBAL);
+    heap.global_mut().set_property_and_flags(
+        "global",
+        Content::Data(Heap::GLOBAL),
+        Access::HIDDEN
+    );
 
     Ok(())
 }

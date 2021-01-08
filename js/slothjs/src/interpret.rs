@@ -466,7 +466,7 @@ impl Interpretable for CallExpression {
             Content::Data(function_ref) => {
                 let function_object = state.heap.get(function_ref).to_object()?;
                 // TODO: check if this is a Function
-                function_object.properties.get("[[value]]")
+                function_object.properties.get(JSObject::VALUE)
                     .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?
             }
             _ => prop,
@@ -509,9 +509,10 @@ impl Interpretable for FunctionExpression {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
+            // TODO: capture free variables
         };
         function_object.set_property_and_flags(
-            "[[value]]",
+            JSObject::VALUE,
             Content::Closure(closure),
             Access::NONE
         );
