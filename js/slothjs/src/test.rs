@@ -58,11 +58,6 @@ fn eval(input: &str) -> JSON {
     }
 }
 
-fn evalexc(input: &str) -> Exception {
-    let mut state = RuntimeState::new();
-    run_interpreter(input, &mut state).unwrap_err()
-}
-
 fn evalbool(input: &str) -> bool {
     let mut state = RuntimeState::new();
     match interpret(input, &mut state) {
@@ -74,27 +69,60 @@ fn evalbool(input: &str) -> bool {
     }
 }
 
+/// Runs interpretation of the first argument (a string literal),
+/// then compares the result to the second argument (anything that `serde_json::json!`
+/// understands).
+macro_rules! assert_eval {
+    ($js:literal, $json:tt) => {
+        let mut state = RuntimeState::new();
+        let expected = json!($json);
+        match interpret($js, &mut state) {
+            Ok(result) => {
+                let result = result.to_json(&state.heap);
+                assert_eq!( result, expected )
+            }
+            Err(exc) => {
+                panic!(format!("\n     want value: {}\n  got exception: {:?}", expected, exc))
+            }
+        }
+    }
+}
+
+/// Run interpretation of the first argument (a string literal),
+/// then expects it to fail with a given variant of Exception:
+/// ```ignored
+/// assert_exception!( "bla", Exception::ReferenceNotFound );
+/// ```
+// TODO: look if it's possible to match exception arguments as well:
+// ```
+// assert_exception!( "bla", Exception::ReferenceNotFound("bla") );
+// ```
+macro_rules! assert_exception {
+    ($js:literal, $exc:path) => {
+        let mut state = RuntimeState::new();
+        match interpret($js, &mut state) {
+            Err($exc(_)) => (),
+            other => {
+                panic!(format!("\n   want {}\n   got: {:?}\n", stringify!($exc), other))
+            }
+        }
+    };
+}
 
 #[test]
 fn test_literals() {
-    assert_eq!( eval("null"),       JSON::Null);
-    assert_eq!( eval("true"),       JSON::from(true));
-    assert_eq!( eval("42"),         JSON::from(42.0));
-    assert_eq!( eval("0x2a"),       JSON::from(42.0));
-    assert_eq!( eval("052"),        JSON::from(42.0));
+    assert_eval!( "null",       null);
+    assert_eval!( "true",       true);
+    assert_eval!( "42",         42.0);
+    assert_eval!( "0x2a",       42.0);
+    assert_eval!( "052",        42.0);
     //assert_eq!( eval("[]"),         JSValue::from(json!([])));
     //assert_eq!( eval("+5"),         JSValue::from(5));
     //assert_eq!( eval("+'5'"),       JSValue::from(5));
 
-    assert_eq!(
-        eval("\"hello \\\"world\\\"\""),
-        JSON::from("hello \"world\"".to_string())
-    );
+    assert_eval!( "\"hello \\\"world\\\"\"", "hello \"world\"");
 
-    assert_eq!(
-        eval("var a = {one:1, two:2}; a"),
-        json!({"one": 1.0, "two": 2.0})
-    );
+    assert_eval!("var a = {one:1, two:2}; a", {"one": 1.0, "two": 2.0});
 
     assert_eq!(
         eval("let x = 'one'; let o = {[x]: 1}; o.one"),
@@ -247,8 +275,8 @@ fn test_member_expression() {
         eval("let a = {}; a.sub = {}; a.sub.one = 1; a"),
         json!({"sub": {"one": 1.0}})
     );
-    assert!( evalexc("let a = {}; a.sub.one = 1")
-        .kind_eq(&Exception::ReferenceNotAnObject(Interpreted::VOID))
+    assert_exception!(
+        "let a = {}; a.sub.one = 1", Exception::ReferenceNotAnObject
     );
 }
 
@@ -276,15 +304,9 @@ fn test_assignment() {
 #[test]
 fn test_scope() {
     assert_eq!( eval("a = 1; a"),   JSON::from(1.0) );
-    assert!( evalexc("b")
-        .kind_eq(&Exception::ReferenceNotFound(String::new()))
-    );
-    assert!( evalexc("a = a + 1")
-        .kind_eq(&Exception::ReferenceNotFound(String::from("a")))
-    );
-    assert!( evalexc("a += 1")
-        .kind_eq(&Exception::ReferenceNotFound(String::from("a")))
-    );
+    assert_exception!( "b", Exception::ReferenceNotFound );
+    assert_exception!( "a = a + 1", Exception::ReferenceNotFound );
+    assert_exception!( "a += 1", Exception::ReferenceNotFound );
 }
 
 /*
@@ -529,6 +551,12 @@ fn test_builtin_function() {
         eval("Object.getOwnPropertyDescriptor(global, 'Function')"),
         json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
     );
+    assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
+    assert_eval!(r#"
+        var gcd = function(a, b) { return (a == b ? a : (a < b ? gcd(a, b-a) : gcd(a-b, b))); };
+        gcd(12, 15)
+    "#, 3.0);
+    assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
     */
 }
 
@@ -551,9 +579,7 @@ fn test_objects() {
         JSON::from(1.0)
     );
 
-    assert!( evalexc("a.one = 1").kind_eq(
-            &Exception::ReferenceNotFound("a".to_string())
-    ));
+    assert_exception!( "a.one = 1", Exception::ReferenceNotFound );
 }
 
 /// ```sh
@@ -570,4 +596,6 @@ fn test_sizes() {
     println!("============================");
 }
 
-#[test] fn test_scratch() { }
+// this is for one-off experiments, don't commit anything here:
+#[test] fn test_scratch() {
+}

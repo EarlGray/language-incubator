@@ -27,9 +27,9 @@
 * TODO WhileStatement
 * TODO DoWhileStatement
 * TODO BreakStatement, ContinueStatement
-* TODO UnaryExpression
+* DONE [2021-01-04 Mon] UnaryExpression
 ** DONE [2021-01-03 Sun] everything, except...
-** TODO =delete=
+** DONE [2021-01-04 Mon] =delete=
 * TODO user exceptions
 ** TODO =try=, =catch=, =finally=
 ** TODO stacktraces with source locations
@@ -53,15 +53,17 @@
 ** TODO =Number=
 ** TODO =String=
 ** TODO =Boolean=
-* DONE [2021-01-01 Fri] builtin functions
+* DONE [2021-01-01 Fri] builtin function calls
 ** DONE [2021-01-01 Fri] CallExpression
 * TODO user functions
 ** TODO FunctionExpression
 *** TODO =arguments=
-*** TODO function scope
+*** DONE [2021-01-06 Wed] function scope
 *** TODO closures
-** TODO ReturnExpression
+** DONE [2021-01-06 Wed] ReturnExpression
 ** TODO FunctionDeclaration
+** TODO recursive functions
+*** TODO limit call stack, throw StackOverflow
 * TODO user objects
 ** TODO prototype chain
 ** TODO ThisExpression
