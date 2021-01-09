@@ -184,6 +184,9 @@ fn repl_main(esparse_path: &Path) -> io::Result<()> {
             break;
         }
         let input = input.unwrap().unwrap();
+        if input.len() == 0 {
+            continue;
+        }
 
         // evaluate
         match evaluate_input(esparse_path, &input, &mut state) {
