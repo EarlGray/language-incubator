@@ -462,18 +462,22 @@ impl Interpretable for CallExpression {
                 let this_ref = of.to_ref(&state.heap)?;
                 (this_ref, name.clone())
             }
-            Interpreted::Ref(_func_ref) =>
-                todo!(),
-            Interpreted::Value(_) =>
-                return Err(Exception::TypeErrorNotCallable(callee.clone()))
+            _ => return Err(Exception::TypeErrorNotCallable(callee.clone()))
         };
 
-        let this_object = state.heap.get(this_ref).to_object()?;
-        let prop = this_object.properties.get(&method_name)
-            .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?;
+        let prop = match state.heap.lookup_protochain(this_ref, &method_name) {
+            Some(Interpreted::Member{ of, name }) => {
+                let objref = of.to_ref(&state.heap)?;
+                state.heap.object(objref)?.properties.get(&name).unwrap()
+            }
+            Some(_) => unreachable!(),
+            None => {
+                return Err(Exception::TypeErrorNotCallable(callee.clone()));
+            }
+        };
         let prop = match prop.content {
             Content::Data(function_ref) => {
-                let function_object = state.heap.get(function_ref).to_object()?;
+                let function_object = state.heap.object(function_ref)?;
                 // TODO: check if this is a Function
                 function_object.properties.get(JSObject::VALUE)
                     .ok_or(Exception::TypeErrorNotCallable(callee.clone()))?

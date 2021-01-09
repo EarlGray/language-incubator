@@ -434,6 +434,21 @@ impl Heap {
         Ok(objref)
     }
 
+    pub fn lookup_protochain(&self, mut objref: JSRef, propname: &str) -> Option<Interpreted> {
+        while let Ok(object) = self.get(objref).to_object() {
+            if object.properties.contains_key(propname) {
+                return Some(Interpreted::Member{
+                    of: Box::new(Interpreted::Ref(objref)),
+                    name: propname.to_string()
+                });
+            }
+
+            objref = object.property_ref(JSObject::PROTO).unwrap_or(Heap::NULL);
+        }
+        None
+    }
+
+    /// Deserializes JSON into objects on the heap
     pub fn object_from_json(&mut self, json: &JSON) -> JSValue {
         if let Some(obj) = json.as_object() {
             let mut object = JSObject::new();
