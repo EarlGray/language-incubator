@@ -1,12 +1,10 @@
 use crate::error::Exception;
-use crate::object;
 use crate::object::{
     Content,
     Heap,
     Interpreted,
     JSRef,
     JSValue,
-    PropertyFlags as Access
 };
 
 /*
@@ -57,25 +55,22 @@ fn parse_int(
  */
 fn make_readonly_property(heap: &mut Heap, name: &str, value: JSValue) {
     let valref = heap.allocate(value);
-    let content = object::Content::Data(valref);
-    heap.global_mut().set_property_and_flags(name, content, Access::READONLY);
+    heap.global_mut().set_readonly(name, Content::Data(valref));
 }
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     make_readonly_property(heap, "NaN", JSValue::Number(f64::NAN));
     make_readonly_property(heap, "undefined", JSValue::Undefined);
 
-    heap.global_mut().set_property_and_flags(
+    heap.global_mut().set_hidden(
         "parseInt",
         Content::NativeFunction(parse_int),
-        Access::HIDDEN
     );
 
     // The `global` self-reference:
-    heap.global_mut().set_property_and_flags(
+    heap.global_mut().set_hidden(
         "global",
         Content::Data(Heap::GLOBAL),
-        Access::HIDDEN
     );
 
     Ok(())

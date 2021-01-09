@@ -6,7 +6,6 @@ use crate::object::{
     JSObject,
     JSRef,
     JSValue,
-    PropertyFlags as Access,
 };
 use crate::error::Exception;
 use crate::ast::*;      // yes, EVERYTHING
@@ -51,13 +50,11 @@ impl RuntimeState {
         // TODO: let and const should be block-scoped
         if !self.scope().properties.contains_key(name) {
             let valueref = self.heap.allocate(JSValue::Undefined);
-            let flags = if kind.is_none() { Access::ALL } else { Access::ALL ^ Access::CONF };
-
-            self.scope_mut().set_property_and_flags(
-                name,
-                Content::Data(valueref),
-                flags,
-            );
+            if kind.is_none() {
+                self.scope_mut().set_property_ref(name, valueref);
+            } else {
+                self.scope_mut().set_nonconf(name, Content::Data(valueref));
+            }
         }
         Ok(())
     }
@@ -97,17 +94,15 @@ impl RuntimeState {
             let paramref = value.to_ref_or_allocate(&mut self.heap)?;
             scope_object.set_property_ref(name, paramref);
         }
-        scope_object.set_property_and_flags(
+        scope_object.set_system(
             Self::SAVED_SCOPE,
             Content::Data(old_scope_ref),
-            Access::NONE
         );
         let new_scope_ref = self.heap.allocate(JSValue::Object(scope_object));
 
-        self.heap.global_mut().set_property_and_flags(
+        self.heap.global_mut().set_system(
             Self::LOCAL_SCOPE,
             Content::Data(new_scope_ref),
-            Access::NONE
         );
         Ok(())
     }
@@ -122,10 +117,9 @@ impl RuntimeState {
         if saved_scope_ref == Heap::GLOBAL {
             self.heap.global_mut().properties.remove(Self::LOCAL_SCOPE);
         } else {
-            self.heap.global_mut().set_property_and_flags(
+            self.heap.global_mut().set_system(
                 Self::LOCAL_SCOPE,
                 Content::Data(saved_scope_ref),
-                Access::NONE
             );
         }
 
@@ -499,21 +493,19 @@ impl Interpretable for CallExpression {
 
 impl Interpretable for FunctionExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
-        // __proto__ => Function.prototype
-        let function_prototype_ref = state.heap.lookup_ref(&["Object", "prototype"])?;
-
         let mut function_object = JSObject::new();
-        function_object.set_property_and_flags(
-            "__proto__",
+
+        // __proto__ => Function.prototype
+        let function_prototype_ref = state.heap.lookup_ref(&["Function", "prototype"])?;
+        function_object.set_system(
+            JSObject::PROTO,
             Content::Data(function_prototype_ref),
-            Access::NONE
         );
 
         let length_ref = state.heap.allocate(JSValue::Number(self.params.len() as f64));
-        function_object.set_property_and_flags(
+        function_object.set_nonconf(
             "length",
             Content::Data(length_ref),
-            Access::ALL ^ Access::CONF
         );
 
         let closure = object::Closure {
@@ -522,10 +514,9 @@ impl Interpretable for FunctionExpression {
             body: self.body.clone(),
             // TODO: compute and capture free variables
         };
-        function_object.set_property_and_flags(
+        function_object.set_system(
             JSObject::VALUE,
             Content::Closure(closure),
-            Access::NONE
         );
 
         Ok(Interpreted::Value(JSValue::Object(function_object)))

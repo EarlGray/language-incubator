@@ -8,7 +8,6 @@ use crate::object::{
     JSObject,
     JSRef,
     JSValue,
-    PropertyFlags as Access,
 };
 use crate::error::Exception;
 
@@ -33,23 +32,20 @@ fn object_proto_dbg(
     Ok(Interpreted::VOID)
 }
 
-fn init_object_prototype(heap: &mut Heap) -> JSRef {
+pub fn init_proto(heap: &mut Heap) -> JSRef {
     /* Object.prototype */
     let mut object_proto = JSObject::new();
-    object_proto.set_property_and_flags(
+    object_proto.set_hidden(
         "toString",
-        Content::NativeFunction(object_proto_toString),
-        Access::HIDDEN,
+        Content::NativeFunction(object_proto_toString)
     );
-    object_proto.set_property_and_flags(
+    object_proto.set_system(
         "dbg",
         Content::NativeFunction(object_proto_dbg),
-        Access::ALL ^ Access::CONF
     );
-    object_proto.set_property_and_flags(
-        "__proto__",
-        Content::Data(Heap::NULL),
-        Access::NONE
+    object_proto.set_system(
+        JSObject::PROTO,
+        Content::Data(Heap::NULL)
     );
 
     heap.allocate(JSValue::Object(object_proto))
@@ -143,45 +139,27 @@ fn object_object_getOwnPropertyDescriptor(
     Ok(Interpreted::Value(descriptor))
 }
 
-pub fn init(heap: &mut Heap) -> Result<(), Exception> {
-    let object_proto_ref = init_object_prototype(heap);
-
+pub fn init_object(heap: &mut Heap, object_proto: JSRef) -> Result<JSRef, Exception> {
     let mut object_object = JSObject::new();
 
     /* the Object */
-    object_object.set_property_and_flags(
+    object_object.set_system(
         "prototype",
-        Content::Data(object_proto_ref),
-        Access::NONE
+        Content::Data(object_proto),
     );
-    object_object.set_property_and_flags(
+    object_object.set_hidden(
         "is",
         Content::NativeFunction(object_object_is),
-        Access::HIDDEN,
     );
-    object_object.set_property_and_flags(
+    object_object.set_hidden(
         "getOwnPropertyDescriptor",
         Content::NativeFunction(object_object_getOwnPropertyDescriptor),
-        Access::HIDDEN
     );
-    object_object.set_property_and_flags(
+    object_object.set_system(
         JSObject::VALUE,
         Content::NativeFunction(object_constructor),
-        Access::NONE
     );
 
     let object_ref = heap.allocate(JSValue::Object(object_object));
-
-    heap.object_mut(object_proto_ref)?.set_property_and_flags(
-        "constructor",
-        Content::Data(object_ref),
-        Access::HIDDEN
-    );
-
-    heap.global_mut().set_property_and_flags(
-        "Object",
-        Content::Data(object_ref),
-        Access::HIDDEN
-    );
-    Ok(())
+    Ok(object_ref)
 }

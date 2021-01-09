@@ -8,7 +8,6 @@ use crate::object::{
     JSRef,
     JSValue,
     Heap,
-    PropertyFlags as Access,
 };
 
 fn function_constructor(

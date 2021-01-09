@@ -546,6 +546,7 @@ impl JSObject {
     /// - as the primitive value of a Number/Boolean/String object;
     /// - as the function entry in a Function.
     pub const VALUE: &'static str = "[[value]]";
+    pub const PROTO: &'static str = "__proto__";
 
     pub fn new() -> JSObject {
         let properties = HashMap::new();
@@ -562,20 +563,7 @@ impl JSObject {
         )
     }
 
-    pub fn property_func(&self, name: &str) -> Option<NativeFunction> {
-        if let Some(prop) = self.properties.get(name) {
-            if let Content::NativeFunction(func) = prop.content {
-                return Some(func);
-            }
-        }
-        None
-    }
-
-    pub fn set_property(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, PropertyFlags::ALL)
-    }
-
-    pub fn set_property_and_flags(&mut self, name: &str, content: Content, access: PropertyFlags) {
+    fn set_property_and_flags(&mut self, name: &str, content: Content, access: Access) {
         match self.properties.get_mut(name) {
             Some(prop) =>
                 if prop.access.writable() {
@@ -591,20 +579,39 @@ impl JSObject {
     pub fn set_property_ref(&mut self, name: &str, propref: JSRef) {
         self.set_property(name, Content::Data(propref))
     }
+    pub fn set_property(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, Access::ALL)
+    }
+
+    pub fn set_system(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, Access::NONE)
+    }
+
+    pub fn set_hidden(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, Access::ALL ^ Access::ENUM)
+    }
+
+    pub fn set_nonconf(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, Access::ALL ^ Access::CONF)
+    }
+
+    pub fn set_readonly(&mut self, name: &str, content: Content) {
+        self.set_property_and_flags(name, content, Access::ALL ^ Access::WRITE)
+    }
 }
 
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
     pub content: Content,
-    pub access: PropertyFlags,
+    pub access: Access,
 }
 
 impl Property {
     pub fn from_ref(heapref: JSRef) -> Property {
         Property {
             content: Content::Data(heapref),
-            access: PropertyFlags::ALL,
+            access: Access::ALL,
         }
     }
 
@@ -614,22 +621,20 @@ impl Property {
 
 
 bitflags! {
-    pub struct PropertyFlags: u8 {
+    pub struct Access: u8 {
         const ENUM = 0b001;
         const CONF = 0b010;
         const WRITE = 0b100;
 
         const NONE = 0b000;
-        const READONLY = Self::ENUM.bits | Self::CONF.bits;
-        const HIDDEN = Self::CONF.bits | Self::WRITE.bits;
         const ALL = 0b111;
     }
 }
 
-impl PropertyFlags {
-    pub fn enumerable(&self) -> bool { self.contains(PropertyFlags::ENUM) }
-    pub fn configurable(&self) -> bool { self.contains(PropertyFlags::CONF) }
-    pub fn writable(&self) -> bool { self.contains(PropertyFlags::WRITE) }
+impl Access {
+    pub fn enumerable(&self) -> bool { self.contains(Access::ENUM) }
+    pub fn configurable(&self) -> bool { self.contains(Access::CONF) }
+    pub fn writable(&self) -> bool { self.contains(Access::WRITE) }
 }
 
 
