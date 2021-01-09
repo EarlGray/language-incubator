@@ -468,6 +468,7 @@ pub enum Interpreted {
 
 impl Interpreted {
     pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
+    pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
 
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
         let value = match self {
@@ -528,6 +529,10 @@ impl Interpreted {
             _ => Ok(()),
         }
     }
+}
+
+impl<T> From<T> for Interpreted where JSValue: From<T>  {
+    fn from(value: T) -> Interpreted { Interpreted::Value(JSValue::from(value)) }
 }
 
 /// Javascript objects

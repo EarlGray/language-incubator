@@ -544,7 +544,16 @@ fn test_functions() {
 #[test]
 fn test_global_methods() {
     // parseInt
-    assert_eq!( eval("parseInt('42')"),     JSON::from(42.0));
+    assert_eval!( "parseInt('42')",     42.0 );
+    assert_eval!( "parseInt(5)",        5.0 );
+    assert_eval!( "parseInt('nope')",   (f64::NAN) );
+    assert_eval!( "parseInt('1'+'2', 'yep')", 12.0 );
+    //assert_eval!( "parseInt('0x10')",   16.0 );
+    assert_eval!( "parseInt('22', 38)", (f64::NAN) );
+    assert_eval!( "parseInt('22', 1)",  (f64::NAN) );
+    assert_eval!( "parseInt('20', 8)",  16.0 );
+    assert_eval!( "parseInt('020', 10)", 20.0 );
+    assert_eval!( "parseInt('020')",     16.0 );
 }
 
 #[test]
