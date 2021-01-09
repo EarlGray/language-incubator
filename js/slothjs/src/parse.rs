@@ -261,8 +261,6 @@ impl TryFrom<&JSON> for Expr {
                 Expr::Assign(expr)
             }
             "BinaryExpression" => {
-                /*
-                */
                 let expr = BinaryExpression::try_from(jexpr)?;
                 Expr::BinaryOp(expr)
             }
@@ -381,6 +379,8 @@ impl TryFrom<&JSON> for BinaryExpression {
         let opstr = json_get_str(jexpr, "operator")?;
         let op = match opstr {
             "+" => BinOp::Plus,
+            "-" => BinOp::Minus,
+            "*" => BinOp::Star,
             "==" => BinOp::EqEq,
             "!=" => BinOp::NotEq,
             "<" => BinOp::Less,
@@ -407,6 +407,8 @@ impl TryFrom<&JSON> for AssignmentExpression {
         let modop = match jop {
             "=" => None,
             "+=" => Some(BinOp::Plus),
+            "-=" => Some(BinOp::Minus),
+            "*=" => Some(BinOp::Star),
             _ => return Err(ParseError::UnexpectedValue{
                 want: "= | +=",
                 value: jexpr.get("operator").unwrap().clone()

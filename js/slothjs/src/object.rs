@@ -224,6 +224,16 @@ impl JSValue {
         }
     }
 
+    pub fn numerically<F>(&self, other: &JSValue, op: F) -> JSValue
+        where F: Fn(f64, f64) -> f64
+    {
+        let val = match (self.numberify(), other.numberify()) {
+            (Some(lnum), Some(rnum)) => op(lnum, rnum),
+            _ => f64::NAN
+        };
+        JSValue::Number(val)
+    }
+
     pub fn plus(&self, other: &JSValue, heap: &Heap) -> JSValue {
         if !(self.is_string() || other.is_string()) {
             if let Some(lnum) = self.numberify() {
@@ -236,6 +246,11 @@ impl JSValue {
         let rvalstr = other.stringify(heap);
         JSValue::from(lvalstr + &rvalstr)
     }
+
+    pub fn minus(&self, other: &JSValue, _heap: &Heap) -> JSValue {
+        JSValue::numerically(self, other, |a, b| a - b)
+    }
+
 
     pub fn less(&self, other: &JSValue, _heap: &Heap) -> JSValue {
         // TODO: Abstract Relational Comparison

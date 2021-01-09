@@ -137,9 +137,28 @@ pub type FunctionParameter = Identifier;
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
     Plus,
+    Minus,
+    Star,
     EqEq,
     NotEq,
     Less,
+    /*
+    InstanceOf,
+    In,
+    Slash,
+    Percent,
+    StarStar,
+    Pipe,
+    Hat,
+    Ampersand,
+    EqEqEq,
+    NotEqEq,
+    Greater,
+    LtEq,
+    LtLt,
+    GtGt,
+    GtGtGt
+     */
 }
 
 #[derive(Debug, Clone, PartialEq)]

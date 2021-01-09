@@ -143,6 +143,17 @@ fn test_binary_operations() {
     assert_eq!( eval("null + null"),    JSON::from(0.0) );
     assert_eq!( eval("true + null"),    JSON::from(1.0) );
 
+    assert_eval!( "5 - 3",  2.0 );
+    assert_eval!( "3.5 - 5",  (-1.5) );
+    assert_eval!( "5 - 'hello'",  (f64::NAN) );
+    assert_eval!( "5 - true",  4.0 );
+
+    assert_eval!( "5 * 3",      15.0 );
+    assert_eval!( "'lol' * 3",  (f64::NAN) );
+    assert_eval!( "'2' * '3'",  6.0 );
+    assert_eval!( "3 * null",   0.0 );
+
+
     // o_O
     assert!( evalbool("2 == 2") );
     assert!( !evalbool("2 == 3") );
@@ -225,9 +236,6 @@ fn test_binary_operations() {
     assert_eq!( eval("5 - 3"), JSValue::from(2) );
     assert!( evalbool("isNaN('a' - 3)"));
 
-    assert_eq!( eval("3 * 2"), JSValue::from(6) );
-    assert_eq!( eval("3 * null"), JSValue::from(0) );
-
     assert_eq!( eval("6 / 3"), JSValue::from(2) );
 
     assert_eq!( eval("143 % 12"), JSValue::from(11) );
@@ -282,16 +290,16 @@ fn test_member_expression() {
 
 #[test]
 fn test_assignment() {
-    assert_eq!( eval("var a = 1; a = 2; a"),            JSON::from(2.0));
-    assert_eq!( eval("a = b = 1; a + b"),               JSON::from(2.0));
-    assert_eq!( eval("var a = 1; a += 1; a"),           JSON::from(2.0));
-    assert_eq!( eval("var a = 1; a += 1"),              JSON::from(2.0));
+    assert_eval!( "var a = 1; a = 2; a",    2.0 );
+    assert_eval!( "a = b = 1; a + b",       2.0 );
+    assert_eval!( "var a = 1; a += 1; a",   2.0 );
+    assert_eval!( "var a = 1; a += 1",      2.0 );
+    assert_eval!( "var a = 3; a *= a; a",   9.0 );
+    assert_eval!( "var a = 1; a -= 1; a",   0.0 );
     /*
-    assert_eq!( eval("var a = 3; a *= a; a"),            JSValue::from(9));
     assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
     assert_eq!( eval("var a = 3; a /= a; a"),            JSValue::from(1));
     assert_eq!( eval("var a = 13; a %= 8; a"),            JSValue::from(5));
-    assert_eq!( eval("var a = 1; a -= 1; a"),            JSValue::from(0));
     assert_eq!( eval("var a = 1; a <<= 4; a"),            JSValue::from(16));
     assert_eq!( eval("var a = 32; a >>= 4; a"),            JSValue::from(2));
     assert_eq!( eval("var a = 32; a >>>= 4; a"),            JSValue::from(2));

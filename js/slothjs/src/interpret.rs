@@ -310,8 +310,10 @@ impl Interpretable for BinaryExpression {
         let result = match op {
             BinOp::EqEq => JSValue::from(lval.loose_eq(&rval)),
             BinOp::NotEq => JSValue::from(!lval.loose_eq(&rval)),
-            BinOp::Plus => JSValue::plus(&lval, &rval, &state.heap),
             BinOp::Less => JSValue::less(&lval, &rval, &state.heap),
+            BinOp::Plus => JSValue::plus(&lval, &rval, &state.heap),
+            BinOp::Minus => JSValue::minus(&lval, &rval, &state.heap),
+            BinOp::Star => JSValue::numerically(&lval, &rval, |a, b| a * b),
         };
         Ok(Interpreted::Value(result))
     }
@@ -405,6 +407,8 @@ impl Interpretable for AssignmentExpression {
             let value = value.to_value(&state.heap)?;
             let newvalue = match op {
                 BinOp::Plus => JSValue::plus(oldvalue, &value, &state.heap),
+                BinOp::Minus => JSValue::minus(oldvalue, &value, &state.heap),
+                BinOp::Star => JSValue::numerically(oldvalue, &value, |a, b| a * b),
                 _ => panic!(format!("Binary operation {:?} cannot be used in assignment", op))
             };
             *state.heap.get_mut(objref) = newvalue.clone();
