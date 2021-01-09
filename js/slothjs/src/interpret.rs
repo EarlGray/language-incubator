@@ -20,6 +20,7 @@ pub struct RuntimeState {
 impl RuntimeState {
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";
     const SAVED_SCOPE: &'static str = "[[saved_scope]]";
+    const SCOPE_THIS: &'static str = "[[this]]";
 
     pub fn new() -> Self {
         RuntimeState{ heap: Heap::new() }
@@ -83,7 +84,8 @@ impl RuntimeState {
 
     fn push_scope(&mut self,
         params: Vec<Identifier>,
-        values: Vec<Interpreted>
+        values: Vec<Interpreted>,
+        this_ref: JSRef,
     ) -> Result<(), Exception> {
         let old_scope_ref = self.scope_ref();
 
@@ -97,6 +99,10 @@ impl RuntimeState {
         scope_object.set_system(
             Self::SAVED_SCOPE,
             Content::Data(old_scope_ref),
+        );
+        scope_object.set_system(
+            Self::SCOPE_THIS,
+            Content::Data(this_ref),
         );
         let new_scope_ref = self.heap.allocate(JSValue::Object(scope_object));
 
@@ -368,6 +374,12 @@ impl Interpretable for ObjectExpression {
     fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
         let mut object = JSObject::new();
 
+        let object_proto_ref = state.heap.lookup_ref(&["Object", "prototype"])?;
+        object.set_system(
+            JSObject::PROTO,
+            Content::Data(object_proto_ref),
+        );
+
         for (key, valexpr) in self.0.iter() {
             let keyname = match key {
                 ObjectKey::Identifier(ident) =>
@@ -382,8 +394,7 @@ impl Interpretable for ObjectExpression {
             object.set_property_ref(&keyname, propref);
         }
 
-        let object = JSValue::Object(object);
-        Ok(Interpreted::Value(object))
+        Ok(Interpreted::Value(JSValue::Object(object)))
     }
 }
 
@@ -474,7 +485,7 @@ impl Interpretable for CallExpression {
                 func(this_ref, method_name, arguments, &mut state.heap),
             Content::Closure(closure) => {
                 let object::Closure{ params, body, .. } = closure.clone();
-                state.push_scope(params, arguments)?;
+                state.push_scope(params, arguments, this_ref)?;
                 let result = body.interpret(state);
                 state.pop_scope()?;
                 match result {
