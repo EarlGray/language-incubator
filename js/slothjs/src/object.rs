@@ -659,6 +659,7 @@ pub enum Content {
     NativeFunction(NativeFunction),
     Closure(Closure),
     /*
+    Array(JSArray),
     Accesssor{
         get: Option<Callable>,
         set: Option<Callable>,
@@ -721,3 +722,10 @@ pub struct Closure {
     pub body: Box<ast::BlockStatement>,
     //pub free_variables: Vec<JSRef>,
 }
+
+/*
+#[derive(Clone, Debug)]
+pub struct JSArray {
+    storage: BTreeMap<usize, JSObject>,
+}
+*/

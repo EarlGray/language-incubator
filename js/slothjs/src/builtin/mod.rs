@@ -27,7 +27,9 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     heap.global_mut().set_hidden("Function", Content::Data(the_function));
     heap.object_mut(function_proto)?.set_hidden("constructor", Content::Data(the_function));
 
-    array::init(heap)?;
+    let the_array = array::init(heap)?;
+    heap.global_mut().set_hidden("Array", Content::Data(the_array));
+
     console::init(heap)?;
 
     Ok(())
