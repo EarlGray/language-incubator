@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str::FromStr;
 use std::fmt;
 
 use bitflags::bitflags;
@@ -81,6 +82,9 @@ impl JSValue {
                         Content::Closure(closure) => {
                             format!("{:?}", closure)
                         }
+                        Content::Array(array) => {
+                            format!("{:?}", array)
+                        }
                     };
                     s.push_str(&val);
                     s.push(',');
@@ -120,25 +124,7 @@ impl JSValue {
             JSValue::Bool(b) => JSON::from(*b),
             JSValue::Number(n) => JSON::from(*n),
             JSValue::String(s) => JSON::from(s.as_str()),
-            JSValue::Object(object) => {
-                let mut json = json!({});
-                for (key, property) in object.properties.iter() {
-                    if !property.enumerable() {
-                        continue
-                    }
-
-                    match property.content {
-                        Content::Data(propref) => {
-                            let value = heap.get(propref);
-                            let jvalue = value.to_json(heap);
-                            json[key] = jvalue;
-                        }
-                        Content::NativeFunction(_) => (),
-                        Content::Closure(_) => (),
-                    }
-                }
-                json
-            }
+            JSValue::Object(object) => object.to_json(heap),
         }
     }
 
@@ -568,12 +554,29 @@ impl JSObject {
         JSObject{ properties }
     }
 
+    pub fn as_array(&self) -> Option<&JSArray> {
+        self.properties.get(JSObject::VALUE).and_then(|prop|
+            match &prop.content {
+                Content::Array(array) => Some(array),
+                _ => None,
+            }
+        )
+    }
+
     pub fn property_ref(&self, name: &str) -> Option<JSRef> {
+        if let Some(array) = self.as_array() {
+            if let Ok(index) = usize::from_str(name) {
+                if let Some(aref) = array.storage.get(index) {
+                    return Some(*aref);
+                }
+            }
+        }
         self.properties.get(name).and_then(|prop|
             match prop.content {
                 Content::Data(href) => Some(href),
                 Content::NativeFunction(_) => None,
                 Content::Closure(_) => None,
+                Content::Array(_) => None,
             }
         )
     }
@@ -612,6 +615,35 @@ impl JSObject {
 
     pub fn set_readonly(&mut self, name: &str, content: Content) {
         self.set_property_and_flags(name, content, Access::ALL ^ Access::WRITE)
+    }
+
+    pub fn to_json(&self, heap: &Heap) -> JSON {
+        if let Some(prop) = self.properties.get(JSObject::VALUE) {
+            if let Content::Array(array) = &prop.content {
+                let values = array.storage.iter().map(|elemref|
+                    heap.get(*elemref).to_json(heap)
+                ).collect();
+                return JSON::Array(values);
+            }
+        }
+        let mut json = json!({});
+        for (key, property) in self.properties.iter() {
+            if !property.enumerable() {
+                continue
+            }
+
+            match property.content {
+                Content::Data(propref) => {
+                    let value = heap.get(propref);
+                    let jvalue = value.to_json(heap);
+                    json[key] = jvalue;
+                }
+                Content::NativeFunction(_) => (),
+                Content::Closure(_) => unreachable!(),
+                Content::Array(_) => unreachable!(),
+            }
+        }
+        json
     }
 }
 
@@ -658,8 +690,8 @@ pub enum Content {
     Data(JSRef),
     NativeFunction(NativeFunction),
     Closure(Closure),
-    /*
     Array(JSArray),
+    /*
     Accesssor{
         get: Option<Callable>,
         set: Option<Callable>,
@@ -687,6 +719,9 @@ impl fmt::Debug for Content {
             }
             Content::NativeFunction(func) => {
                 write!(f, "Content::NativeFunction(*{:x})", func_ptr(*func))
+            }
+            Content::Array(storage) => {
+                write!(f, "Content::Array({:?})", &storage)
             }
             Content::Closure(closure) => {
                 let name = closure.id.as_ref()
@@ -723,9 +758,9 @@ pub struct Closure {
     //pub free_variables: Vec<JSRef>,
 }
 
-/*
 #[derive(Clone, Debug)]
 pub struct JSArray {
-    storage: BTreeMap<usize, JSObject>,
+    pub storage: Vec<JSRef>,
 }
-*/
+
+impl JSArray {}

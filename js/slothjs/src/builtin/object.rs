@@ -125,13 +125,14 @@ fn object_object_getOwnPropertyDescriptor(
     descriptor_object.set_property_ref("writable", writable);
     let dataref = match prop.content {
         Content::Data(dataref) => dataref,
-        Content::NativeFunction(_func) => {
-            heap.allocate(JSValue::from("[[native]]"))
-        }
         Content::Closure(closure) => {
             let repr = format!("{:?}", closure);
             heap.allocate(JSValue::from(repr))
         }
+        Content::NativeFunction(_func) =>
+            heap.allocate(JSValue::from("[[native]]")),
+        Content::Array(_) =>
+            heap.allocate(JSValue::from("[[array]]")),
     };
     descriptor_object.set_property_ref("value", dataref);
 

@@ -622,7 +622,6 @@ fn test_objects() {
 
 #[test]
 fn test_arrays() {
-    /*
     assert_eval!( "[]",   [] );
     assert_eval!( "[1, 'a', undefined]",   [1.0, "a", null] );
 
@@ -630,13 +629,12 @@ fn test_arrays() {
     assert_eval!( "let a = ['zero', 'one']; a[2]",  null );
 
     assert_eval!( "let a = ['zero', 'one']; a.length", 2 );
+    //assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
 
     assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
-    assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
     assert_eval!( "let a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
 
-    assert_eval!( "let a = ['zero']; a.push('one'); a[1]",  "one" );
-    */
+    //assert_eval!( "let a = ['zero']; a.push('one'); a[1]",  "one" );
 }
 
 /// ```sh

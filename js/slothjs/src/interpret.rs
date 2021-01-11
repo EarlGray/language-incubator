@@ -3,6 +3,7 @@ use crate::object::{
     Content,
     Heap,
     Interpreted,
+    JSArray,
     JSObject,
     JSRef,
     JSValue,
@@ -263,7 +264,7 @@ impl Interpretable for Expr {
             Expr::Identifier(expr) =>           expr.interpret(state),
             Expr::BinaryOp(expr) =>             expr.interpret(state),
             Expr::Call(expr) =>                 expr.interpret(state),
-            Expr::Array(_expr) =>               todo!(),
+            Expr::Array(expr) =>                expr.interpret(state),
             Expr::Member(expr) =>               expr.interpret(state),
             Expr::Object(expr) =>               expr.interpret(state),
             Expr::Assign(expr) =>               expr.interpret(state),
@@ -393,6 +394,25 @@ impl Interpretable for ObjectExpression {
             let propref = valresult.to_ref_or_allocate(&mut state.heap)?;
             object.set_property_ref(&keyname, propref);
         }
+
+        Ok(Interpreted::Value(JSValue::Object(object)))
+    }
+}
+
+impl Interpretable for ArrayExpression {
+    fn interpret(&self, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+        let ArrayExpression(exprs) = self;
+
+        let mut object = JSObject::new();
+
+        let array_proto = state.heap.lookup_ref(&["Array", "prototype"])?;
+        object.set_system(JSObject::PROTO, Content::Data(array_proto));
+
+        let storage = exprs.iter().map(|expr| {
+            let value = expr.interpret(state)?;
+            value.to_ref_or_allocate(&mut state.heap)
+        }).collect::<Result<Vec<JSRef>, Exception>>()?;
+        object.set_system(JSObject::VALUE, Content::Array(JSArray{ storage }));
 
         Ok(Interpreted::Value(JSValue::Object(object)))
     }
