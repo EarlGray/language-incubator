@@ -65,7 +65,7 @@
 ** TODO recursive functions
 *** TODO limit call stack, throw StackOverflow
 * TODO user objects
-** TODO prototype chain
+** DONE [2021-01-09 Sat] prototype chain
 ** TODO ThisExpression
 ** TODO NewExpression
 ** TODO properties, =get=, =set=

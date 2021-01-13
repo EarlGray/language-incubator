@@ -471,6 +471,13 @@ impl Interpreted {
     pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
     pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
 
+    pub fn member(objref: JSRef, name: &str) -> Interpreted {
+        Interpreted::Member{
+            of: Box::new(Interpreted::Ref(objref)),
+            name: name.to_string()
+        }
+    }
+
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
         let value = match self {
             Interpreted::Ref(href) =>
@@ -529,6 +536,12 @@ impl Interpreted {
             }
             _ => Ok(()),
         }
+    }
+}
+
+impl From<JSObject> for Interpreted {
+    fn from(object: JSObject) -> Interpreted {
+        Interpreted::Value(JSValue::Object(object))
     }
 }
 

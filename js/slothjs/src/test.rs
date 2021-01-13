@@ -628,7 +628,7 @@ fn test_arrays() {
     assert_eval!( "let a = ['zero', 'one']; a[1]",  "one" );
     assert_eval!( "let a = ['zero', 'one']; a[2]",  null );
 
-    assert_eval!( "let a = ['zero', 'one']; a.length", 2 );
+    //assert_eval!( "let a = ['zero', 'one']; a.length", 2 );
     //assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
 
     assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
@@ -645,9 +645,15 @@ fn test_sizes() {
     use std::mem::size_of;
     println!("============================");
     println!("size_of JSRef:  \t{}", size_of::<object::JSRef>());
+    println!("size_of JSObject:\t{}", size_of::<object::JSObject>());
     println!("size_of JSValue:\t{}", size_of::<JSValue>());
-    println!("size_of Property:\t{}", size_of::<object::Property>());
     println!("size_of Interpreted:\t{}", size_of::<object::Interpreted>());
+    println!("size_of Property:\t{}", size_of::<object::Property>());
+    println!("size_of   Access:\t{}", size_of::<object::Access>());
+    println!("size_of   Content:\t{}", size_of::<object::Content>());
+    println!("size_of     JSArray:\t{}", size_of::<object::JSArray>());
+    println!("size_of     NativeFunc:\t{}", size_of::<object::NativeFunction>());
+    println!("size_of     Closure:\t{}", size_of::<object::Closure>());
     println!("============================");
 }
 

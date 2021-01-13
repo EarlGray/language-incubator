@@ -67,17 +67,14 @@ impl RuntimeState {
                 .expect("scope is not an object, something is messed up");
 
             if scope_object.properties.contains_key(name) {
-                let of = Box::new(Interpreted::Ref(local_scope));
-                let found = Interpreted::Member{ of, name: name.to_string() };
-                return Some(found);
+                return Some(Interpreted::member(local_scope, name));
             }
         }
 
         // TODO: lookup free variables of the current call
 
         if self.heap.global().properties.contains_key(name) {
-            let of = Box::new(Interpreted::Ref(Heap::GLOBAL));
-            Some(Interpreted::Member{ of, name: name.to_string() })
+            Some(Interpreted::member(Heap::GLOBAL, name))
         } else {
             None
         }
@@ -363,11 +360,7 @@ impl Interpretable for MemberExpression {
             Exception::ReferenceNotAnObject(objresult.clone())
         })?;
 
-        let result = Interpreted::Member{
-            of: Box::new(Interpreted::Ref(objref)),
-            name: propname.to_string()
-        };
-        Ok(result)
+        Ok(Interpreted::member(objref, &propname))
     }
 }
 
@@ -395,7 +388,7 @@ impl Interpretable for ObjectExpression {
             object.set_property_ref(&keyname, propref);
         }
 
-        Ok(Interpreted::Value(JSValue::Object(object)))
+        Ok(Interpreted::from(object))
     }
 }
 
@@ -414,7 +407,7 @@ impl Interpretable for ArrayExpression {
         }).collect::<Result<Vec<JSRef>, Exception>>()?;
         object.set_system(JSObject::VALUE, Content::Array(JSArray{ storage }));
 
-        Ok(Interpreted::Value(JSValue::Object(object)))
+        Ok(Interpreted::from(object))
     }
 }
 
@@ -554,6 +547,6 @@ impl Interpretable for FunctionExpression {
             Content::Closure(closure),
         );
 
-        Ok(Interpreted::Value(JSValue::Object(function_object)))
+        Ok(Interpreted::from(function_object))
     }
 }
