@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use serde_json::json;
 
 use crate::ast::Program;
+use crate::heap;
 use crate::object;
 use crate::object::{JSON, JSValue, Interpreted};
 use crate::error::{Exception, ParseError};
@@ -61,7 +62,7 @@ fn eval(input: &str) -> JSON {
 fn evalbool(input: &str) -> bool {
     let mut state = RuntimeState::new();
     match interpret(input, &mut state) {
-        Ok(value) => value.boolify(),
+        Ok(value) => value.boolify(&state.heap),
         Err(e) => {
             let msg = format!("{:?}", e);
             panic!(msg)
@@ -564,13 +565,13 @@ fn test_builtin_object() {
     assert!( evalbool("Object.is(Object.__proto__.__proto__.__proto__, null)") );
 
     // Object.getOwnPropertyDescriptor
-    assert_eq!(
-        eval("Object.getOwnPropertyDescriptor(Object, 'prototype')"),
-        json!({"writable": false, "configurable": false, "enumerable": false, "value": {}})
+    assert_eval!(
+        "Object.getOwnPropertyDescriptor(Object, 'prototype')",
+        {"writable": false, "configurable": false, "enumerable": false, "value": {}}
     );
-    assert_eq!(
-        eval("Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')"),
-        json!({"enumerable": false, "writable": true, "configurable": true, "value": "[[native]]"})
+    assert_eval!(
+        "Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')",
+        {"configurable": true, "enumerable": false, "value": {}, "writable": true}
     );
 
     // Object.is
@@ -643,17 +644,21 @@ fn test_arrays() {
 #[test]
 fn test_sizes() {
     use std::mem::size_of;
+    use object::{Access, Content, Interpreted, ObjectValue, Property};
+
     println!("============================");
-    println!("size_of JSRef:  \t{}", size_of::<object::JSRef>());
-    println!("size_of JSObject:\t{}", size_of::<object::JSObject>());
+    println!("size_of JSRef:  \t{}", size_of::<heap::JSRef>());
     println!("size_of JSValue:\t{}", size_of::<JSValue>());
-    println!("size_of Interpreted:\t{}", size_of::<object::Interpreted>());
-    println!("size_of Property:\t{}", size_of::<object::Property>());
-    println!("size_of   Access:\t{}", size_of::<object::Access>());
-    println!("size_of   Content:\t{}", size_of::<object::Content>());
+    println!("size_of Interpreted:\t{}", size_of::<Interpreted>());
+    println!("size_of JSObject:\t{}", size_of::<object::JSObject>());
+    println!("size_of   HashMap:\t{}", size_of::<std::collections::HashMap<String, Property>>());
+    println!("size_of   ObjectValue:\t{}", size_of::<ObjectValue>());
     println!("size_of     JSArray:\t{}", size_of::<object::JSArray>());
     println!("size_of     NativeFunc:\t{}", size_of::<object::NativeFunction>());
     println!("size_of     Closure:\t{}", size_of::<object::Closure>());
+    println!("size_of Property:\t{}", size_of::<Property>());
+    println!("size_of   Access:\t{}", size_of::<Access>());
+    println!("size_of   Content:\t{}", size_of::<Content>());
     println!("============================");
 }
 

@@ -5,8 +5,9 @@ use crate::object::{
     Content,
     Interpreted,
     JSObject,
+};
+use crate::heap::{
     JSRef,
-    JSValue,
     Heap,
 };
 
@@ -19,29 +20,21 @@ fn function_constructor(
     todo!()
 }
 
-pub fn init_proto(heap: &mut Heap, object_proto: JSRef) -> JSRef {
+
+pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+    /* the Function.prototype */
     let mut function_proto = JSObject::new();
+    function_proto.proto = Heap::OBJECT_PROTO;
 
-    // Function.prototype.__proto__ = Object.prototype
-    function_proto.set_system(JSObject::PROTO, Content::Data(object_proto));
+    *heap.get_mut(Heap::FUNCTION_PROTO) = function_proto;
 
-    heap.allocate(JSValue::Object(function_proto))
-}
-
-
-pub fn init_object(heap: &mut Heap, proto_ref: JSRef) -> Result<JSRef, Exception> {
     /* the Function object */
-    let mut function_object = JSObject::new();
+    let mut function_object = JSObject::from_func(function_constructor);
 
-    function_object.set_system(
-        "prototype",
-        Content::Data(proto_ref),
-    );
-    function_object.set_system(
-        JSObject::VALUE,
-        Content::NativeFunction(function_constructor),
-    );
+    function_object.set_system("prototype", Content::from(Heap::FUNCTION_PROTO));
 
-    let function_object_ref = heap.allocate(JSValue::Object(function_object));
-    Ok(function_object_ref)
+    let the_function_ref = heap.alloc(function_object);
+    heap.get_mut(Heap::FUNCTION_PROTO).set_hidden("constructor", Content::from(the_function_ref));
+
+    Ok(the_function_ref)
 }

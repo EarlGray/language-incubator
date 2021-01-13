@@ -4,10 +4,12 @@
 use crate::object::{
     Content,
     Interpreted,
-    Heap,
     JSObject,
-    JSRef,
     JSValue,
+};
+use crate::heap::{
+    Heap,
+    JSRef,
 };
 use crate::error::Exception;
 
@@ -28,27 +30,8 @@ fn object_proto_dbg(
     heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
     dbg!(this_ref);
-    dbg!(heap.object(this_ref)?);
+    dbg!(heap.get(this_ref));
     Ok(Interpreted::VOID)
-}
-
-pub fn init_proto(heap: &mut Heap) -> JSRef {
-    /* Object.prototype */
-    let mut object_proto = JSObject::new();
-    object_proto.set_hidden(
-        "toString",
-        Content::NativeFunction(object_proto_toString)
-    );
-    object_proto.set_system(
-        "dbg",
-        Content::NativeFunction(object_proto_dbg),
-    );
-    object_proto.set_system(
-        JSObject::PROTO,
-        Content::Data(Heap::NULL)
-    );
-
-    heap.allocate(JSValue::Object(object_proto))
 }
 
 
@@ -73,7 +56,7 @@ fn object_object_is(
     let right = arguments.get(1).unwrap_or(&Interpreted::VOID);
 
     let answer = match (left.to_value(heap), right.to_value(heap)) {
-        (Ok(Undefined), Ok(Undefined)) | (Ok(Null), Ok(Null)) => true,
+        (Ok(Undefined), Ok(Undefined)) => true,
         (Ok(String(lstr)), Ok(String(rstr))) if &lstr == &rstr => true,
         (Ok(Bool(lb)), Ok(Bool(rb))) if lb == rb => true,
         (Ok(Number(lnum)), Ok(Number(rnum))) =>
@@ -109,58 +92,66 @@ fn object_object_getOwnPropertyDescriptor(
     let propname = arguments.get(1).unwrap_or(&Interpreted::VOID);
     let propname = propname.to_value(&*heap)?.stringify(&*heap);
 
-    let inspected_object = heap.get_mut(inspected_ref).to_object()?;
+    let inspected_object = heap.get_mut(inspected_ref);
     let prop = match inspected_object.properties.get(&propname) {
         Some(prop) => prop.clone(),
         None => return Ok(Interpreted::VOID)
     };
 
-    let configurable = heap.allocate(JSValue::from(prop.access.configurable()));
-    let enumerable = heap.allocate(JSValue::from(prop.access.enumerable()));
-    let writable = heap.allocate(JSValue::from(prop.access.writable()));
-
-    let mut descriptor_object = JSObject::new();
-    descriptor_object.set_property_ref("configurable", configurable);
-    descriptor_object.set_property_ref("enumerable", enumerable);
-    descriptor_object.set_property_ref("writable", writable);
-    let dataref = match prop.content {
-        Content::Data(dataref) => dataref,
-        Content::Closure(closure) => {
-            let repr = format!("{:?}", closure);
-            heap.allocate(JSValue::from(repr))
-        }
-        Content::NativeFunction(_func) =>
-            heap.allocate(JSValue::from("[[native]]")),
-        Content::Array(_) =>
-            heap.allocate(JSValue::from("[[array]]")),
+    let descriptor_ref = heap.allocate();
+    let descriptor_object = heap.get_mut(descriptor_ref);
+    descriptor_object.set_property(
+        "configurable",
+        Content::from(prop.access.configurable())
+    );
+    descriptor_object.set_property(
+        "enumerable",
+        Content::from(prop.access.enumerable())
+    );
+    descriptor_object.set_property(
+        "writable",
+        Content::from(prop.access.writable())
+    );
+    let value = match prop.content {
+        Content::Value(val) => val,
     };
-    descriptor_object.set_property_ref("value", dataref);
+    descriptor_object.set_property(
+        "value",
+        Content::Value(value)
+    );
 
-    let descriptor = JSValue::Object(descriptor_object);
-    Ok(Interpreted::Value(descriptor))
+    Ok(Interpreted::from(descriptor_ref))
 }
 
-pub fn init_object(heap: &mut Heap, object_proto: JSRef) -> Result<JSRef, Exception> {
-    let mut object_object = JSObject::new();
+pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+    /* Object.prototype */
+    let mut object_proto = JSObject::new();
+    object_proto.proto = Heap::NULL;
+
+    let to_string_ref = heap.alloc(JSObject::from_func(object_proto_toString));
+    object_proto.set_hidden("toString", Content::from(to_string_ref));
+
+    let dbg_ref = heap.alloc(JSObject::from_func(object_proto_dbg));
+    object_proto.set_system("dbg", Content::from(dbg_ref));
+
+    *heap.get_mut(Heap::OBJECT_PROTO) = object_proto;
 
     /* the Object */
-    object_object.set_system(
-        "prototype",
-        Content::Data(object_proto),
-    );
-    object_object.set_hidden(
-        "is",
-        Content::NativeFunction(object_object_is),
-    );
+    let mut object_object = JSObject::from_func(object_constructor);
+
+    object_object.set_system("prototype", Content::from(Heap::OBJECT_PROTO));
+
+    let is_ref = heap.alloc(JSObject::from_func(object_object_is));
+    object_object.set_hidden("is", Content::from(is_ref));
+
+    let gop_ref = heap.alloc(JSObject::from_func(object_object_getOwnPropertyDescriptor));
     object_object.set_hidden(
         "getOwnPropertyDescriptor",
-        Content::NativeFunction(object_object_getOwnPropertyDescriptor),
-    );
-    object_object.set_system(
-        JSObject::VALUE,
-        Content::NativeFunction(object_constructor),
+        Content::from(gop_ref),
     );
 
-    let object_ref = heap.allocate(JSValue::Object(object_object));
-    Ok(object_ref)
+    let the_object_ref = heap.alloc(object_object);
+    heap.get_mut(Heap::OBJECT_PROTO).set_hidden("constructor", Content::from(the_object_ref));
+
+    Ok(the_object_ref)
 }

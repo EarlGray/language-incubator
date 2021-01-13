@@ -8,25 +8,55 @@ use serde_json::json;
 
 use crate::error::Exception;
 use crate::ast;
-use crate::builtin;
+use crate::heap::{Heap, JSRef};
 
 pub type JSON = serde_json::Value;
 
 pub type JSNumber = f64;
 
-/// A value: either primitive or object
+/// A `JSValue` is either a primitive value or a reference to an object.
 #[derive(Debug, Clone, PartialEq)]
 pub enum JSValue {
     Undefined,
-    Null,
     Bool(bool),
+    Number(JSNumber),
     String(String),
     //Symbol(String)
-    Number(JSNumber),
-    Object(JSObject),
+    Ref(JSRef),
 }
 
 impl JSValue {
+    pub const NULL: JSValue = JSValue::Ref(Heap::NULL);
+
+    /// to_ref() tries to return the underlying object reference, if any.
+    /// It's useful for checking if a value points to an object.
+    pub fn to_ref(&self) -> Result<JSRef, Exception> {
+        if let JSValue::Ref(objref) = self {
+            Ok(*objref)
+        } else {
+            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn to_json(&self, heap: &Heap) -> JSON {
+        match self {
+            JSValue::Undefined => JSON::Null,
+            JSValue::Bool(b) => JSON::from(*b),
+            JSValue::Number(n) => JSON::from(*n),
+            JSValue::String(s) => JSON::from(s.as_str()),
+            JSValue::Ref(Heap::NULL) => JSON::Null,
+            JSValue::Ref(href) => heap.get(*href).to_json(heap),
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            JSValue::String(_) => true,
+            _ => false,
+        }
+    }
+
     /// to_string() makes a human-readable string representation of the value:
     /// ```
     /// # use serde_json::json;
@@ -48,102 +78,25 @@ impl JSValue {
     /// ```
     pub fn to_string(&self, heap: &Heap) -> String {
         match self {
-            JSValue::Undefined => "undefined".to_string(),
-            JSValue::Null => "null".to_string(),
-            JSValue::Bool(b) => b.to_string(),
-            JSValue::Number(n) => n.to_string(),
             JSValue::String(s) =>
                 JSON::from(s.as_str()).to_string(),
-            JSValue::Object(object) => {
-                let mut s = String::new();
-                let mut empty = true;
-                s.push('{');
-                for (key, property) in object.properties.iter() {
-                    if !property.enumerable() {
-                        continue;
-                    }
-
-                    s.push(' ');
-                    if is_valid_identifier(&key) {
-                        s.push_str(key);
-                    } else {
-                        let skey = JSON::from(key.as_str()).to_string();
-                        s.push_str(&skey);
-                    }
-                    s.push_str(": ");
-                    let val = match &property.content {
-                        Content::Data(heapref) => {
-                            let value = heap.get(*heapref);
-                            value.to_string(heap)
-                        }
-                        Content::NativeFunction(func) => {
-                            format!("*{:x}", func_ptr(*func))
-                        }
-                        Content::Closure(closure) => {
-                            format!("{:?}", closure)
-                        }
-                        Content::Array(array) => {
-                            format!("{:?}", array)
-                        }
-                    };
-                    s.push_str(&val);
-                    s.push(',');
-                    empty = false;
-                }
-                if !empty { s.pop(); s.push(' '); }
-                s.push('}');
-                s
-            }
-        }
-    }
-
-    /// to_object() tries to return the underlying object, if any.
-    /// It's useful for checking if a value is an object.
-    pub fn to_object(&self) -> Result<&JSObject, Exception> {
-        if let JSValue::Object(object) = self {
-            Ok(object)
-        } else {
-            /* TODO: wrap a primitive with an object */
-            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
-        }
-    }
-
-    pub fn to_object_mut(&mut self) -> Result<&mut JSObject, Exception> {
-        if let JSValue::Object(object) = self {
-            Ok(object)
-        } else {
-            /* TODO: wrap a primitive with an object? */
-            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn to_json(&self, heap: &Heap) -> JSON {
-        match self {
-            JSValue::Undefined | JSValue::Null => JSON::Null,
-            JSValue::Bool(b) => JSON::from(*b),
-            JSValue::Number(n) => JSON::from(*n),
-            JSValue::String(s) => JSON::from(s.as_str()),
-            JSValue::Object(object) => object.to_json(heap),
-        }
-    }
-
-    pub fn is_string(&self) -> bool {
-        match self {
-            JSValue::String(_) => true,
-            _ => false,
+            JSValue::Ref(heapref) =>
+                heap.get(*heapref).to_string(heap),
+            _ => self.stringify(heap)
         }
     }
 
     /// stringify() makes everything into a string
     /// used for evaluation in a string context.
     /// It corresponds to .toString() in JavaScript
-    pub fn stringify(&self, heap: &Heap) -> String {
+    pub fn stringify(&self, _heap: &Heap) -> String {
         match self {
+            JSValue::Undefined => "undefined".to_string(),
+            JSValue::Bool(b) => b.to_string(),
+            JSValue::Number(n) => n.to_string(),
             JSValue::String(s) => s.clone(),
-            JSValue::Object(_obj) =>
-                "[object Object]".to_string(),
-            _ => self.to_string(heap),
+            JSValue::Ref(_r) =>
+                "[object Object]".to_string(), // TODO: not all are just Object
         }
     }
 
@@ -151,24 +104,27 @@ impl JSValue {
     /// for evalation in a numeric context.
     /// It is slightly more strict than `+value` in JavaScript: only
     /// `value.numberify().unwrap_or(f64::NAN)` corresponds to `+value` in JavaScript.
-    pub fn numberify(&self) -> Option<JSNumber> {
+    pub fn numberify(&self, heap: &Heap) -> Option<JSNumber> {
         match self {
-            JSValue::Null => Some(0.0),
             JSValue::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
             JSValue::Number(n) => Some(*n),
             JSValue::String(s) => s.parse::<JSNumber>().ok(),
-            // TODO: JSObject of Number/Boolean/String
+            JSValue::Ref(Heap::NULL) => Some(0.0),
+            JSValue::Ref(r) => {
+                heap.get(*r).to_value(heap).and_then(|v| v.numberify(heap))
+            }
             _ => None
         }
     }
 
     /// boolify() treats everythings as a truthy value.
-    pub fn boolify(&self) -> bool {
+    pub fn boolify(&self, heap: &Heap) -> bool {
         match self {
-            JSValue::Undefined | JSValue::Null => false,
+            JSValue::Undefined => false,
             JSValue::String(s) => s.len() > 0,
+            JSValue::Ref(Heap::NULL) => false,
             _ =>
-                if let Some(n) = self.numberify() {
+                if let Some(n) = self.numberify(heap) {
                     !(n == 0.0 || f64::is_nan(n))
                 } else {
                     true
@@ -176,44 +132,52 @@ impl JSValue {
         }
     }
 
-    pub fn type_of(&self) -> &'static str {
+    pub fn type_of(&self, heap: &Heap) -> &'static str {
         match self {
             JSValue::Undefined => "undefined",
-            JSValue::Null | JSValue::Object(_) => "object",
             JSValue::String(_) => "string",
             JSValue::Number(_) => "number",
             JSValue::Bool(_) => "boolean",
+            JSValue::Ref(r) => {
+                if let Some(v) = heap.get(*r).to_value(heap) {
+                    v.type_of(heap)
+                } else {
+                    "object"
+                }
+            }
         }
     }
 
     /// Abstract Equality Comparison:
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_
-    pub fn loose_eq(&self, other: &JSValue) -> bool {
-        let lval = if self == &JSValue::Undefined { &JSValue::Null } else { self };
-        let rval = if other == &JSValue::Undefined { &JSValue::Null } else { other };
-        match (&lval, &rval) {
-            (JSValue::Null, JSValue::Null) => true,
-            (JSValue::Null, _) | (_, JSValue::Null) => false,
+    pub fn loose_eq(&self, other: &JSValue, heap: &Heap) -> bool {
+        let lval = if self == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { self };
+        let rval = if other == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { other };
+        match (lval, rval) {
+            (JSValue::Undefined, JSValue::Undefined) => true,
+            (JSValue::Undefined, _) | (_, JSValue::Undefined) => false,
             (JSValue::Number(_), JSValue::Number(_))
                 | (JSValue::String(_), JSValue::String(_))
                 | (JSValue::Bool(_), JSValue::Bool(_))
-                | (JSValue::Object(_), JSValue::Object(_)) =>
-                (self == other),
-            _ => {
-                if let Some(lnum) = self.numberify() {
-                    if let Some(rnum) = self.numberify() {
-                        return lnum == rnum;
-                    }
-                }
-                return false;
-            }
+                => self == other,
+            (JSValue::Ref(lref), JSValue::Ref(rref)) if lref == rref => true,
+            (JSValue::Ref(lref), JSValue::Ref(rref)) =>
+                match (heap.get(*lref).to_value(heap), heap.get(*rref).to_value(heap)) {
+                    (Some(lval), Some(rval)) => (lval == rval),
+                    _ => false,
+                },
+            _ =>
+                match (self.numberify(heap), other.numberify(heap)) {
+                    (Some(lnum), Some(rnum)) => (lnum == rnum),
+                    _ => false,
+                },
         }
     }
 
-    pub fn numerically<F>(&self, other: &JSValue, op: F) -> JSValue
+    pub fn numerically<F>(&self, other: &JSValue, heap: &Heap, op: F) -> JSValue
         where F: Fn(f64, f64) -> f64
     {
-        let val = match (self.numberify(), other.numberify()) {
+        let val = match (self.numberify(heap), other.numberify(heap)) {
             (Some(lnum), Some(rnum)) => op(lnum, rnum),
             _ => f64::NAN
         };
@@ -221,33 +185,29 @@ impl JSValue {
     }
 
     pub fn plus(&self, other: &JSValue, heap: &Heap) -> JSValue {
-        if !(self.is_string() || other.is_string()) {
-            if let Some(lnum) = self.numberify() {
-                if let Some(rnum) = other.numberify() {
-                    return JSValue::from(lnum + rnum);
-                }
-            }
+        if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
+            return JSValue::from(lstr.to_string() + rstr);
+        }
+        if let (Some(lnum), Some(rnum)) = (self.numberify(heap), other.numberify(heap)) {
+            return JSValue::from(lnum + rnum);
         }
         let lvalstr = self.stringify(heap);
         let rvalstr = other.stringify(heap);
         JSValue::from(lvalstr + &rvalstr)
     }
 
-    pub fn minus(&self, other: &JSValue, _heap: &Heap) -> JSValue {
-        JSValue::numerically(self, other, |a, b| a - b)
+    pub fn minus(&self, other: &JSValue, heap: &Heap) -> JSValue {
+        JSValue::numerically(self, other, heap, |a, b| a - b)
     }
 
 
-    pub fn less(&self, other: &JSValue, _heap: &Heap) -> JSValue {
+    pub fn less(&self, other: &JSValue, heap: &Heap) -> JSValue {
         // TODO: Abstract Relational Comparison
-        // TODO: toPrimitive()
-        if let JSValue::String(lstr) = self {
-            if let JSValue::String(rstr) = other {
-                return JSValue::from(lstr < rstr);
-            }
+        if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
+            return JSValue::from(lstr < rstr);
         };
-        let lnum = self.numberify().unwrap_or(f64::NAN);
-        let rnum = other.numberify().unwrap_or(f64::NAN);
+        let lnum = self.numberify(heap).unwrap_or(f64::NAN);
+        let rnum = other.numberify(heap).unwrap_or(f64::NAN);
         JSValue::from(lnum < rnum)
     }
 }
@@ -272,6 +232,10 @@ impl From<&str> for JSValue {
     fn from(s: &str) -> Self { JSValue::String(s.to_string()) }
 }
 
+impl From<JSRef> for JSValue {
+    fn from(r: JSRef) -> Self { JSValue::Ref(r) }
+}
+
 impl TryFrom<&JSON> for JSValue {
     type Error = ();
 
@@ -279,7 +243,7 @@ impl TryFrom<&JSON> for JSValue {
     /// Excludes objects and arrays.
     fn try_from(json: &JSON) -> Result<JSValue, Self::Error> {
         let value = if json.is_null() {
-            JSValue::Null
+            JSValue::NULL
         } else if let Some(b) = json.as_bool() {
             JSValue::Bool(b)
         } else if let Some(n) = json.as_f64() {
@@ -295,263 +259,33 @@ impl TryFrom<&JSON> for JSValue {
 
 #[test]
 fn test_numberify() {
-    assert_eq!( JSValue::from("5").numberify(),    Some(5.0) );
+    let dummy = Heap::new();
+    assert_eq!( JSValue::from("5").numberify(&dummy),    Some(5.0) );
 }
 
 #[test]
 fn test_boolify() {
+    let dummy = Heap::new();
+
     // true
-    assert!( JSValue::from(true).boolify() );
-    assert!( JSValue::from(1).boolify() );
-    assert!( JSValue::from("0").boolify() );
-    //assert!( JSValue::from(json!([])).boolify() );
+    assert!( JSValue::from(true).boolify(&dummy) );
+    assert!( JSValue::from(1).boolify(&dummy) );
+    assert!( JSValue::from("0").boolify(&dummy) );
+    //assert!( JSValue::from(json!([])).boolify(&dummy) );
 
     // false
-    assert!( !JSValue::from(false).boolify() );
-    assert!( !JSValue::from(0).boolify() );
-    assert!( !JSValue::from(f64::NAN).boolify() );
-    assert!( !JSValue::from("").boolify() );
-    assert!( !JSValue::Null.boolify() );
-}
-
-fn is_valid_identifier(s: &str) -> bool {
-    let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
-
-    let mut it = s.chars();
-    if let Some(c) = it.next() {
-        is_start(c) && it.all(|c| is_start(c) || c.is_numeric())
-    } else {
-        false
-    }
-}
-
-/// Runtime heap
-pub struct Heap(Vec<JSValue>);
-
-impl Heap {
-    pub const NULL: JSRef = JSRef(0);
-    pub const GLOBAL: JSRef = JSRef(1);
-
-    pub fn new() -> Self {
-        let heap_vec = vec![
-            JSValue::Null,                     /* [Heap::NULL] */
-            JSValue::Object(JSObject::new()),  /* [Heap::GLOBAL] */
-        ];
-
-        let mut heap = Heap(heap_vec);
-        builtin::init(&mut heap)
-            .expect("failed to initialize builtin objects");
-        heap
-    }
-
-    pub fn object(&self, objref: JSRef) -> Result<&JSObject, Exception> {
-        self.get(objref).to_object()
-    }
-
-    pub fn object_mut(&mut self, objref: JSRef) -> Result<&mut JSObject, Exception> {
-        self.get_mut(objref).to_object_mut()
-    }
-
-    pub fn global(&self) -> &JSObject {
-        self.object(Heap::GLOBAL).unwrap()
-    }
-
-    pub fn global_mut(&mut self) -> &mut JSObject {
-        self.object_mut(Heap::GLOBAL).unwrap()
-    }
-
-    pub fn allocate(&mut self, value: JSValue) -> JSRef {
-        let ind = self.0.len();
-        self.0.push(value);
-        JSRef(ind)
-    }
-
-    pub fn get(&self, jsref: JSRef) -> &JSValue {
-        self.0.get(jsref.0).unwrap()
-    }
-
-    pub fn get_mut(&mut self, jsref: JSRef) -> &mut JSValue {
-        self.0.get_mut(jsref.0).unwrap()
-    }
-
-    pub fn property_or_create(&mut self, objref: JSRef, name: &str) -> Result<JSRef, Exception> {
-        let object = self.get(objref).to_object()?;
-        match object.property_ref(name) {
-            Some(propref) => Ok(propref),
-            None => {
-                let propref = self.allocate(JSValue::Undefined);
-                let object = self.get_mut(objref).to_object_mut()?;
-                object.set_property_ref(name, propref);
-                Ok(propref)
-            }
-        }
-    }
-
-    pub fn property_assign(
-        &mut self,
-        objref: JSRef,
-        name: &str,
-        what: &Interpreted
-    ) -> Result<(), Exception> {
-        if let Ok(valref) = what.to_ref(self) {
-            if let JSValue::Object{..} = self.get(valref) {
-                let object = self.get_mut(objref).to_object_mut()?;
-                object.set_property_ref(&name, valref);
-                return Ok(());
-            }
-        }
-        let object = self.get(objref).to_object()?;
-        if object.properties.get(name).map(|prop| prop.access.writable()).unwrap_or(true) {
-            let propref = self.property_or_create(objref, &name)?;
-            let value = what.to_value(self)?;
-            *self.get_mut(propref) = value.clone();
-        }
-        Ok(())
-    }
-
-    pub fn lookup_ref(&self, property_chain: &[&str]) -> Result<JSRef, Exception> {
-        let mut objref = Heap::GLOBAL;
-        for propname in property_chain {
-            let object = self.get(objref).to_object()?;
-            objref = object.property_ref(propname).ok_or_else(||
-                Exception::TypeErrorGetProperty(Interpreted::Ref(objref), propname.to_string())
-            )?;
-        }
-        Ok(objref)
-    }
-
-    pub fn lookup_protochain(&self, mut objref: JSRef, propname: &str) -> Option<Interpreted> {
-        while let Ok(object) = self.get(objref).to_object() {
-            if object.properties.contains_key(propname) {
-                return Some(Interpreted::Member{
-                    of: Box::new(Interpreted::Ref(objref)),
-                    name: propname.to_string()
-                });
-            }
-
-            objref = object.property_ref(JSObject::PROTO).unwrap_or(Heap::NULL);
-        }
-        None
-    }
-
-    /// Deserializes JSON into objects on the heap
-    pub fn object_from_json(&mut self, json: &JSON) -> JSValue {
-        if let Some(obj) = json.as_object() {
-            let mut object = JSObject::new();
-            for (key, jval) in obj.iter() {
-                let value = self.object_from_json(jval);
-                let propref = self.allocate(value);
-                object.set_property_ref(key, propref);
-            }
-            JSValue::Object(object)
-        //} else if let Some(a) = json.as_array() {
-        } else {
-            JSValue::try_from(json).expect("primitive JSON")
-        }
-    }
-}
-
-/// A heap reference: a Heap index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct JSRef(usize);
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Interpreted {
-    /// An object member; might not exist yet.
-    Member{ of: Box<Interpreted>, name: String },
-
-    /// A heap reference
-    Ref(JSRef),
-
-    /// An off-heap value
-    Value(JSValue),
-}
-
-impl Interpreted {
-    pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
-    pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
-
-    pub fn member(objref: JSRef, name: &str) -> Interpreted {
-        Interpreted::Member{
-            of: Box::new(Interpreted::Ref(objref)),
-            name: name.to_string()
-        }
-    }
-
-    pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
-        let value = match self {
-            Interpreted::Ref(href) =>
-                heap.get(*href).clone(),
-            Interpreted::Value(value) =>
-                value.clone(),
-            Interpreted::Member{of, name} => {
-                let objref = of.to_ref(heap)?;
-                let object = heap.get(objref).to_object()?;
-                match object.property_ref(&name) {
-                    Some(propref) => heap.get(propref).clone(),
-                    None => JSValue::Undefined,
-                }
-            }
-        };
-        Ok(value)
-    }
-
-    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
-        match self {
-            Interpreted::Ref(href) => Ok(*href),
-            Interpreted::Member{of, name} => {
-                let objref = of.to_ref(heap)?;
-                let object = heap.get(objref).to_object()?;
-                object.property_ref(name).ok_or_else(||
-                    Exception::TypeErrorGetProperty(self.clone(), name.to_string())
-                )
-            }
-            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
-        }
-    }
-
-    pub fn to_ref_or_allocate(&self, heap: &mut Heap) -> Result<JSRef, Exception> {
-        match self {
-            Interpreted::Ref(href) => Ok(*href),
-            Interpreted::Value(value) => Ok(heap.allocate(value.clone())),
-            Interpreted::Member{of, name} => {
-                let objref = of.to_ref(heap)?;
-                heap.property_or_create(objref, &name)
-            }
-        }
-    }
-
-    /// Corresponds to Javascript `delete` operator and all its weirdness.
-    /// Ok/Err correspond to `true`/`false` from `delete`.
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
-    pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
-        match self {
-            Interpreted::Member{ of, name } => {
-                let objref = of.to_ref(heap)?;
-                let object = heap.get_mut(objref).to_object_mut()?;
-                // TODO: do not remove non-configurable properties
-                // TODO: do not remove global/functions variables
-                object.properties.remove(name);
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    }
-}
-
-impl From<JSObject> for Interpreted {
-    fn from(object: JSObject) -> Interpreted {
-        Interpreted::Value(JSValue::Object(object))
-    }
-}
-
-impl<T> From<T> for Interpreted where JSValue: From<T>  {
-    fn from(value: T) -> Interpreted { Interpreted::Value(JSValue::from(value)) }
+    assert!( !JSValue::from(false).boolify(&dummy) );
+    assert!( !JSValue::from(0).boolify(&dummy) );
+    assert!( !JSValue::from(f64::NAN).boolify(&dummy) );
+    assert!( !JSValue::from("").boolify(&dummy) );
+    assert!( !JSValue::NULL.boolify(&dummy) );
 }
 
 /// Javascript objects
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct JSObject {
+    pub proto: JSRef,
+    pub value: ObjectValue,
     pub properties: HashMap<String, Property>,
 }
 
@@ -559,39 +293,103 @@ impl JSObject {
     /// A property with this name is used:
     /// - as the primitive value of a Number/Boolean/String object;
     /// - as the function entry in a Function.
+    /// - as optimizied storage in an Array
     pub const VALUE: &'static str = "[[value]]";
-    pub const PROTO: &'static str = "__proto__";
 
     pub fn new() -> JSObject {
-        let properties = HashMap::new();
-        JSObject{ properties }
+        JSObject{
+            proto: Heap::OBJECT_PROTO,
+            value: ObjectValue::None,
+            properties: HashMap::new(),
+        }
     }
+
+    pub fn from_func(f: NativeFunction) -> JSObject {
+        JSObject{
+            proto: Heap::FUNCTION_PROTO,
+            value: ObjectValue::VMCall(VMCall(f)),
+            properties: HashMap::new(),
+        }
+    }
+
+    pub fn from_closure(closure: Closure) -> JSObject {
+        let params_count = closure.params.len() as f64;
+        let mut function_object = JSObject{
+            proto: Heap::FUNCTION_PROTO,
+            value: ObjectValue::Closure(Box::new(closure)),
+            properties: HashMap::new(),
+        };
+        function_object.set_nonconf("length", Content::from(params_count));
+        function_object
+    }
+
+    pub fn to_value(&self, _heap: &Heap) -> Option<JSValue> {
+        use ObjectValue::*;
+        match &self.value {
+            Boolean(b) => Some(JSValue::Bool(*b)),
+            Number(n) => Some(JSValue::Number(*n)),
+            String(s) => Some(JSValue::String(s.clone())),
+            _ => Option::None,
+        }
+    }
+
 
     pub fn as_array(&self) -> Option<&JSArray> {
-        self.properties.get(JSObject::VALUE).and_then(|prop|
-            match &prop.content {
-                Content::Array(array) => Some(array),
-                _ => None,
-            }
-        )
+        match &self.value {
+            ObjectValue::Array(array) => Some(array),
+            _ => None,
+        }
     }
 
-    pub fn property_ref(&self, name: &str) -> Option<JSRef> {
+    pub fn as_array_mut(&mut self) -> Option<&mut JSArray> {
+        match &mut self.value {
+            ObjectValue::Array(array) => Some(array),
+            _ => None,
+        }
+    }
+
+    pub fn property_value(&self, name: &str) -> Option<&JSValue> {
         if let Some(array) = self.as_array() {
             if let Ok(index) = usize::from_str(name) {
-                if let Some(aref) = array.storage.get(index) {
-                    return Some(*aref);
+                if let Some(value) = array.storage.get(index) {
+                    return Some(value);
                 }
             }
         }
         self.properties.get(name).and_then(|prop|
-            match prop.content {
-                Content::Data(href) => Some(href),
-                Content::NativeFunction(_) => None,
-                Content::Closure(_) => None,
-                Content::Array(_) => None,
+            match &prop.content {
+                Content::Value(value) => Some(value),
             }
         )
+    }
+
+    pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+        if let Some(array) = self.as_array_mut() {
+            if let Ok(index) = usize::from_str(name) {
+                // TODO: a[100500] will be interesting.
+                while array.storage.len() <= index {
+                    array.storage.push(JSValue::Undefined);
+                }
+                array.storage[index] = value;
+                return Ok(());
+            }
+        }
+
+        let place = match self.properties.get_mut(name) {
+            Some(place) => place,
+            None => {
+                self.set_property(name, Content::Value(JSValue::Undefined));
+                self.properties.get_mut(name).unwrap()
+            }
+        };
+        if place.access.writable() {
+            match place.content {
+                Content::Value(_) => {
+                    place.content = Content::Value(value);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn set_property_and_flags(&mut self, name: &str, content: Content, access: Access) {
@@ -607,9 +405,6 @@ impl JSObject {
         }
     }
 
-    pub fn set_property_ref(&mut self, name: &str, propref: JSRef) {
-        self.set_property(name, Content::Data(propref))
-    }
     pub fn set_property(&mut self, name: &str, content: Content) {
         self.set_property_and_flags(name, content, Access::ALL)
     }
@@ -631,35 +426,94 @@ impl JSObject {
     }
 
     pub fn to_json(&self, heap: &Heap) -> JSON {
-        if let Some(prop) = self.properties.get(JSObject::VALUE) {
-            if let Content::Array(array) = &prop.content {
-                let values = array.storage.iter().map(|elemref|
-                    heap.get(*elemref).to_json(heap)
-                ).collect();
-                return JSON::Array(values);
-            }
+        if let Some(array) = self.as_array() {
+            let jvals = array.storage.iter()
+                .map(|v| v.to_json(heap))
+                .collect();
+            return JSON::Array(jvals);
         }
+
         let mut json = json!({});
         for (key, property) in self.properties.iter() {
             if !property.enumerable() {
                 continue
             }
 
-            match property.content {
-                Content::Data(propref) => {
-                    let value = heap.get(propref);
+            match &property.content {
+                Content::Value(value) => {
                     let jvalue = value.to_json(heap);
                     json[key] = jvalue;
                 }
-                Content::NativeFunction(_) => (),
-                Content::Closure(_) => unreachable!(),
-                Content::Array(_) => unreachable!(),
             }
         }
         json
     }
+
+    pub fn to_string(&self, heap: &Heap) -> String {
+        fn is_valid_identifier(s: &str) -> bool {
+            let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
+
+            let mut it = s.chars();
+            if let Some(c) = it.next() {
+                is_start(c) && it.all(|c| is_start(c) || c.is_numeric())
+            } else {
+                false
+            }
+        }
+
+        let mut s = String::new();
+        let mut empty = true;
+        s.push('{');
+        for (key, property) in self.properties.iter() {
+            if !property.enumerable() {
+                continue;
+            }
+
+            s.push(' ');
+            if is_valid_identifier(&key) {
+                s.push_str(key);
+            } else {
+                let skey = JSON::from(key.as_str()).to_string();
+                s.push_str(&skey);
+            }
+            s.push_str(": ");
+            let val = match &property.content {
+                Content::Value(value) =>
+                    value.to_string(heap),
+            };
+            s.push_str(&val);
+            s.push(',');
+            empty = false;
+        }
+        if !empty { s.pop(); s.push(' '); }
+        s.push('}');
+        s
+    }
 }
 
+
+#[derive(Debug, Clone)]
+pub enum ObjectValue {
+    None,
+
+    // primitive values
+    Boolean(bool),
+    Number(JSNumber),
+    String(String),
+
+    // Function
+    VMCall(VMCall),
+    Closure(Box<Closure>),
+
+    // Array
+    Array(JSArray),
+}
+
+impl ObjectValue {
+    pub fn from_func(func: NativeFunction) -> ObjectValue {
+        ObjectValue::VMCall(VMCall(func))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
@@ -668,9 +522,9 @@ pub struct Property {
 }
 
 impl Property {
-    pub fn from_ref(heapref: JSRef) -> Property {
+    pub fn from_value(value: JSValue) -> Property {
         Property {
-            content: Content::Data(heapref),
+            content: Content::Value(value),
             access: Access::ALL,
         }
     }
@@ -698,56 +552,41 @@ impl Access {
 }
 
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Content {
-    Data(JSRef),
-    NativeFunction(NativeFunction),
-    Closure(Closure),
-    Array(JSArray),
+    Value(JSValue),
     /*
-    Accesssor{
-        get: Option<Callable>,
-        set: Option<Callable>,
+    Accessor{
+        get: Option<JSRef>,
+        set: Option<JSRef>,
     },
     */
 }
 
-impl PartialEq for Content {
-    fn eq(&self, other: &Content) -> bool {
-        match (self, other) {
-            (Content::Data(dit), Content::Data(dat)) =>
-                dit == dat,
-            (Content::NativeFunction(dit), Content::NativeFunction(dat)) =>
-                func_ptr(*dit) == func_ptr(*dat),
-            _ => false
-        }
+impl<T> From<T> for Content where JSValue: From<T> {
+    fn from(x: T) -> Content { Content::Value(JSValue::from(x)) }
+}
+
+#[derive(Clone)]
+pub struct VMCall(NativeFunction);
+
+impl VMCall {
+    pub fn call(&self,
+        this_ref: JSRef,
+        method_name: String,
+        arguments: Vec<Interpreted>,
+        heap: &mut Heap
+    ) -> Result<Interpreted, Exception> {
+        self.0(this_ref, method_name, arguments, heap)
+    }
+    pub fn ptr(&self) -> usize {
+        self.0 as *const () as usize
     }
 }
 
-impl fmt::Debug for Content {
+impl fmt::Debug for VMCall {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Content::Data(heapref) => {
-                write!(f, "Content::Data({:?})", heapref)
-            }
-            Content::NativeFunction(func) => {
-                write!(f, "Content::NativeFunction(*{:x})", func_ptr(*func))
-            }
-            Content::Array(storage) => {
-                write!(f, "Content::Array({:?})", &storage)
-            }
-            Content::Closure(closure) => {
-                let name = closure.id.as_ref()
-                    .map(|id| id.0.as_str())
-                    .unwrap_or("<anonymous>");
-                let param_names = closure.params.iter()
-                    .map(|id| id.0.clone())
-                    .collect::<Vec<String>>();
-                write!(f, "Content::Closure( {}(", name)?;
-                write!(f, "{}", param_names.join(", "))?;
-                write!(f, "))")
-            }
-        }
+        write!(f, "VMCall(*{:x})", self.ptr())
     }
 }
 
@@ -755,12 +594,8 @@ pub type NativeFunction = fn(
     this_ref: JSRef,
     method_name: String,
     arguments: Vec<Interpreted>,
-    heap: &mut Heap,
+    heap: &'_ mut Heap,
 ) -> Result<Interpreted, Exception>;
-
-fn func_ptr(func: NativeFunction) -> usize {
-    func as *const () as usize
-}
 
 
 #[derive(Clone, Debug)]
@@ -773,7 +608,72 @@ pub struct Closure {
 
 #[derive(Clone, Debug)]
 pub struct JSArray {
-    pub storage: Vec<JSRef>,
+    pub storage: Vec<JSValue>,
 }
 
 impl JSArray {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Interpreted {
+    /// An object member; might not exist yet.
+    Member{ of: JSRef, name: String },
+
+    /// A value
+    Value(JSValue),
+}
+
+impl Interpreted {
+    pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
+    pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
+
+    pub fn member(of: JSRef, name: &str) -> Interpreted {
+        Interpreted::Member{ of, name: name.to_string() }
+    }
+
+    pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
+        let value = match self {
+            Interpreted::Value(value) =>
+                value.clone(),
+            Interpreted::Member{of, name} => {
+                match heap.get(*of).property_value(name) {
+                    Some(value) => value.clone(),
+                    None => JSValue::Undefined,
+                }
+            }
+        };
+        Ok(value)
+    }
+
+    /// Corresponds to Javascript `delete` operator and all its weirdness.
+    /// Ok/Err correspond to `true`/`false` from `delete`.
+    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
+    pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
+        match self {
+            Interpreted::Member{ of, name } => {
+                heap.get_mut(*of).properties.remove(name);
+                // TODO: do not remove non-configurable properties
+                // TODO: do not remove global/functions variables
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
+        match self {
+            Interpreted::Value(JSValue::Ref(r)) =>
+                Ok(*r),
+            Interpreted::Member{of, name} =>
+                match heap.get(*of).property_value(name) {
+                    Some(JSValue::Ref(r)) => Ok(*r),
+                    _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.to_string()))
+                }
+            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
+        }
+    }
+}
+
+impl<T> From<T> for Interpreted where JSValue: From<T>  {
+    fn from(value: T) -> Interpreted { Interpreted::Value(JSValue::from(value)) }
+}
+

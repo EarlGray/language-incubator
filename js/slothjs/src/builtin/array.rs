@@ -1,11 +1,12 @@
 use crate::error::Exception;
 use crate::object::{
     Content,
-    Heap,
     Interpreted,
     JSObject,
+};
+use crate::heap::{
+    Heap,
     JSRef,
-    JSValue,
 };
 
 fn array_object_constructor(
@@ -14,43 +15,23 @@ fn array_object_constructor(
     _arguments: Vec<Interpreted>,
     _heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let object = JSObject::new();
-    /*
-    let values = arguments.into_iter()
-        .map(|arg| arg.to_value(&heap))
-        .collect::<Result<Vec<JSValue>, Exception>>()?;
-
-    object.set_system(JSObject::VALUE, Content::Array(values));
-    */
-    Ok(Interpreted::Value(JSValue::Object(object)))
+    todo!()
 }
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+    /*
     let mut proto_object = JSObject::new();
 
-    // Array.prototype.__proto__ = Object.prototype
-    let object_proto_ref = heap.lookup_ref(&["Object", "prototype"])?;
-    proto_object.set_system(
-        JSObject::PROTO,
-        Content::Data(object_proto_ref)
-    );
+    *heap.get_mut(Heap::ARRAY_PROTO) = proto_object;
+    */
 
-    let proto_ref = heap.allocate(JSValue::Object(proto_object));
-
-    let mut array_object = JSObject::new();
-
-    // Array.__proto__ = Function.prototype
-    let function_proto_ref = heap.lookup_ref(&["Function", "prototype"])?;
-    array_object.set_system(JSObject::PROTO, Content::Data(function_proto_ref));
+    let mut array_object = JSObject::from_func(array_object_constructor);
 
     // Array.prototype
-    array_object.set_system("prototype", Content::Data(proto_ref));
+    array_object.set_system("prototype", Content::from(Heap::ARRAY_PROTO));
 
-    // Array()
-    array_object.set_system(JSObject::VALUE, Content::NativeFunction(array_object_constructor));
+    let array_ref = heap.alloc(array_object);
+    heap.get_mut(Heap::ARRAY_PROTO).set_system("constructor", Content::from(array_ref));
 
-    let object_ref = heap.allocate(JSValue::Object(array_object));
-    heap.object_mut(proto_ref)?.set_system("constructor", Content::Data(object_ref));
-
-    Ok(object_ref)
+    Ok(array_ref)
 }

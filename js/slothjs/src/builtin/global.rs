@@ -1,10 +1,13 @@
 use crate::error::Exception;
 use crate::object::{
     Content,
-    Heap,
     Interpreted,
-    JSRef,
+    JSObject,
     JSValue,
+};
+use crate::heap::{
+    Heap,
+    JSRef,
 };
 
 /*
@@ -25,7 +28,7 @@ fn parse_int(
     let value = value.stringify(heap);
 
     let radix = arguments.get(1).unwrap_or(&Interpreted::VOID);
-    let radix = radix.to_value(heap)?.numberify();
+    let radix = radix.to_value(heap)?.numberify(heap);
     let mut radix = radix.unwrap_or(0.0) as u32;
     if radix == 0 {
         let (c0, c1) = {
@@ -53,25 +56,19 @@ fn parse_int(
 /*
  *  init
  */
-fn make_readonly_property(heap: &mut Heap, name: &str, value: JSValue) {
-    let valref = heap.allocate(value);
-    heap.global_mut().set_readonly(name, Content::Data(valref));
-}
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
-    make_readonly_property(heap, "NaN", JSValue::Number(f64::NAN));
-    make_readonly_property(heap, "undefined", JSValue::Undefined);
+    let parse_int_ref = heap.alloc(JSObject::from_func(parse_int));
 
-    heap.global_mut().set_hidden(
-        "parseInt",
-        Content::NativeFunction(parse_int),
-    );
+    let global = heap.get_mut(Heap::GLOBAL);
+
+    global.set_readonly("NaN", Content::from(f64::NAN));
+    global.set_readonly("undefined", Content::from(JSValue::Undefined));
+
+    global.set_hidden("parseInt", Content::from(parse_int_ref));
 
     // The `global` self-reference:
-    heap.global_mut().set_hidden(
-        "global",
-        Content::Data(Heap::GLOBAL),
-    );
+    global.set_hidden("global", Content::from(Heap::GLOBAL));
 
     Ok(())
 }
