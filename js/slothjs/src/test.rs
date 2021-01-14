@@ -6,14 +6,15 @@ use serde_json::json;
 
 use crate::ast::Program;
 use crate::heap;
+use crate::heap::Heap;
 use crate::object;
 use crate::object::{JSON, JSValue, Interpreted};
 use crate::error::{Exception, ParseError};
-use crate::interpret::{Interpretable, RuntimeState};
+use crate::interpret::Interpretable;
 
 const ESPARSE: &str = "./node_modules/.bin/esparse";
 
-fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<Interpreted, Exception> {
+fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let mut child = Command::new(ESPARSE)
         .arg("--loc")
         .stdin(Stdio::piped())
@@ -40,18 +41,18 @@ fn run_interpreter(input: &str, state: &mut RuntimeState) -> Result<Interpreted,
         })?;
     let program = Program::try_from(&json)
         .map_err(|e| Exception::SyntaxError(e))?;
-    program.interpret(state)
+    program.interpret(heap)
 }
 
-fn interpret(input: &str, state: &mut RuntimeState) -> Result<JSValue, Exception> {
-    let result = run_interpreter(input, state)?;
-    result.to_value(&state.heap)
+fn interpret(input: &str, heap: &mut Heap) -> Result<JSValue, Exception> {
+    let result = run_interpreter(input, heap)?;
+    result.to_value(heap)
 }
 
 fn eval(input: &str) -> JSON {
-    let mut state = RuntimeState::new();
-    match interpret(input, &mut state) {
-        Ok(value) => value.to_json(&state.heap),
+    let mut heap = Heap::new();
+    match interpret(input, &mut heap) {
+        Ok(value) => value.to_json(&heap),
         Err(e) => {
             let msg = format!("{:?}", e);
             json!({"error": msg})
@@ -60,9 +61,9 @@ fn eval(input: &str) -> JSON {
 }
 
 fn evalbool(input: &str) -> bool {
-    let mut state = RuntimeState::new();
-    match interpret(input, &mut state) {
-        Ok(value) => value.boolify(&state.heap),
+    let mut heap = Heap::new();
+    match interpret(input, &mut heap) {
+        Ok(value) => value.boolify(&heap),
         Err(e) => {
             let msg = format!("{:?}", e);
             panic!(msg)
@@ -75,11 +76,11 @@ fn evalbool(input: &str) -> bool {
 /// understands).
 macro_rules! assert_eval {
     ($js:literal, $json:tt) => {
-        let mut state = RuntimeState::new();
+        let mut heap = Heap::new();
         let expected = json!($json);
-        match interpret($js, &mut state) {
+        match interpret($js, &mut heap) {
             Ok(result) => {
-                let result = result.to_json(&state.heap);
+                let result = result.to_json(&heap);
                 assert_eq!( result, expected )
             }
             Err(exc) => {
@@ -100,8 +101,8 @@ macro_rules! assert_eval {
 // ```
 macro_rules! assert_exception {
     ($js:literal, $exc:path) => {
-        let mut state = RuntimeState::new();
-        match interpret($js, &mut state) {
+        let mut heap = Heap::new();
+        match interpret($js, &mut heap) {
             Err($exc(_)) => (),
             other => {
                 panic!(format!("\n   want {}\n   got: {:?}\n", stringify!($exc), other))

@@ -19,11 +19,8 @@ use std::convert::TryFrom;
 
 use serde_json::Value as JSON;
 
-use slothjs::ast::Program;
-use slothjs::interpret::{
-    Interpretable,
-    RuntimeState,
-};
+use slothjs::{Heap, Program};
+use slothjs::interpret::Interpretable;
 
 fn die<E: Debug>(msg: &str, err: E, errcode: i32) -> ! {
     eprintln!("{}: {:?}", msg, err);
@@ -43,12 +40,12 @@ fn main() {
         let ast = Program::try_from(&json)
             .unwrap_or_else(|e| die("Parse error", e, 2));
 
-        let mut state = RuntimeState::new();
-        let result = ast.interpret(&mut state)
+        let mut heap = Heap::new();
+        let result = ast.interpret(&mut heap)
             .unwrap_or_else(|e| die("Interpretation error", e, 3));
 
         // TODO: JSON output, optionally
-        let value = result.to_value(&state.heap).unwrap();
-        println!("{}", value.to_string(&state.heap));
+        let value = result.to_value(&heap).unwrap();
+        println!("{}", value.to_string(&heap));
     }
 }

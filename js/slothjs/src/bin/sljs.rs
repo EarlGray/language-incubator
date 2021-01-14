@@ -25,13 +25,15 @@ use std::path::{Path, PathBuf};
 
 use atty::Stream;
 
-use slothjs::error::{Exception, ParseError};
-use slothjs::object::{JSON, JSValue};
-use slothjs::ast::Program;
-use slothjs::interpret::{
-    Interpretable,
-    RuntimeState,
+use slothjs::{
+    Exception,
+    Heap,
+    JSON,
+    JSValue,
+    Program,
 };
+use slothjs::error::ParseError;
+use slothjs::interpret::Interpretable;
 
 
 const TMPDIRNAME: &str = "sljs";
@@ -130,7 +132,7 @@ enum EvalError {
     Value(Exception),
 }
 
-fn evaluate_input(esparse_path: &Path, input: &str, state: &mut RuntimeState) -> Result<JSValue, EvalError> {
+fn evaluate_input(esparse_path: &Path, input: &str, heap: &mut Heap) -> Result<JSValue, EvalError> {
     let (stdout, _stderr) = run_esprima(esparse_path, input)
         .map_err(|e| EvalError::Syntax(e))?;
     let json = serde_json::from_str(&stdout)
@@ -138,10 +140,10 @@ fn evaluate_input(esparse_path: &Path, input: &str, state: &mut RuntimeState) ->
     let ast = Program::try_from(&json)
         .map_err(|e| EvalError::Parser(e))?;
 
-    let result = ast.interpret(state)
+    let result = ast.interpret(heap)
         .map_err(|e| EvalError::Exception(e))?;
 
-    result.to_value(&state.heap)
+    result.to_value(heap)
         .map_err(|e| EvalError::Value(e))
 }
 
@@ -150,8 +152,8 @@ fn batch_main(esparse_path: &Path) -> io::Result<()> {
     let mut input  = String::new();
     io::stdin().lock().read_to_string(&mut input)?;
 
-    let mut state = RuntimeState::new();
-    let value = evaluate_input(esparse_path, &input, &mut state).map_err(|e| {
+    let mut heap = Heap::new();
+    let value = evaluate_input(esparse_path, &input, &mut heap).map_err(|e| {
         match e {
             EvalError::Syntax(e) => die_io("SyntaxError", e, 1),
             EvalError::JSON(e) => die("JSONError", e, 2),
@@ -161,14 +163,14 @@ fn batch_main(esparse_path: &Path) -> io::Result<()> {
         };
         io::Error::from(io::ErrorKind::Other)
     })?;
-    let output = value.to_string(&state.heap);
+    let output = value.to_string(&heap);
     println!("{}", output);
 
     Ok(())
 }
 
 fn repl_main(esparse_path: &Path) -> io::Result<()> {
-    let mut state = RuntimeState::new();
+    let mut heap = Heap::new();
 
     let stdin = io::stdin();
     let mut input_iter = stdin.lock().lines();
@@ -189,9 +191,9 @@ fn repl_main(esparse_path: &Path) -> io::Result<()> {
         }
 
         // evaluate
-        match evaluate_input(esparse_path, &input, &mut state) {
+        match evaluate_input(esparse_path, &input, &mut heap) {
             Ok(value) => {
-                let output = value.to_string(&state.heap);
+                let output = value.to_string(&heap);
                 println!("{}", output);
             },
             Err(EvalError::Syntax(err)) => {

@@ -61,20 +61,19 @@ impl JSValue {
     /// ```
     /// # use serde_json::json;
     /// # use slothjs::object::JSValue;
-    /// # use slothjs::interpret::RuntimeState;
-    /// # let mut state = RuntimeState::new();
-    /// # let heap = &mut state.heap;
-    /// assert_eq!( JSValue::from("1").to_string(heap), "\"1\"" );
-    /// assert_eq!( JSValue::from(1).to_string(heap),    "1" );
+    /// # use slothjs::heap::Heap;
+    /// # let mut heap = Heap::new();
+    /// assert_eq!( JSValue::from("1").to_string(&heap), "\"1\"" );
+    /// assert_eq!( JSValue::from(1).to_string(&heap),    "1" );
     /// ```
     /// ```ignore
     /// let json_object = json!({"one": 1, "two": 2});
     /// let example_object = heap.object_from_json(&json_object);
-    /// assert_eq!( example_object.to_string(heap), "{ one: 1, two: 2 }");
+    /// assert_eq!( example_object.to_string(&heap), "{ one: 1, two: 2 }");
     ///
     /// let json_array = json!([1, 2]);
     /// let example_array = heap.object_from_json(&json_array);
-    /// assert_eq!( example_array.to_string(heap), "[1,2]" );
+    /// assert_eq!( example_array.to_string(&heap), "[1,2]" );
     /// ```
     pub fn to_string(&self, heap: &Heap) -> String {
         match self {
