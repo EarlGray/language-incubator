@@ -255,7 +255,12 @@ impl Heap {
                 object.set_property(key, Content::Value(value))
             }
             JSValue::Ref(self.alloc(object))
-        //} else if let Some(a) = json.as_array() {
+        } else if let Some(jarray) = json.as_array() {
+            let storage = jarray.iter().map(|jval|
+                self.object_from_json(jval)
+            ).collect();
+            let object = JSObject::from_array(storage);
+            JSValue::Ref(self.alloc(object))
         } else {
             JSValue::try_from(json).expect("primitive JSON")
         }

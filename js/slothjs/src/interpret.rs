@@ -2,7 +2,6 @@ use crate::object;
 use crate::object::{
     Content,
     Interpreted,
-    JSArray,
     JSObject,
     JSValue,
 };
@@ -275,16 +274,12 @@ impl Interpretable for ObjectExpression {
 impl Interpretable for ArrayExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let ArrayExpression(exprs) = self;
-
-        let mut object = JSObject::new();
-        object.proto = Heap::ARRAY_PROTO;
-
         let storage = exprs.iter().map(|expr| {
             let value = expr.interpret(heap)?;
             value.to_value(heap)
         }).collect::<Result<Vec<JSValue>, Exception>>()?;
-        object.value = object::ObjectValue::Array(JSArray{ storage });
 
+        let object = JSObject::from_array(storage);
         let object_ref = heap.alloc(object);
         Ok(Interpreted::from(object_ref))
     }
