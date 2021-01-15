@@ -25,7 +25,7 @@ fn parse_int(
         return Ok(Interpreted::Value(value))
     }
 
-    let value = value.stringify(heap);
+    let value = value.stringify(heap)?;
 
     let radix = arguments.get(1).unwrap_or(&Interpreted::VOID);
     let radix = radix.to_value(heap)?.numberify(heap);

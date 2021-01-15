@@ -60,26 +60,35 @@ impl JSValue {
     /// to_string() makes a human-readable string representation of the value:
     /// ```
     /// # use serde_json::json;
-    /// # use slothjs::object::JSValue;
-    /// # use slothjs::heap::Heap;
+    /// # use slothjs::{JSValue, Heap};
     /// # let mut heap = Heap::new();
-    /// assert_eq!( JSValue::from("1").to_string(&heap), "\"1\"" );
-    /// assert_eq!( JSValue::from(1).to_string(&heap),    "1" );
+    /// assert_eq!(
+    ///     JSValue::from("1").to_string(&mut heap).unwrap(),
+    ///     "\"1\""
+    /// );
+    /// assert_eq!(
+    ///     JSValue::from(1).to_string(&mut heap).unwrap(),
+    ///     "1"
+    /// );
     ///
-    /// let json_object = json!({"one": 1, "two": 2});
+    /// let json_object = json!({"one": 1});
     /// let example_object = heap.object_from_json(&json_object);
-    /// assert_eq!( example_object.to_string(&heap), "{ two: 2, one: 1 }");
+    /// assert_eq!(
+    ///     example_object.to_string(&mut heap).unwrap(),
+    ///     "{ one: 1 }"
+    /// );
     ///
-    /// //let json_array = json!([1, 2]);
-    /// //let example_array = heap.object_from_json(&json_array);
-    /// //assert_eq!( example_array.to_string(&heap), "[1,2]" );
+    /// let json_array = json!([1, 2]);
+    /// let example_array = heap.object_from_json(&json_array);
+    /// assert_eq!( example_array.to_string(&mut heap).unwrap(), "[1, 2]" );
     /// ```
-    pub fn to_string(&self, heap: &Heap) -> String {
+    pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
         match self {
             JSValue::String(s) =>
-                JSON::from(s.as_str()).to_string(),
-            JSValue::Ref(heapref) =>
-                heap.get(*heapref).to_string(heap),
+                Ok(JSON::from(s.as_str()).to_string()),
+            JSValue::Ref(heapref) => {
+                heap.get(*heapref).clone().to_string(heap)
+            }
             _ => self.stringify(heap)
         }
     }
@@ -87,14 +96,23 @@ impl JSValue {
     /// stringify() makes everything into a string
     /// used for evaluation in a string context.
     /// It corresponds to .toString() in JavaScript
-    pub fn stringify(&self, _heap: &Heap) -> String {
+    pub fn stringify(&self, heap: &mut Heap) -> Result<String, Exception> {
         match self {
-            JSValue::Undefined => "undefined".to_string(),
-            JSValue::Bool(b) => b.to_string(),
-            JSValue::Number(n) => n.to_string(),
-            JSValue::String(s) => s.clone(),
-            JSValue::Ref(_r) =>
-                "[object Object]".to_string(), // TODO: not all are just Object
+            JSValue::Undefined => Ok("undefined".to_string()),
+            JSValue::Bool(b) => Ok(b.to_string()),
+            JSValue::Number(n) => Ok(n.to_string()),
+            JSValue::String(s) => Ok(s.clone()),
+            JSValue::Ref(Heap::NULL) => Ok("null".to_string()),
+            JSValue::Ref(r) => {
+                match heap.lookup_protochain(*r, "toString") {
+                    Some(to_string) => {
+                        let funcref = to_string.to_ref(heap)?;
+                        let result = heap.execute(funcref, *r, "toString", vec![])?;
+                        Ok(result.to_value(heap)?.stringify(heap)?)
+                    }
+                    None => Ok("[object Object]".to_string())
+                }
+            }
         }
     }
 
@@ -109,7 +127,16 @@ impl JSValue {
             JSValue::String(s) => s.parse::<JSNumber>().ok(),
             JSValue::Ref(Heap::NULL) => Some(0.0),
             JSValue::Ref(r) => {
-                heap.get(*r).to_value(heap).and_then(|v| v.numberify(heap))
+                let object = heap.get(*r);
+                if let Some(array) = object.as_array() {
+                    match &array.storage[..] {
+                        [] => Some(0.0),                // +[]  == 0
+                        [val] => val.numberify(heap),   // +[x] == x
+                        _ => None,                      // +[x, y, ..] == NaN
+                    }
+                } else {
+                    object.to_primitive(heap).and_then(|v| v.numberify(heap))
+                }
             }
             _ => None
         }
@@ -137,7 +164,7 @@ impl JSValue {
             JSValue::Number(_) => "number",
             JSValue::Bool(_) => "boolean",
             JSValue::Ref(r) => {
-                if let Some(v) = heap.get(*r).to_value(heap) {
+                if let Some(v) = heap.get(*r).to_primitive(heap) {
                     v.type_of(heap)
                 } else {
                     "object"
@@ -147,7 +174,7 @@ impl JSValue {
     }
 
     /// Abstract Equality Comparison:
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_>
     pub fn loose_eq(&self, other: &JSValue, heap: &Heap) -> bool {
         let lval = if self == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { self };
         let rval = if other == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { other };
@@ -160,7 +187,7 @@ impl JSValue {
                 => self == other,
             (JSValue::Ref(lref), JSValue::Ref(rref)) if lref == rref => true,
             (JSValue::Ref(lref), JSValue::Ref(rref)) =>
-                match (heap.get(*lref).to_value(heap), heap.get(*rref).to_value(heap)) {
+                match (heap.get(*lref).to_primitive(heap), heap.get(*rref).to_primitive(heap)) {
                     (Some(lval), Some(rval)) => (lval == rval),
                     _ => false,
                 },
@@ -182,20 +209,20 @@ impl JSValue {
         JSValue::Number(val)
     }
 
-    pub fn plus(&self, other: &JSValue, heap: &Heap) -> JSValue {
+    pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> Result<JSValue, Exception> {
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
-            return JSValue::from(lstr.to_string() + rstr);
+            return Ok(JSValue::from(lstr.to_string() + rstr));
         }
         if let (Some(lnum), Some(rnum)) = (self.numberify(heap), other.numberify(heap)) {
-            return JSValue::from(lnum + rnum);
+            return Ok(JSValue::from(lnum + rnum));
         }
-        let lvalstr = self.stringify(heap);
-        let rvalstr = other.stringify(heap);
-        JSValue::from(lvalstr + &rvalstr)
+        let lvalstr = self.stringify(heap)?;
+        let rvalstr = other.stringify(heap)?;
+        Ok(JSValue::from(lvalstr + &rvalstr))
     }
 
-    pub fn minus(&self, other: &JSValue, heap: &Heap) -> JSValue {
-        JSValue::numerically(self, other, heap, |a, b| a - b)
+    pub fn minus(&self, other: &JSValue, heap: &Heap) -> Result<JSValue, Exception> {
+        Ok(JSValue::numerically(self, other, heap, |a, b| a - b))
     }
 
 
@@ -288,10 +315,6 @@ pub struct JSObject {
 }
 
 impl JSObject {
-    /// A property with this name is used:
-    /// - as the primitive value of a Number/Boolean/String object;
-    /// - as the function entry in a Function.
-    /// - as optimizied storage in an Array
     pub const VALUE: &'static str = "[[value]]";
 
     pub fn new() -> JSObject {
@@ -329,7 +352,7 @@ impl JSObject {
         }
     }
 
-    pub fn to_value(&self, _heap: &Heap) -> Option<JSValue> {
+    pub fn to_primitive(&self, _heap: &Heap) -> Option<JSValue> {
         use ObjectValue::*;
         match &self.value {
             Boolean(b) => Some(JSValue::Bool(*b)),
@@ -455,7 +478,7 @@ impl JSObject {
         json
     }
 
-    pub fn to_string(&self, heap: &Heap) -> String {
+    pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
         fn is_valid_identifier(s: &str) -> bool {
             let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
 
@@ -467,9 +490,24 @@ impl JSObject {
             }
         }
 
+        let is_array = self.as_array().is_some();
+
         let mut s = String::new();
         let mut empty = true;
-        s.push('{');
+
+        if let Some(array) = self.as_array() {
+            s.push('[');
+            for item in array.storage.iter() {
+                empty = false;
+                let itemstr = item.to_string(heap)?;
+                s.push_str(&itemstr);
+                s.push(','); s.push(' ');
+            }
+            if !empty { s.pop(); s.push(' '); }
+        } else {
+            s.push('{');
+        }
+
         for (key, property) in self.properties.iter() {
             if !property.enumerable() {
                 continue;
@@ -485,19 +523,28 @@ impl JSObject {
             s.push_str(": ");
             let val = match &property.content {
                 Content::Value(value) =>
-                    value.to_string(heap),
+                    value.to_string(heap)?,
             };
             s.push_str(&val);
             s.push(',');
             empty = false;
         }
-        if !empty { s.pop(); s.push(' '); }
-        s.push('}');
-        s
+        if is_array {
+            if !empty { s.pop(); s.pop(); }
+            s.push(']');
+        } else {
+            if !empty { s.pop(); s.push(' '); }
+            s.push('}');
+        }
+        Ok(s)
     }
 }
 
 
+/// This is used:
+/// - as the primitive value of a `Number`/`Boolean`/`String` object;
+/// - as the function entry in a `Function`.
+/// - as optimizied storage in an `Array`
 #[derive(Debug, Clone)]
 pub enum ObjectValue {
     None,
@@ -651,8 +698,8 @@ impl Interpreted {
     }
 
     /// Corresponds to Javascript `delete` operator and all its weirdness.
-    /// Ok/Err correspond to `true`/`false` from `delete`.
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
+    /// `Ok`/`Err` correspond to `true`/`false` from `delete`.
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete>
     pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
         match self {
             Interpreted::Member{ of, name } => {
@@ -682,4 +729,3 @@ impl Interpreted {
 impl<T> From<T> for Interpreted where JSValue: From<T>  {
     fn from(value: T) -> Interpreted { Interpreted::Value(JSValue::from(value)) }
 }
-

@@ -1,5 +1,3 @@
-//use std::fmt;
-
 use crate::object::{Interpreted, JSON};
 
 #[allow(dead_code)]
@@ -32,6 +30,7 @@ pub enum Exception {
 impl Exception {
     pub fn kind_eq(&self, other: &Exception) -> bool {
         // meh, could the compiler write this for me?
+        // - use macros, Luke.
         use Exception::*;
         match (self, other) {
             (SyntaxError(_), SyntaxError(_))
@@ -46,13 +45,3 @@ impl Exception {
         }
     }
 }
-
-/*
-impl Display for Exception {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Exception::*;
-        match self {
-        }
-    }
-}
-*/

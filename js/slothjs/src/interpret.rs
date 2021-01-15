@@ -188,8 +188,8 @@ impl Interpretable for BinaryExpression {
             BinOp::EqEq => JSValue::from(JSValue::loose_eq(&lval, &rval, heap)),
             BinOp::NotEq => JSValue::from(!JSValue::loose_eq(&lval, &rval, heap)),
             BinOp::Less => JSValue::less(&lval, &rval, heap),
-            BinOp::Plus => JSValue::plus(&lval, &rval, heap),
-            BinOp::Minus => JSValue::minus(&lval, &rval, heap),
+            BinOp::Plus => JSValue::plus(&lval, &rval, heap)?,
+            BinOp::Minus => JSValue::minus(&lval, &rval, heap)?,
             BinOp::Star => JSValue::numerically(&lval, &rval, heap, |a, b| a * b),
         };
         Ok(Interpreted::Value(result))
@@ -225,7 +225,7 @@ impl Interpretable for MemberExpression {
         // compute the name of the property:
         let propname = if *computed {
             let propval = propexpr.interpret(heap)?.to_value(heap)?;
-            propval.stringify(heap)
+            propval.stringify(heap)?
         } else {
             match &**propexpr {
                 Expr::Identifier(name) => name.0.clone(),
@@ -239,7 +239,7 @@ impl Interpretable for MemberExpression {
             Exception::ReferenceNotAnObject(objresult.clone())
         })?;
 
-        if propname == "__proto__" {
+        if &propname == "__proto__" {
             let proto = heap.get(objref).proto;
             return Ok(Interpreted::from(proto));
         }
@@ -258,7 +258,7 @@ impl Interpretable for ObjectExpression {
                     ident.clone(),
                 ObjectKey::Computed(expr) => {
                     let result = expr.interpret(heap)?.to_value(heap)?;
-                    result.stringify(heap)
+                    result.stringify(heap)?
                 }
             };
             let valresult = valexpr.interpret(heap)?;
@@ -297,8 +297,8 @@ impl Interpretable for AssignmentExpression {
             let oldvalue = assignee.to_value(heap)?;
             let value = value.to_value(heap)?;
             let newvalue = match op {
-                BinOp::Plus => JSValue::plus(&oldvalue, &value, heap),
-                BinOp::Minus => JSValue::minus(&oldvalue, &value, heap),
+                BinOp::Plus => JSValue::plus(&oldvalue, &value, heap)?,
+                BinOp::Minus => JSValue::minus(&oldvalue, &value, heap)?,
                 BinOp::Star => JSValue::numerically(&oldvalue, &value, heap, |a, b| a * b),
                 _ => panic!(format!("Binary operation {:?} cannot be used in assignment", op))
             };

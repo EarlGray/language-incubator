@@ -118,9 +118,9 @@ fn test_literals() {
     assert_eval!( "42",         42.0);
     assert_eval!( "0x2a",       42.0);
     assert_eval!( "052",        42.0);
-    //assert_eq!( eval("[]"),         JSValue::from(json!([])));
-    //assert_eq!( eval("+5"),         JSValue::from(5));
-    //assert_eq!( eval("+'5'"),       JSValue::from(5));
+    assert_eval!( "[]",         []);
+    assert_eval!( "+5",         5.0);
+    assert_eval!( "+'5'",       5.0);
 
     assert_eval!( "\"hello \\\"world\\\"\"", "hello \"world\"");
 
@@ -140,10 +140,17 @@ fn test_binary_operations() {
     // O_o
     assert_eq!( eval("2 + 2"),          JSON::from(4.0) );
     assert_eq!( eval("'1' + '2'"),      JSON::from("12") );
-    //assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
-    //assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
+    assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
+    assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
     assert_eq!( eval("null + null"),    JSON::from(0.0) );
     assert_eq!( eval("true + null"),    JSON::from(1.0) );
+    assert_eval!( "'' + [1, 2]",    "1,2" );
+    assert_eval!( "'' + null",   "null" );
+    assert_eval!( "'' + true",   "true" );
+    assert_eval!( "'' + {}",     "[object Object]" );
+    assert_eval!( "({} + {})",     "[object Object][object Object]" );
+    assert_eval!( "({} + [])",     "[object Object]" ); // expression
+    assert_eval!( "{} +[]",         0.0 );              // two statements
 
     assert_eval!( "5 - 3",  2.0 );
     assert_eval!( "3.5 - 5",  (-1.5) );
@@ -443,8 +450,12 @@ fn test_unary_operations() {
     assert_eq!( eval("+1"),                 JSON::from(1.0) );
     assert_eq!( eval("+'1'"),               JSON::from(1.0) );
     assert_eq!( eval("+false"),             JSON::from(0.0) );
+    assert_eq!( eval("+null"),              JSON::from(0.0) );
     assert!( evalbool("let v = +{}; v != v") );         // NaN
+    assert!( evalbool("let v = +[1, 2]; v != v") );
     assert!( evalbool("let v = +'false'; v != v") );
+    assert_eval!( "let a = []; +a",          0.0 );
+    assert_eval!( "let a = [1]; +a",         1.0 );
 
     assert_eq!( eval("-'1'"),               JSON::from(-1.0) );
 

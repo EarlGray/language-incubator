@@ -46,6 +46,8 @@ fn main() {
 
         // TODO: JSON output, optionally
         let value = result.to_value(&heap).unwrap();
-        println!("{}", value.to_string(&heap));
+        let output = value.to_string(&mut heap)
+            .unwrap_or_else(|e| die("Exception", e, 4));
+        println!("{}", output);
     }
 }

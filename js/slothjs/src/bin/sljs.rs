@@ -163,7 +163,8 @@ fn batch_main(esparse_path: &Path) -> io::Result<()> {
         };
         io::Error::from(io::ErrorKind::Other)
     })?;
-    let output = value.to_string(&heap);
+    let output = value.to_string(&mut heap)
+        .unwrap_or_else(|e| die("Exception", e, 6));
     println!("{}", output);
 
     Ok(())
@@ -192,10 +193,11 @@ fn repl_main(esparse_path: &Path) -> io::Result<()> {
 
         // evaluate
         match evaluate_input(esparse_path, &input, &mut heap) {
-            Ok(value) => {
-                let output = value.to_string(&heap);
-                println!("{}", output);
-            },
+            Ok(value) =>
+                match value.to_string(&mut heap) {
+                    Ok(output) => println!("{}", output),
+                    Err(e) => eprintln!("Exception: {:?}", e)
+                },
             Err(EvalError::Syntax(err)) => {
                 eprintln!("SyntaxError: {:?}", err.kind());
                 eprintln!("{}", err.get_ref().unwrap());

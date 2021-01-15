@@ -73,10 +73,6 @@ impl Heap {
         JSRef(ind)
     }
 
-    pub fn allocate(&mut self) -> JSRef {
-        self.alloc(JSObject::new())
-    }
-
     fn local_scope(&self) -> Option<JSRef> {
         match self.get(Heap::GLOBAL).property_value(Heap::LOCAL_SCOPE) {
             Some(JSValue::Ref(scope_ref)) => Some(*scope_ref),
@@ -84,7 +80,7 @@ impl Heap {
         }
     }
 
-    pub fn scope(&self) -> &JSObject {
+    fn scope(&self) -> &JSObject {
         let scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
         self.get(scope_ref)
     }
@@ -99,10 +95,11 @@ impl Heap {
     pub fn declare_var(&mut self, kind: Option<DeclarationKind>, name: &str) -> Result<(), Exception> {
         // TODO: let and const should be block-scoped
         if !self.scope().properties.contains_key(name) {
+            let content = Content::Value(JSValue::Undefined);
             if kind.is_none() {
-                self.scope_mut().set_property(name, Content::Value(JSValue::Undefined));
+                self.scope_mut().set_property(name, content);
             } else {
-                self.scope_mut().set_nonconf(name, Content::Value(JSValue::Undefined));
+                self.scope_mut().set_nonconf(name, content);
             }
         }
         Ok(())
@@ -137,20 +134,11 @@ impl Heap {
             let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
             scope_object.set_nonconf(name, Content::Value(value));
         }
-        scope_object.set_system(
-            Self::SAVED_SCOPE,
-            Content::Value(JSValue::Ref(old_scope_ref)),
-        );
-        scope_object.set_system(
-            Self::SCOPE_THIS,
-            Content::Value(JSValue::Ref(this_ref)),
-        );
+        scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref));
+        scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref));
 
         let new_scope_ref = self.alloc(scope_object);
-        self.get_mut(Heap::GLOBAL).set_system(
-            Self::LOCAL_SCOPE,
-            Content::Value(JSValue::Ref(new_scope_ref)),
-        );
+        self.get_mut(Heap::GLOBAL).set_system(Self::LOCAL_SCOPE, Content::from(new_scope_ref));
         Ok(())
     }
 
@@ -168,13 +156,11 @@ impl Heap {
             }
         };
 
+        let global = self.get_mut(Heap::GLOBAL);
         if saved_scope_ref == Heap::GLOBAL {
-            self.get_mut(Heap::GLOBAL).properties.remove(Self::LOCAL_SCOPE);
+            global.properties.remove(Self::LOCAL_SCOPE);
         } else {
-            self.get_mut(Heap::GLOBAL).set_system(
-                Self::LOCAL_SCOPE,
-                Content::Value(JSValue::Ref(saved_scope_ref)),
-            );
+            global.set_system(Self::LOCAL_SCOPE, Content::from(saved_scope_ref));
         }
 
         Ok(())
@@ -184,7 +170,7 @@ impl Heap {
         while objref != Heap::NULL {
             let object = self.get(objref);
             if object.properties.contains_key(propname) {
-                return Some(Interpreted::Member{ of: objref, name: propname.to_string() });
+                return Some(Interpreted::member(objref, propname));
             }
 
             objref = object.proto;

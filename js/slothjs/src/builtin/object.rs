@@ -20,7 +20,7 @@ fn object_proto_toString(
     _arguments: Vec<Interpreted>,
     _heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
-    Ok(Interpreted::Value(JSValue::from("TODO")))
+    Ok(Interpreted::from("[object Object]"))
 }
 
 fn object_proto_dbg(
@@ -90,7 +90,8 @@ fn object_object_getOwnPropertyDescriptor(
     )?;
 
     let propname = arguments.get(1).unwrap_or(&Interpreted::VOID);
-    let propname = propname.to_value(&*heap)?.stringify(&*heap);
+    let propname = propname.to_value(&*heap)?;
+    let propname = propname.stringify(heap)?;
 
     let inspected_object = heap.get_mut(inspected_ref);
     let prop = match inspected_object.properties.get(&propname) {
@@ -98,8 +99,7 @@ fn object_object_getOwnPropertyDescriptor(
         None => return Ok(Interpreted::VOID)
     };
 
-    let descriptor_ref = heap.allocate();
-    let descriptor_object = heap.get_mut(descriptor_ref);
+    let mut descriptor_object = JSObject::new();
     descriptor_object.set_property(
         "configurable",
         Content::from(prop.access.configurable())
@@ -120,6 +120,7 @@ fn object_object_getOwnPropertyDescriptor(
         Content::Value(value)
     );
 
+    let descriptor_ref = heap.alloc(descriptor_object);
     Ok(Interpreted::from(descriptor_ref))
 }
 
