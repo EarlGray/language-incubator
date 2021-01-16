@@ -329,6 +329,7 @@ fn test_scope() {
     assert_eval!( "var a = false; { a = true } a",          true );
     //assert_eval!( "var a = true; { let a = false; } a",     true );
     //assert_eval!( "var a = false; (function() { a = true; })(); a", true );
+    assert_eval!( "var a = true; (function(a) { a = false })('nope'); a", true );
 
     //assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
 
@@ -567,17 +568,17 @@ fn test_functions() {
 
 #[test]
 fn test_global_methods() {
-    // parseInt
+    // parseInt:
     assert_eval!( "parseInt('42')",     42.0 );
     assert_eval!( "parseInt(5)",        5.0 );
     assert_eval!( "parseInt('nope')",   (f64::NAN) );
     assert_eval!( "parseInt('1'+'2', 'yep')", 12.0 );
-    //assert_eval!( "parseInt('0x10')",   16.0 );
     assert_eval!( "parseInt('22', 38)", (f64::NAN) );
     assert_eval!( "parseInt('22', 1)",  (f64::NAN) );
     assert_eval!( "parseInt('20', 8)",  16.0 );
     assert_eval!( "parseInt('020', 10)", 20.0 );
     assert_eval!( "parseInt('020')",     16.0 );
+    //assert_eval!( "parseInt('0x10')",   16.0 );
 }
 
 #[test]
@@ -586,6 +587,21 @@ fn test_builtin_object() {
     assert!( evalbool("Object.is(Object.__proto__, Function.prototype)") );
     assert!( evalbool("Object.is(Object.__proto__.__proto__, Object.prototype)") );
     assert!( evalbool("Object.is(Object.__proto__.__proto__.__proto__, null)") );
+
+    /*
+    // constructor
+    assert_eval!( "Object(null)",     {} );
+    assert_eval!( "Object(undefined)", {} );
+    assert_eval!( "Object({one: 1})", {"one": 1} );
+    assert_eval!( "Object(1) instanceof Number", true );
+
+    assert_eval!( "new Object(null)",     {} );
+    assert_eval!( "new Object(undefined)", {} );
+    assert_eval!( "new Object({one: 1})", {"one": 1} );
+    assert_eval!( "new Object(1) instanceof Number", true );
+    */
+
+    // Object.defineProperty
 
     // Object.getOwnPropertyDescriptor
     assert_eval!(
@@ -611,6 +627,16 @@ fn test_builtin_object() {
     assert!( evalbool("var a = {}; var b = a; Object.is(a, b)") );
     assert!( !evalbool("Object.is({}, {})") );
     assert!( evalbool("Object.is(global, global)") );
+
+    /*
+    // Object.assign
+    assert_eval!(r#"
+        const obj = {one: 1};
+        const copy = Object.assign({}, obj);
+        obj.one
+    "#, 1.0);
+     */
+    // Object.create
 }
 
 #[test]
@@ -642,6 +668,71 @@ fn test_objects() {
     );
 
     assert_exception!( "a.one = 1", Exception::ReferenceNotFound );
+}
+
+#[test]
+fn test_this() {
+    /*
+    assert_eval!("var f = function() { return this; }; f() == global", true );
+
+    assert_eval!(r#"
+        const test = { prop: 42, func: function() { return this.prop; } };
+        test.func()
+    "#, 42.0 );
+
+    assert_eval!(r#"
+        var o = {f: function() { return this.a + this.b; }}
+        var p = Object.create(o)
+        p.a = 1
+        p.b = 4
+        p.f()
+    "#, 5.0 );
+
+    // call
+    assert_eval!(r#"
+        const add = function(c, d) { return this.a + this.b + c + d }
+        var o = {a: 1, b: 3}
+        add.call(o, 5, 7)
+    "#, 16.0);
+
+    // apply
+    assert_eval!(r#"
+        const f = function(c, d) { return this.a + this.b + c + d }
+        var o = {a: 1, b: 3}
+        f.apply(o, [5, 7])
+    "#, 16.0);
+
+    // bind
+    assert_eval!(r#"
+        var f = function(c, d) { return this.a + this.b + c + d }
+        f = f.bind({a: 1, b: 3}, 5)
+        f(7)
+    "#, 16.0);
+
+    assert_eval!(r#"
+        var f = function(c, d) { return this.a + this.b + c + d }
+        f = f.bind({a: 1, b: 3})
+        f(5, 7)
+    "#, 16.0);
+    assert_eval!(r#"
+        var obj = { a: 1, get one() { return this.a; }};
+        obj.one
+    "#, 1.0);
+    assert_eval!(r#"
+        var obj = { a: 1 };
+        Object.defineProperty(obj, 'one', {
+            get: function() { return this.a; },
+            enumerable: true,
+            configurable: true
+        });
+        obj.one
+    "#, 1.0);
+    assert_eval!(r#"
+        let Class = function() { this.prop = true; }
+        let obj = new Class();
+        obj.prop
+    "#, true);
+    */
 }
 
 #[test]
