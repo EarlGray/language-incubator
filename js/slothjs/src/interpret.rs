@@ -340,22 +340,15 @@ impl Interpretable for CallExpression {
 
         let callee = callee_expr.interpret(heap)?;
 
-        let (this_ref, method_name) = match &callee {
-            Interpreted::Member{ of, name } => (*of, name),
+        match &callee {
+            Interpreted::Member{ of, name } =>
+                heap.execute_method(*of, &name, arguments),
+            Interpreted::Value(JSValue::Ref(funcref)) => {
+                let this_ref = Heap::GLOBAL;  // TODO: figure out what is this
+                heap.execute(*funcref, this_ref, "<anonymous>", arguments)
+            }
             _ => return Err(Exception::TypeErrorNotCallable(callee.clone()))
-        };
-
-        let (of, name) = match heap.lookup_protochain(this_ref, &method_name) {
-            Some(Interpreted::Member{ of, name }) => (of, name),
-            Some(_) => unreachable!(),
-            None => return Err(Exception::TypeErrorNotCallable(callee.clone()))
-        };
-        let funcobj_ref = match heap.get(of).properties.get(&name) {
-            Some(object::Property{ content: Content::Value(JSValue::Ref(func_ref)), ..}) => *func_ref,
-            _ => return Err(Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))
-        };
-
-        heap.execute(funcobj_ref, this_ref, &method_name, arguments)
+        }
     }
 }
 

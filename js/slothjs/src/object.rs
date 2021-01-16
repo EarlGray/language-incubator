@@ -315,8 +315,6 @@ pub struct JSObject {
 }
 
 impl JSObject {
-    pub const VALUE: &'static str = "[[value]]";
-
     pub fn new() -> JSObject {
         JSObject{
             proto: Heap::OBJECT_PROTO,

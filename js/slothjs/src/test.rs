@@ -320,10 +320,19 @@ fn test_assignment() {
 
 #[test]
 fn test_scope() {
-    assert_eq!( eval("a = 1; a"),   JSON::from(1.0) );
+    assert_eval!( "a = 1; a",   1.0 );
     assert_exception!( "b", Exception::ReferenceNotFound );
     assert_exception!( "a = a + 1", Exception::ReferenceNotFound );
     assert_exception!( "a += 1", Exception::ReferenceNotFound );
+
+    assert_eval!( "var a = false; { var a = true; } a",     true );
+    assert_eval!( "var a = false; { a = true } a",          true );
+    //assert_eval!( "var a = true; { let a = false; } a",     true );
+    //assert_eval!( "var a = false; (function() { a = true; })(); a", true );
+
+    //assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
+
+    //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 }
 
 /*
@@ -505,13 +514,15 @@ fn test_unary_operations() {
 #[test]
 fn test_functions() {
     // CallExpression for builtin functions
-    assert_eq!( eval("parseInt('42')"),     JSON::from(42.0));
+    assert_eval!( "parseInt('42')",     42.0);
 
     // FunctionExpression
-    assert_eq!( eval(r#"
+    assert_eval!( r#"
         let twice = function(x) { return x + x; };
         twice(12)
-    "#), JSON::from(24.0));
+    "#, 24.0);
+
+    assert_eval!( "(function () { return true; })()",   true );
 
     assert!( evalbool(r#"
         let func = function() { return true; return false; };
