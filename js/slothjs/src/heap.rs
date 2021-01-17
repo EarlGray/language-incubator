@@ -42,6 +42,7 @@ impl Heap {
     pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";
     const SAVED_SCOPE: &'static str = "[[saved_scope]]";
+    const CAPTURED_SCOPE: &'static str = "[[captured_scope]]";
 
     pub fn new() -> Self {
         let mut heap_vec = Vec::new();
@@ -84,7 +85,7 @@ impl Heap {
     }
 
     /// If there's a local scope, return a `JSRef` to it.
-    fn local_scope(&self) -> Option<JSRef> {
+    pub(crate) fn local_scope(&self) -> Option<JSRef> {
         match self.get(Heap::GLOBAL).get_value(Heap::LOCAL_SCOPE) {
             Some(JSValue::Ref(scope_ref)) => Some(*scope_ref),
             _ => None,
@@ -118,14 +119,30 @@ impl Heap {
     }
 
     pub fn lookup_var(&mut self, name: &str) -> Option<Interpreted> {
-        if let Some(local_scope) = self.local_scope() {
-            if self.get(local_scope).properties.contains_key(name) {
-                return Some(Interpreted::member(local_scope, name));
+        if let Some(local_ref) = self.local_scope() {
+            // local scope lookup
+            let local = self.get(local_ref);
+            if local.properties.contains_key(name) {
+                return Some(Interpreted::member(local_ref, name));
+            }
+
+            // captured scopes lookup
+            let mut scope_ref = local.properties.get(Self::CAPTURED_SCOPE)
+                .and_then(|prop| prop.to_ref())
+                .unwrap_or(Heap::NULL);
+            while scope_ref != Heap::NULL {
+                let scope = self.get(scope_ref);
+                if scope.properties.contains_key(name) {
+                    return Some(Interpreted::member(scope_ref, name));
+                }
+
+                scope_ref = scope.properties.get(Self::CAPTURED_SCOPE)
+                    .and_then(|prop| prop.to_ref())
+                    .unwrap_or(Heap::NULL);
             }
         }
 
-        // TODO: lookup in free variables of the current call
-
+        // global scope lookup
         if self.get(Heap::GLOBAL).properties.contains_key(name) {
             Some(Interpreted::member(Heap::GLOBAL, name))
         } else {
@@ -137,7 +154,7 @@ impl Heap {
         params: Vec<Identifier>,
         values: Vec<Interpreted>,
         this_ref: JSRef,
-    ) -> Result<(), Exception> {
+    ) -> Result<JSRef, Exception> {
         let old_scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
 
         let mut scope_object = JSObject::new();
@@ -153,7 +170,8 @@ impl Heap {
         self.get_mut(Heap::GLOBAL).update_even_nonwritable(
             Self::LOCAL_SCOPE,
             JSValue::Ref(new_scope_ref),
-        )
+        )?;
+        Ok(new_scope_ref)
     }
 
     fn pop_scope(&mut self) -> Result<(), Exception> {
@@ -201,8 +219,14 @@ impl Heap {
                 vmcall.call(this_ref, method_name.to_string(), arguments, self)
             }
             ObjectValue::Closure(closure) => {
-                let Closure{params, body, ..} = &*closure;
-                self.push_scope(params.clone(), arguments, this_ref)?;
+                let Closure{params, body, captured_scope, ..} = &*closure;
+                let scope = self.push_scope(params.clone(), arguments, this_ref)?;
+                if *captured_scope != Heap::NULL {
+                    self.get_mut(scope).set_system(
+                        Self::CAPTURED_SCOPE,
+                        Content::from(*captured_scope)
+                    )?;
+                }
                 let result = body.interpret(self);
                 self.pop_scope()?;
                 match result {

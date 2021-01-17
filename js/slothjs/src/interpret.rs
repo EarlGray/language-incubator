@@ -368,7 +368,7 @@ impl Interpretable for FunctionExpression {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
-            // TODO: compute and capture free variables
+            captured_scope: heap.local_scope().unwrap_or(Heap::NULL)
         };
 
         let function_object = JSObject::from_closure(closure);

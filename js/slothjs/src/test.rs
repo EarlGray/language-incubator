@@ -562,7 +562,11 @@ fn test_functions() {
     "#), JSON::from(144.0));
     */
 
-    // TODO: closures and scope
+    assert_eval!(r#"
+        let adder = function(y) { return function(x) { return x + y; } };
+        let add3 = adder(3);
+        add3(4)
+    "#, 7.0);
 }
 
 #[test]

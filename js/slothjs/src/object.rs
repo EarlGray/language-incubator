@@ -723,7 +723,7 @@ pub struct Closure {
     pub id: Option<ast::Identifier>,
     pub params: Vec<ast::Identifier>,
     pub body: Box<ast::BlockStatement>,
-    //pub free_variables: Vec<JSRef>,
+    pub captured_scope: JSRef,
 }
 
 /// The underlying storage of an Array object.
