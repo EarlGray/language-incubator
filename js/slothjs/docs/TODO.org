@@ -52,6 +52,7 @@
 * TODO builtin primitive wrappers
 ** TODO =Number=
 ** TODO =String=
+*** TODO string indexing
 ** TODO =Boolean=
 * DONE [2021-01-01 Fri] builtin function calls
 ** DONE [2021-01-01 Fri] CallExpression

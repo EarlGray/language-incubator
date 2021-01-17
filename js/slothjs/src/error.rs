@@ -19,7 +19,7 @@ pub enum Exception {
     SyntaxError(ParseError<JSON>),
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(String),
-    TypeErrorSetProperty(Interpreted, String),
+    TypeErrorSetReadonly(Interpreted, String),
     TypeErrorGetProperty(Interpreted, String),
     TypeErrorCannotAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
@@ -36,7 +36,7 @@ impl Exception {
             (SyntaxError(_), SyntaxError(_))
                 | (ReferenceNotAnObject(_), ReferenceNotAnObject(_))
                 | (ReferenceNotFound(_), ReferenceNotFound(_))
-                | (TypeErrorSetProperty(_, _), TypeErrorSetProperty(_, _))
+                | (TypeErrorSetReadonly(_, _), TypeErrorSetReadonly(_, _))
                 | (TypeErrorGetProperty(_, _), TypeErrorGetProperty(_, _))
                 | (TypeErrorCannotAssign(_), TypeErrorCannotAssign(_))
                 | (TypeErrorNotCallable(_), TypeErrorNotCallable(_))

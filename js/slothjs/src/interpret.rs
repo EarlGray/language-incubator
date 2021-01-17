@@ -126,7 +126,12 @@ impl Interpretable for VariableDeclaration {
             heap.declare_var(Some(self.kind), name)?;
             if let Some(init) = optinit {
                 let value = init.to_value(heap)?;
-                heap.scope_mut().update(name, value)?;
+                heap.scope_mut().update(name, value).or_else(|e|
+                    match e {
+                        Exception::TypeErrorSetReadonly(_, _) => Ok(()),
+                        _ => Err(e)
+                    }
+                )?;
             }
         }
         Ok(Interpreted::VOID)
@@ -319,7 +324,12 @@ impl Interpretable for AssignmentExpression {
             match assignee {
                 Interpreted::Member{of, name} => {
                     let value = value.to_value(heap)?;
-                    heap.get_mut(of).update(&name, value.clone())?;
+                    heap.get_mut(of).update(&name, value.clone()).or_else(|e|
+                        match e {
+                            Exception::TypeErrorSetReadonly(_, _) => Ok(()),
+                            _ => Err(e)
+                        }
+                    )?;
                     Ok(Interpreted::Value(value))
                 }
                 _ => Err(Exception::TypeErrorCannotAssign(assignee))
@@ -339,7 +349,6 @@ impl Interpretable for CallExpression {
         }
 
         let callee = callee_expr.interpret(heap)?;
-
         match &callee {
             Interpreted::Member{ of, name } =>
                 heap.execute_method(*of, &name, arguments),

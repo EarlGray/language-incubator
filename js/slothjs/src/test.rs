@@ -544,7 +544,6 @@ fn test_functions() {
     "#), JSON::from(1.0));
 
     assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
-    /*
     assert_eval!(r#"
         var gcd = function(a, b) { return (a == b ? a : (a < b ? gcd(a, b-a) : gcd(a-b, b))); };
         gcd(12, 15)
@@ -553,7 +552,6 @@ fn test_functions() {
     assert_eq!( eval(r#"
         (function(x) { return x + x; })(12)
     "#), JSON::from(24.0));
-     */
 
     /*
     // FunctionDeclaration

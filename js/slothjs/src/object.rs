@@ -390,33 +390,50 @@ impl JSObject {
         )
     }
 
-    pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+    fn update_maybe_nonwritable(
+        &mut self,
+        name: &str,
+        value: JSValue,
+        even_nonwritable: bool
+    ) -> Result<(), Exception> {
         if let Some(array) = self.as_array_mut() {
             if let Ok(index) = usize::from_str(name) {
                 // TODO: a[100500] will be interesting.
                 while array.storage.len() <= index {
                     array.storage.push(JSValue::Undefined);
                 }
-                array.storage[index] = value;
+                array.storage[index] = value.clone();
                 return Ok(());
             }
         }
 
-        let place = match self.properties.get_mut(name) {
-            Some(place) => place,
-            None => {
-                self.set_property(name, Content::Value(JSValue::Undefined));
-                self.properties.get_mut(name).unwrap()
-            }
-        };
-        if place.access.writable() {
-            match place.content {
-                Content::Value(_) => {
-                    place.content = Content::Value(value);
-                }
+        if !self.properties.contains_key(name) {
+            self.set_property(name, Content::Value(JSValue::Undefined));
+        }
+
+        let place = self.properties.get_mut(name).unwrap();
+        if !(even_nonwritable || place.access.writable()) {
+            let what = Interpreted::from("???");  // TODO
+            let name = name.to_string();
+            return Err(Exception::TypeErrorSetReadonly(what, name));
+        }
+        match place.content {
+            Content::Value(_) => {
+                place.content = Content::Value(value);
             }
         }
         Ok(())
+    }
+
+    /// If self is an array:
+    ///  - tries to parse `name` into an index;
+    ///  - grows an array until it has this index;
+    ///  - insert the new value at this index;
+    /// Otherwise:
+    ///  - if `name` is not an own property of `self`, create it with Access::all()
+    ///  - if the property is writable, assign the content created from `value`.
+    pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+        self.update_maybe_nonwritable(name, value, false)
     }
 
     fn set_property_and_flags(&mut self, name: &str, content: Content, access: Access) {

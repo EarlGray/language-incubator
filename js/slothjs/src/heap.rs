@@ -7,6 +7,7 @@ use crate::ast::{
     Identifier,
 };
 use crate::object::{
+    Access,
     Closure,
     Content,
     Interpreted,
@@ -138,7 +139,15 @@ impl Heap {
         scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref));
 
         let new_scope_ref = self.alloc(scope_object);
-        self.get_mut(Heap::GLOBAL).set_system(Self::LOCAL_SCOPE, Content::from(new_scope_ref));
+
+        // do not use `.set_system()`: it silently ignores updates on non-writable properties.
+        let global = self.get_mut(Heap::GLOBAL);
+        let entry = global.properties.entry(String::from(Self::LOCAL_SCOPE)).or_insert(Property{
+            content: Content::from(JSValue::Undefined),
+            access: Access::empty(),
+        });
+        entry.content = Content::from(new_scope_ref);
+
         Ok(())
     }
 
@@ -147,13 +156,9 @@ impl Heap {
             .expect(".pop_scope without local scope, something is very wrong");
         let this_scope_object = self.get(this_scope_ref);
         let saved_scope_ref = match this_scope_object.properties.get(Self::SAVED_SCOPE) {
-            Some(prop) => match prop.content {
-                Content::Value(JSValue::Ref(r)) => r,
-                _ => panic!(".pop scope without saved scope, something is very wrong")
-            },
-            other => {
+            Some(Property{ content: Content::Value(JSValue::Ref(r)), ..}) => *r,
+            other =>
                 panic!("saved_scope is invalid: {:?}, something is very wrong", other)
-            }
         };
 
         let global = self.get_mut(Heap::GLOBAL);
