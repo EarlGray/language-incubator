@@ -31,10 +31,12 @@ impl JSValue {
     /// to_ref() tries to return the underlying object reference, if any.
     /// It's useful for checking if a value points to an object.
     pub fn to_ref(&self) -> Result<JSRef, Exception> {
-        if let JSValue::Ref(objref) = self {
-            Ok(*objref)
-        } else {
-            Err(Exception::ReferenceNotAnObject(Interpreted::Value(self.clone())))
+        match self {
+            JSValue::Ref(objref) => Ok(*objref),
+            _ => {
+                let what = Interpreted::Value(self.clone());
+                Err(Exception::ReferenceNotAnObject(what))
+            }
         }
     }
 
@@ -157,6 +159,7 @@ impl JSValue {
         }
     }
 
+    /// Javascript's `typeof`
     pub fn type_of(&self, heap: &Heap) -> &'static str {
         match self {
             JSValue::Undefined => "undefined",
@@ -173,7 +176,7 @@ impl JSValue {
         }
     }
 
-    /// Abstract Equality Comparison:
+    /// Abstract Equality Comparison, `==`:
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_>
     pub fn loose_eq(&self, other: &JSValue, heap: &Heap) -> bool {
         let lval = if self == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { self };
@@ -209,6 +212,8 @@ impl JSValue {
         JSValue::Number(val)
     }
 
+    /// Addition operator:
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Addition>
     pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> Result<JSValue, Exception> {
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
             return Ok(JSValue::from(lstr.to_string() + rstr));
@@ -221,6 +226,8 @@ impl JSValue {
         Ok(JSValue::from(lvalstr + &rvalstr))
     }
 
+    /// Subtraction operator:
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Subtraction>
     pub fn minus(&self, other: &JSValue, heap: &Heap) -> Result<JSValue, Exception> {
         Ok(JSValue::numerically(self, other, heap, |a, b| a - b))
     }
@@ -306,7 +313,10 @@ fn test_boolify() {
     assert!( !JSValue::NULL.boolify(&dummy) );
 }
 
-/// Javascript objects
+/// Javascript objects.
+/// A `JSObject` always has a `proto`.
+/// It can have an optional `ObjectValue` (a primitive or array/function/closure).
+/// It has a dictionary of `properties`.
 #[derive(Debug, Clone)]
 pub struct JSObject {
     pub proto: JSRef,
@@ -323,6 +333,7 @@ impl JSObject {
         }
     }
 
+    /// Wrap the given native call into a Function.
     pub fn from_func(f: NativeFunction) -> JSObject {
         JSObject{
             proto: Heap::FUNCTION_PROTO,
@@ -331,6 +342,7 @@ impl JSObject {
         }
     }
 
+    /// Wrap the given `closure` into a Function.
     pub fn from_closure(closure: Closure) -> JSObject {
         let params_count = closure.params.len() as f64;
         let mut function_object = JSObject{
@@ -342,6 +354,7 @@ impl JSObject {
         function_object
     }
 
+    /// Wrap the given vector into an Array.
     pub fn from_array(values: Vec<JSValue>) -> JSObject {
         JSObject{
             proto: Heap::ARRAY_PROTO,
@@ -350,6 +363,7 @@ impl JSObject {
         }
     }
 
+    /// It's roughly `Object.valueOf(self)`
     pub fn to_primitive(&self, _heap: &Heap) -> Option<JSValue> {
         use ObjectValue::*;
         match &self.value {
@@ -361,6 +375,7 @@ impl JSObject {
     }
 
 
+    /// It `self` is an Array, give its underlying storage.
     pub fn as_array(&self) -> Option<&JSArray> {
         match &self.value {
             ObjectValue::Array(array) => Some(array),
@@ -368,6 +383,7 @@ impl JSObject {
         }
     }
 
+    /// It `self` is an Array, give its underlying storage mutably.
     pub fn as_array_mut(&mut self) -> Option<&mut JSArray> {
         match &mut self.value {
             ObjectValue::Array(array) => Some(array),
@@ -375,6 +391,8 @@ impl JSObject {
         }
     }
 
+    /// Tries to get JSValue of the own property `name`.
+    /// This might call getters of the property.
     pub fn get_value(&self, name: &str) -> Option<&JSValue> {
         if let Some(array) = self.as_array() {
             if let Ok(index) = usize::from_str(name) {
@@ -434,6 +452,13 @@ impl JSObject {
         Ok(())
     }
 
+    /// If the own property `name` does not exist, create it with the given `content` and `access`.
+    /// Otherwise, if `name` is a number and `self` is an Array, assign the value of `content`
+    /// into the array.
+    /// Otherwise:
+    /// - if the existing own property is not configurable and the given `access` differs, fail.
+    /// - if the existing own property is not writable, fail
+    /// - replace `content` and `access` of the property.
     pub fn set(
         &mut self,
         name: &str,
@@ -443,6 +468,7 @@ impl JSObject {
         self.set_maybe_nonwritable(name, content, access, false)
     }
 
+    /// Just like `.set()`, but updates even readonly properties.
     pub fn set_even_nonwritable(
         &mut self,
         name: &str,
@@ -452,23 +478,23 @@ impl JSObject {
         self.set_maybe_nonwritable(name, content, access, true)
     }
 
-    /// If self is an array:
-    ///  - tries to parse `name` into an index;
-    ///  - grows an array until it has this index;
-    ///  - insert the new value at this index;
-    /// Otherwise:
-    ///  - if `name` is not an own property of `self`, create it with Access::all()
-    ///  - if the property is writable, assign the content created from `value`.
+    /// If `name` is a number and `self` is an Array, just set the array elemnt to `value`.
+    /// Otherwise: if the own property `name` does not exist, create it with `Access::all()` and
+    /// set to `Content::from(value)`.
+    /// If the own property exists already, call `.set()` with its current access. This will fail
+    /// to update non-writable properties.
     pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
         let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
         self.set(name, Content::from(value), access)
     }
 
+    /// Just like `.update()`, but updates even non-writable properties.
     pub fn update_even_nonwritable(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
         let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
         self.set_even_nonwritable(name, Content::from(value), access)
     }
 
+    // are these shortcuts a good idea?
     pub fn set_property(&mut self, name: &str, content: Content) -> Result<(), Exception> {
         self.set(name, content, Access::all())
     }
@@ -489,6 +515,8 @@ impl JSObject {
         self.set(name, content, Access::READONLY)
     }
 
+
+    /// Create a `JSON` from this `JSObject`.
     pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
         if let Some(array) = self.as_array() {
             let jvals = array.storage.iter()
@@ -509,6 +537,7 @@ impl JSObject {
         Ok(json)
     }
 
+    /// Create a human-readable representation of contents of an Array or an Object.
     pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
         fn is_valid_identifier(s: &str) -> bool {
             let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
@@ -569,7 +598,7 @@ impl JSObject {
 }
 
 
-/// This is used:
+/// `ObjectValue` is used:
 /// - as the primitive value of a `Number`/`Boolean`/`String` object;
 /// - as the function entry in a `Function`.
 /// - as optimizied storage in an `Array`
@@ -645,6 +674,7 @@ pub enum Content {
 }
 
 impl Content {
+    /// This might call getters of the property.
     pub fn to_value(&self) -> Result<JSValue, Exception> {
         match self {
             Self::Value(value) => Ok(value.clone()),
@@ -656,6 +686,7 @@ impl<T> From<T> for Content where JSValue: From<T> {
     fn from(x: T) -> Content { Content::Value(JSValue::from(x)) }
 }
 
+/// A wrapper for NativeFunction to give it `fmt::Debug`.
 #[derive(Clone)]
 pub struct VMCall(NativeFunction);
 
@@ -695,6 +726,7 @@ pub struct Closure {
     //pub free_variables: Vec<JSRef>,
 }
 
+/// The underlying storage of an Array object.
 #[derive(Clone, Debug)]
 pub struct JSArray {
     pub storage: Vec<JSValue>,

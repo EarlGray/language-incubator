@@ -29,18 +29,19 @@ pub struct JSRef(usize);
 pub struct Heap(Vec<JSObject>);
 
 impl Heap {
+    // A set of fixed slots on the heap.
+    // This untangles the builtins intialization and avoids frequent lookups
+    // for e.g. `Array.prototype`.
     pub const NULL: JSRef = JSRef(0);
     pub const GLOBAL: JSRef = JSRef(1);
-    pub const LOCAL: JSRef = JSRef(2);
-    pub const OBJECT_PROTO: JSRef = JSRef(3);
-    pub const FUNCTION_PROTO: JSRef = JSRef(4);
-    pub const ARRAY_PROTO: JSRef = JSRef(5);
+    pub const OBJECT_PROTO: JSRef = JSRef(2);
+    pub const FUNCTION_PROTO: JSRef = JSRef(3);
+    pub const ARRAY_PROTO: JSRef = JSRef(4);
+    const USERSTART: usize = 5;
 
-    const USERSTART: usize = 6;
-
+    pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";
     const SAVED_SCOPE: &'static str = "[[saved_scope]]";
-    const SCOPE_THIS: &'static str = "[[this]]";
 
     pub fn new() -> Self {
         let mut heap_vec = Vec::new();
@@ -102,7 +103,11 @@ impl Heap {
 
     /// Variable declaration in the current scope.
     // NOTE: This should not try to assign an initial value.
-    pub fn declare_var(&mut self, kind: Option<DeclarationKind>, name: &str) -> Result<(), Exception> {
+    pub fn declare_var(
+        &mut self,
+        kind: Option<DeclarationKind>,
+        name: &str
+    ) -> Result<(), Exception> {
         // TODO: let and const should be block-scoped
         if !self.scope().properties.contains_key(name) {
             let content = Content::Value(JSValue::Undefined);
@@ -119,7 +124,7 @@ impl Heap {
             }
         }
 
-        // TODO: lookup free variables of the current call
+        // TODO: lookup in free variables of the current call
 
         if self.get(Heap::GLOBAL).properties.contains_key(name) {
             Some(Interpreted::member(Heap::GLOBAL, name))
@@ -153,13 +158,11 @@ impl Heap {
 
     fn pop_scope(&mut self) -> Result<(), Exception> {
         let this_scope_ref = self.local_scope()
-            .expect(".pop_scope without local scope, something is very wrong");
+            .expect(".pop_scope without local scope");  // yes, panic, this interpreter is broken.
         let this_scope_object = self.get(this_scope_ref);
-        let saved_scope_ref = match this_scope_object.properties.get(Self::SAVED_SCOPE) {
-            Some(Property{ content: Content::Value(JSValue::Ref(r)), ..}) => *r,
-            other =>
-                panic!("saved_scope is invalid: {:?}, something is very wrong", other)
-        };
+        let saved_scope_ref = this_scope_object.properties.get(Self::SAVED_SCOPE)
+            .and_then(|prop| prop.to_ref())
+            .expect("saved scope is not a reference");  // yes, panic, this interpreter is broken.
 
         let global = self.get_mut(Heap::GLOBAL);
         if saved_scope_ref == Heap::GLOBAL {
@@ -171,6 +174,8 @@ impl Heap {
         Ok(())
     }
 
+    /// Find the location of `propname` on the prototype chain of `objref`.
+    /// Return `None` or `Some(Interpreted::Member{..})` pointing to the found own property.
     pub fn lookup_protochain(&self, mut objref: JSRef, propname: &str) -> Option<Interpreted> {
         while objref != Heap::NULL {
             let object = self.get(objref);
@@ -247,13 +252,14 @@ impl Heap {
             }
             JSValue::Ref(self.alloc(object))
         } else if let Some(jarray) = json.as_array() {
-            let storage = jarray.iter().map(|jval|
-                self.object_from_json(jval)
-            ).collect();
+            let storage = jarray.iter()
+                .map(|jval| self.object_from_json(jval))
+                .collect();
             let object = JSObject::from_array(storage);
             JSValue::Ref(self.alloc(object))
         } else {
-            JSValue::try_from(json).expect("primitive JSON")
+            JSValue::try_from(json)
+                .expect("primitive JSON") // not Object/Array, must be primitive
         }
     }
 }
