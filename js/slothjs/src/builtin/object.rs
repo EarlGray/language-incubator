@@ -103,22 +103,20 @@ fn object_object_getOwnPropertyDescriptor(
     descriptor_object.set_property(
         "configurable",
         Content::from(prop.access.configurable())
-    );
+    )?;
     descriptor_object.set_property(
         "enumerable",
         Content::from(prop.access.enumerable())
-    );
+    )?;
     descriptor_object.set_property(
         "writable",
         Content::from(prop.access.writable())
-    );
-    let value = match prop.content {
-        Content::Value(val) => val,
-    };
+    )?;
+    let value = prop.content.to_value()?;
     descriptor_object.set_property(
         "value",
-        Content::Value(value)
-    );
+        Content::from(value)
+    )?;
 
     let descriptor_ref = heap.alloc(descriptor_object);
     Ok(Interpreted::from(descriptor_ref))
@@ -130,29 +128,29 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     object_proto.proto = Heap::NULL;
 
     let to_string_ref = heap.alloc(JSObject::from_func(object_proto_toString));
-    object_proto.set_hidden("toString", Content::from(to_string_ref));
+    object_proto.set_hidden("toString", Content::from(to_string_ref))?;
 
     let dbg_ref = heap.alloc(JSObject::from_func(object_proto_dbg));
-    object_proto.set_system("dbg", Content::from(dbg_ref));
+    object_proto.set_system("dbg", Content::from(dbg_ref))?;
 
     *heap.get_mut(Heap::OBJECT_PROTO) = object_proto;
 
     /* the Object */
     let mut object_object = JSObject::from_func(object_constructor);
 
-    object_object.set_system("prototype", Content::from(Heap::OBJECT_PROTO));
+    object_object.set_system("prototype", Content::from(Heap::OBJECT_PROTO))?;
 
     let is_ref = heap.alloc(JSObject::from_func(object_object_is));
-    object_object.set_hidden("is", Content::from(is_ref));
+    object_object.set_hidden("is", Content::from(is_ref))?;
 
     let gop_ref = heap.alloc(JSObject::from_func(object_object_getOwnPropertyDescriptor));
     object_object.set_hidden(
         "getOwnPropertyDescriptor",
         Content::from(gop_ref),
-    );
+    )?;
 
     let the_object_ref = heap.alloc(object_object);
-    heap.get_mut(Heap::OBJECT_PROTO).set_hidden("constructor", Content::from(the_object_ref));
+    heap.get_mut(Heap::OBJECT_PROTO).set_hidden("constructor", Content::from(the_object_ref))?;
 
     Ok(the_object_ref)
 }

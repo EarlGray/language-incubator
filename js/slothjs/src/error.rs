@@ -20,28 +20,10 @@ pub enum Exception {
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(String),
     TypeErrorSetReadonly(Interpreted, String),
+    TypeErrorNotConfigurable(Interpreted, String),
     TypeErrorGetProperty(Interpreted, String),
     TypeErrorCannotAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
 
     JumpReturn(Interpreted),
-}
-
-impl Exception {
-    pub fn kind_eq(&self, other: &Exception) -> bool {
-        // meh, could the compiler write this for me?
-        // - use macros, Luke.
-        use Exception::*;
-        match (self, other) {
-            (SyntaxError(_), SyntaxError(_))
-                | (ReferenceNotAnObject(_), ReferenceNotAnObject(_))
-                | (ReferenceNotFound(_), ReferenceNotFound(_))
-                | (TypeErrorSetReadonly(_, _), TypeErrorSetReadonly(_, _))
-                | (TypeErrorGetProperty(_, _), TypeErrorGetProperty(_, _))
-                | (TypeErrorCannotAssign(_), TypeErrorCannotAssign(_))
-                | (TypeErrorNotCallable(_), TypeErrorNotCallable(_))
-                => true,
-            _ => false,
-        }
-    }
 }

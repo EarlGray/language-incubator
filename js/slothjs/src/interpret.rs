@@ -268,7 +268,7 @@ impl Interpretable for ObjectExpression {
             };
             let valresult = valexpr.interpret(heap)?;
             let value = valresult.to_value(heap)?;
-            object.set_property(&keyname, Content::Value(value));
+            object.set_property(&keyname, Content::Value(value))?;
         }
 
         let object_ref = heap.alloc(object);

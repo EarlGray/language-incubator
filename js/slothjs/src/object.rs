@@ -39,13 +39,13 @@ impl JSValue {
     }
 
     #[allow(dead_code)]
-    pub fn to_json(&self, heap: &Heap) -> JSON {
+    pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
         match self {
-            JSValue::Undefined => JSON::Null,
-            JSValue::Bool(b) => JSON::from(*b),
-            JSValue::Number(n) => JSON::from(*n),
-            JSValue::String(s) => JSON::from(s.as_str()),
-            JSValue::Ref(Heap::NULL) => JSON::Null,
+            JSValue::Undefined => Ok(JSON::Null),
+            JSValue::Bool(b) => Ok(JSON::from(*b)),
+            JSValue::Number(n) => Ok(JSON::from(*n)),
+            JSValue::String(s) => Ok(JSON::from(s.as_str())),
+            JSValue::Ref(Heap::NULL) => Ok(JSON::Null),
             JSValue::Ref(href) => heap.get(*href).to_json(heap),
         }
     }
@@ -338,7 +338,7 @@ impl JSObject {
             value: ObjectValue::Closure(Box::new(closure)),
             properties: HashMap::new(),
         };
-        function_object.set_nonconf("length", Content::from(params_count));
+        function_object.set_nonconf("length", Content::from(params_count)).unwrap();
         function_object
     }
 
@@ -375,7 +375,7 @@ impl JSObject {
         }
     }
 
-    pub fn property_value(&self, name: &str) -> Option<&JSValue> {
+    pub fn get_value(&self, name: &str) -> Option<&JSValue> {
         if let Some(array) = self.as_array() {
             if let Ok(index) = usize::from_str(name) {
                 if let Some(value) = array.storage.get(index) {
@@ -390,39 +390,66 @@ impl JSObject {
         )
     }
 
-    fn update_maybe_nonwritable(
+    fn set_maybe_nonwritable(
         &mut self,
         name: &str,
-        value: JSValue,
-        even_nonwritable: bool
+        content: Content,
+        access: Access,
+        even_nonwritable: bool,
     ) -> Result<(), Exception> {
-        if let Some(array) = self.as_array_mut() {
-            if let Ok(index) = usize::from_str(name) {
+        if let Ok(index) = usize::from_str(name) {
+            if let Some(array) = self.as_array_mut() {
                 // TODO: a[100500] will be interesting.
                 while array.storage.len() <= index {
                     array.storage.push(JSValue::Undefined);
                 }
-                array.storage[index] = value.clone();
+                let value = content.to_value()?;
+                array.storage[index] = value;
                 return Ok(());
             }
         }
 
-        if !self.properties.contains_key(name) {
-            self.set_property(name, Content::Value(JSValue::Undefined));
-        }
+        match self.properties.get_mut(name) {
+            Some(property) => {
+                if property.access != access && !property.access.configurable() {
+                    let what = Interpreted::from("???");  // TODO
+                    let name = name.to_string();
+                    return Err(Exception::TypeErrorNotConfigurable(what, name));
+                }
 
-        let place = self.properties.get_mut(name).unwrap();
-        if !(even_nonwritable || place.access.writable()) {
-            let what = Interpreted::from("???");  // TODO
-            let name = name.to_string();
-            return Err(Exception::TypeErrorSetReadonly(what, name));
-        }
-        match place.content {
-            Content::Value(_) => {
-                place.content = Content::Value(value);
+                if !(even_nonwritable || property.access.writable()) {
+                    let what = Interpreted::from("???");  // TODO
+                    let name = name.to_string();
+                    return Err(Exception::TypeErrorSetReadonly(what, name));
+                }
+
+                property.access = access;
+                property.content = content;
+            }
+            None => {
+                let prop = Property{ content, access };
+                self.properties.insert( name.to_string(), prop);
             }
         }
         Ok(())
+    }
+
+    pub fn set(
+        &mut self,
+        name: &str,
+        content: Content,
+        access: Access
+    ) -> Result<(), Exception> {
+        self.set_maybe_nonwritable(name, content, access, false)
+    }
+
+    pub fn set_even_nonwritable(
+        &mut self,
+        name: &str,
+        content: Content,
+        access: Access
+    ) -> Result<(), Exception> {
+        self.set_maybe_nonwritable(name, content, access, true)
     }
 
     /// If self is an array:
@@ -433,64 +460,53 @@ impl JSObject {
     ///  - if `name` is not an own property of `self`, create it with Access::all()
     ///  - if the property is writable, assign the content created from `value`.
     pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        self.update_maybe_nonwritable(name, value, false)
+        let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
+        self.set(name, Content::from(value), access)
     }
 
-    fn set_property_and_flags(&mut self, name: &str, content: Content, access: Access) {
-        match self.properties.get_mut(name) {
-            Some(prop) =>
-                if prop.access.writable() {
-                    prop.content = content;
-                },
-            None => {
-                let prop = Property{ content, access };
-                self.properties.insert( name.to_string(), prop);
-            }
-        }
+    pub fn update_even_nonwritable(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+        let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
+        self.set_even_nonwritable(name, Content::from(value), access)
     }
 
-    pub fn set_property(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, Access::ALL)
+    pub fn set_property(&mut self, name: &str, content: Content) -> Result<(), Exception> {
+        self.set(name, content, Access::all())
     }
 
-    pub fn set_system(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, Access::NONE)
+    pub fn set_system(&mut self, name: &str, content: Content) -> Result<(), Exception> {
+        self.set(name, content, Access::empty())
     }
 
-    pub fn set_hidden(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, Access::ALL ^ Access::ENUM)
+    pub fn set_hidden(&mut self, name: &str, content: Content) -> Result<(), Exception> {
+        self.set(name, content, Access::HIDDEN)
     }
 
-    pub fn set_nonconf(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, Access::ALL ^ Access::CONF)
+    pub fn set_nonconf(&mut self, name: &str, content: Content) -> Result<(), Exception> {
+        self.set(name, content, Access::NONCONF)
     }
 
-    pub fn set_readonly(&mut self, name: &str, content: Content) {
-        self.set_property_and_flags(name, content, Access::ALL ^ Access::WRITE)
+    pub fn set_readonly(&mut self, name: &str, content: Content) -> Result<(), Exception> {
+        self.set(name, content, Access::READONLY)
     }
 
-    pub fn to_json(&self, heap: &Heap) -> JSON {
+    pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
         if let Some(array) = self.as_array() {
             let jvals = array.storage.iter()
                 .map(|v| v.to_json(heap))
-                .collect();
-            return JSON::Array(jvals);
+                .collect::<Result<Vec<_>, Exception>>()?;
+            return Ok(JSON::Array(jvals));
         }
 
         let mut json = json!({});
         for (key, property) in self.properties.iter() {
-            if !property.enumerable() {
+            if !property.access.enumerable() {
                 continue
             }
 
-            match &property.content {
-                Content::Value(value) => {
-                    let jvalue = value.to_json(heap);
-                    json[key] = jvalue;
-                }
-            }
+            let jvalue = property.content.to_value()?.to_json(heap)?;
+            json[key] = jvalue;
         }
-        json
+        Ok(json)
     }
 
     pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
@@ -524,7 +540,7 @@ impl JSObject {
         }
 
         for (key, property) in self.properties.iter() {
-            if !property.enumerable() {
+            if !property.access.enumerable() {
                 continue;
             }
 
@@ -536,10 +552,7 @@ impl JSObject {
                 s.push_str(&skey);
             }
             s.push_str(": ");
-            let val = match &property.content {
-                Content::Value(value) =>
-                    value.to_string(heap)?,
-            };
+            let val = property.content.to_value()?.to_string(heap)?;
             s.push_str(&val);
             s.push(',');
             empty = false;
@@ -593,12 +606,12 @@ impl Property {
     pub fn from_value(value: JSValue) -> Property {
         Property {
             content: Content::Value(value),
-            access: Access::ALL,
+            access: Access::all(),
         }
     }
 
-    pub fn enumerable(&self) -> bool { self.access.enumerable() }
-    pub fn writable(&self) -> bool { self.access.writable() }
+    //pub fn enumerable(&self) -> bool { self.access.enumerable() }
+    //pub fn writable(&self) -> bool { self.access.writable() }
 }
 
 
@@ -608,8 +621,9 @@ bitflags! {
         const CONF = 0b010;
         const WRITE = 0b100;
 
-        const NONE = 0b000;
-        const ALL = 0b111;
+        const HIDDEN = Self::CONF.bits | Self::WRITE.bits;
+        const READONLY = Self::ENUM.bits | Self::CONF.bits;
+        const NONCONF = Self::ENUM.bits | Self::WRITE.bits;
     }
 }
 
@@ -629,6 +643,14 @@ pub enum Content {
         set: Option<JSRef>,
     },
     */
+}
+
+impl Content {
+    pub fn to_value(&self) -> Result<JSValue, Exception> {
+        match self {
+            Self::Value(value) => Ok(value.clone()),
+        }
+    }
 }
 
 impl<T> From<T> for Content where JSValue: From<T> {
@@ -703,7 +725,7 @@ impl Interpreted {
             Interpreted::Value(value) =>
                 value.clone(),
             Interpreted::Member{of, name} => {
-                match heap.get(*of).property_value(name) {
+                match heap.get(*of).get_value(name) {
                     Some(value) => value.clone(),
                     None => JSValue::Undefined,
                 }
@@ -732,7 +754,7 @@ impl Interpreted {
             Interpreted::Value(JSValue::Ref(r)) =>
                 Ok(*r),
             Interpreted::Member{of, name} =>
-                match heap.get(*of).property_value(name) {
+                match heap.get(*of).get_value(name) {
                     Some(JSValue::Ref(r)) => Ok(*r),
                     _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.to_string()))
                 }

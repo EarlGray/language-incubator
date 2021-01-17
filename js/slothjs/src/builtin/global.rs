@@ -62,13 +62,13 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
 
     let global = heap.get_mut(Heap::GLOBAL);
 
-    global.set_readonly("NaN", Content::from(f64::NAN));
-    global.set_readonly("undefined", Content::from(JSValue::Undefined));
+    global.set_readonly("NaN", Content::from(f64::NAN))?;
+    global.set_readonly("undefined", Content::from(JSValue::Undefined))?;
 
-    global.set_hidden("parseInt", Content::from(parse_int_ref));
+    global.set_hidden("parseInt", Content::from(parse_int_ref))?;
 
     // The `global` self-reference:
-    global.set_hidden("global", Content::from(Heap::GLOBAL));
+    global.set_hidden("global", Content::from(Heap::GLOBAL))?;
 
     Ok(())
 }

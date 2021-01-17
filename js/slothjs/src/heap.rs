@@ -75,7 +75,7 @@ impl Heap {
     }
 
     fn local_scope(&self) -> Option<JSRef> {
-        match self.get(Heap::GLOBAL).property_value(Heap::LOCAL_SCOPE) {
+        match self.get(Heap::GLOBAL).get_value(Heap::LOCAL_SCOPE) {
             Some(JSValue::Ref(scope_ref)) => Some(*scope_ref),
             _ => None,
         }
@@ -97,11 +97,8 @@ impl Heap {
         // TODO: let and const should be block-scoped
         if !self.scope().properties.contains_key(name) {
             let content = Content::Value(JSValue::Undefined);
-            if kind.is_none() {
-                self.scope_mut().set_property(name, content);
-            } else {
-                self.scope_mut().set_nonconf(name, content);
-            }
+            let access = if kind.is_none() { Access::all() } else { Access::NONCONF };
+            self.scope_mut().set(name, content, access)?;
         }
         Ok(())
     }
@@ -133,22 +130,16 @@ impl Heap {
         for (i, param) in params.iter().enumerate() {
             let name = &param.0;
             let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
-            scope_object.set_nonconf(name, Content::Value(value));
+            scope_object.set_nonconf(name, Content::Value(value))?;
         }
-        scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref));
-        scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref));
+        scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref))?;
+        scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref))?;
 
         let new_scope_ref = self.alloc(scope_object);
-
-        // do not use `.set_system()`: it silently ignores updates on non-writable properties.
-        let global = self.get_mut(Heap::GLOBAL);
-        let entry = global.properties.entry(String::from(Self::LOCAL_SCOPE)).or_insert(Property{
-            content: Content::from(JSValue::Undefined),
-            access: Access::empty(),
-        });
-        entry.content = Content::from(new_scope_ref);
-
-        Ok(())
+        self.get_mut(Heap::GLOBAL).update_even_nonwritable(
+            Self::LOCAL_SCOPE,
+            JSValue::Ref(new_scope_ref),
+        )
     }
 
     fn pop_scope(&mut self) -> Result<(), Exception> {
@@ -165,7 +156,7 @@ impl Heap {
         if saved_scope_ref == Heap::GLOBAL {
             global.properties.remove(Self::LOCAL_SCOPE);
         } else {
-            global.set_system(Self::LOCAL_SCOPE, Content::from(saved_scope_ref));
+            global.update_even_nonwritable(Self::LOCAL_SCOPE, JSValue::Ref(saved_scope_ref))?;
         }
 
         Ok(())
@@ -243,7 +234,7 @@ impl Heap {
             let mut object = JSObject::new();
             for (key, jval) in jobj.iter() {
                 let value = self.object_from_json(jval);
-                object.set_property(key, Content::Value(value))
+                object.set_property(key, Content::Value(value)).unwrap();
             }
             JSValue::Ref(self.alloc(object))
         } else if let Some(jarray) = json.as_array() {

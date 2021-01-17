@@ -52,7 +52,7 @@ fn interpret(input: &str, heap: &mut Heap) -> Result<JSValue, Exception> {
 fn eval(input: &str) -> JSON {
     let mut heap = Heap::new();
     match interpret(input, &mut heap) {
-        Ok(value) => value.to_json(&heap),
+        Ok(value) => value.to_json(&heap).unwrap(),
         Err(e) => {
             let msg = format!("{:?}", e);
             json!({"error": msg})
@@ -80,7 +80,8 @@ macro_rules! assert_eval {
         let expected = json!($json);
         match interpret($js, &mut heap) {
             Ok(result) => {
-                let result = result.to_json(&heap);
+                let result = result.to_json(&heap)
+                    .expect("JSValue::to_json()");
                 assert_eq!( result, expected )
             }
             Err(exc) => {
