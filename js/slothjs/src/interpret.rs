@@ -152,6 +152,7 @@ impl Interpretable for Expr {
             Expr::Conditional(expr) =>          expr.interpret(heap),
             Expr::Unary(expr) =>                expr.interpret(heap),
             Expr::Function(expr) =>             expr.interpret(heap),
+            Expr::This =>                       heap.interpret_this(),
         }
     }
 }

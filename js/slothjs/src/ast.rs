@@ -89,6 +89,7 @@ pub enum Expr {
     Conditional(ConditionalExpression),
     Unary(UnaryExpression),
     Function(FunctionExpression),
+    This,
 }
 
 #[derive(Clone, Debug, PartialEq)]

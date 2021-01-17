@@ -69,6 +69,7 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
 
     // The `global` self-reference:
     global.set_hidden("global", Content::from(Heap::GLOBAL))?;
+    global.set_system(Heap::SCOPE_THIS, Content::from(Heap::GLOBAL))?;
 
     Ok(())
 }

@@ -671,7 +671,6 @@ fn test_objects() {
 
 #[test]
 fn test_this() {
-    /*
     assert_eval!("var f = function() { return this; }; f() == global", true );
 
     assert_eval!(r#"
@@ -679,6 +678,7 @@ fn test_this() {
         test.func()
     "#, 42.0 );
 
+    /*
     assert_eval!(r#"
         var o = {f: function() { return this.a + this.b; }}
         var p = Object.create(o)

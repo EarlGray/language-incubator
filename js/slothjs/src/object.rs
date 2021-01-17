@@ -598,20 +598,19 @@ impl ObjectValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
+    /// A `JSValue` or accessors
     pub content: Content,
+    /// (non)writable | (non)confiurable | (non)enumerable
     pub access: Access,
 }
 
 impl Property {
-    pub fn from_value(value: JSValue) -> Property {
-        Property {
-            content: Content::Value(value),
-            access: Access::all(),
+    pub fn to_ref(&self) -> Option<JSRef> {
+        match self {
+            Property{ content: Content::Value(JSValue::Ref(r)), .. } => Some(*r),
+            _ => None,
         }
     }
-
-    //pub fn enumerable(&self) -> bool { self.access.enumerable() }
-    //pub fn writable(&self) -> bool { self.access.writable() }
 }
 
 
@@ -734,6 +733,19 @@ impl Interpreted {
         Ok(value)
     }
 
+    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
+        match self {
+            Interpreted::Value(JSValue::Ref(r)) =>
+                Ok(*r),
+            Interpreted::Member{of, name} =>
+                match heap.get(*of).get_value(name) {
+                    Some(JSValue::Ref(r)) => Ok(*r),
+                    _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.to_string()))
+                }
+            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
+        }
+    }
+
     /// Corresponds to Javascript `delete` operator and all its weirdness.
     /// `Ok`/`Err` correspond to `true`/`false` from `delete`.
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete>
@@ -746,19 +758,6 @@ impl Interpreted {
                 Ok(())
             }
             _ => Ok(()),
-        }
-    }
-
-    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
-        match self {
-            Interpreted::Value(JSValue::Ref(r)) =>
-                Ok(*r),
-            Interpreted::Member{of, name} =>
-                match heap.get(*of).get_value(name) {
-                    Some(JSValue::Ref(r)) => Ok(*r),
-                    _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.to_string()))
-                }
-            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
         }
     }
 }

@@ -320,6 +320,7 @@ impl TryFrom<&JSON> for Expr {
                 let expr = ObjectExpression::try_from(jexpr)?;
                 Expr::Object(expr)
             }
+            "ThisExpression" => Expr::This,
             "UnaryExpression" => {
                 let expr = UnaryExpression::try_from(jexpr)?;
                 Expr::Unary(expr)

@@ -74,6 +74,15 @@ impl Heap {
         JSRef(ind)
     }
 
+    /// Find out what `this` currently is.
+    pub fn interpret_this(&mut self) -> Result<Interpreted, Exception> {
+        let this_ref = self.lookup_var(Self::SCOPE_THIS)
+            .expect("no this in the current scope")
+            .to_ref(self)?;
+        Ok(Interpreted::from(this_ref))
+    }
+
+    /// If there's a local scope, return a `JSRef` to it.
     fn local_scope(&self) -> Option<JSRef> {
         match self.get(Heap::GLOBAL).get_value(Heap::LOCAL_SCOPE) {
             Some(JSValue::Ref(scope_ref)) => Some(*scope_ref),
