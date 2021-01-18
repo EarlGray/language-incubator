@@ -639,7 +639,33 @@ fn test_builtin_object() {
         obj.one
     "#, 1.0);
      */
-    // Object.create
+    // Object.create()
+    // Object.entries()
+    // Object.keys()
+    // Object.values()
+    // Object.freeze()
+    // Object.getOwnPropertyDescriptors()
+    // Object.getOwnPropertyNames()
+    // Object.getPrototypeOf()
+    // Object.setPrototypeOf()
+    // Object.fromEntries()
+    // Object.isExtensible()
+    // Object.isFrozen()
+    // Object.isSealed()
+    // Object.preventExtensions()
+    // Object.seal()
+
+    // Object.prototype.hasOwnProperty()
+    // Object.prototype.isPrototypeOf()
+    // Object.prototype.propertyIsEnumerable()
+
+    // Object.prototype.toString()
+    assert_eval!("({}).toString()",   "[object Object]");
+
+    // Object.prototype.valueOf()
+    assert_eval!("var obj = {}; obj.valueOf() == obj", true);
+    assert_eval!("var obj = {}; obj.valueOf() == {}", false);
+    assert_exception!("null.valueOf()",  Exception::TypeErrorNotCallable);
 }
 
 #[test]
@@ -651,11 +677,43 @@ fn test_builtin_function() {
     //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
 }
 
+/*
+#[test]
+fn test_builtin_boolean() {
+    assert_eval!("var b = new Boolean(false); !!b",     false);
+    assert_eval!("var b = new Boolean(); !!b",          false);
+    assert_eval!("var b = new Boolean(undefined); !!b", false);
+    assert_eval!("var b = new Boolean(null); !!b",      false);
+    assert_eval!("var b = new Boolean(NaN); !!b",       false);
+
+    assert_eval!("var b = new Boolean(true); !!b",          true);
+    assert_eval!("var b = new Boolean(new Boolean()); !!b", true);
+    assert_eval!("var b = new Boolean([]); !!b",            true);
+
+    assert_eval!("Boolean(false)",  false);
+    assert_eval!("Boolean(-0)",     false);
+    assert_eval!("Boolean(NaN)",    false);
+    assert_eval!("Boolean('')",     false);
+
+    assert_eval!("Boolean([])",             true);
+    assert_eval!("Boolean(new Boolean())",  true);
+    assert_eval!("Boolean(new String(''))",  true);
+
+    // Boolean.prototype.toString()
+    assert_eval!("true.toString()",  "true");
+    assert_eval!("false.toString()",  "false");
+
+    // Boolean.prototype.valueOf()
+    assert_eval!("new Boolean().valueOf()", false);
+    assert_eval!("new Boolean(1).valueOf()", true);
+}
+*/
+
 #[test]
 fn test_objects() {
-    //assert_eq!( eval("var a = [1]; a[0] = 2; a[0]"),    JSValue::from(2));
-    assert_eq!( eval("var a = {v: 1}; a.v = 2; a.v"),   JSON::from(2.0));
-    assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
+    assert_eval!( "var a = [1]; a[0] = 2; a[0]",    2.0);
+    assert_eval!( "var a = {v: 1}; a.v = 2; a.v",   2.0);
+    assert_eval!( "var a = {}; a.one = 1; a",       {"one": 1.0});
 
     assert_eq!(
         eval("var a = {}, b = {}; a.b = b; b.one = 1; a"),

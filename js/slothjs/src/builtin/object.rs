@@ -44,6 +44,16 @@ fn object_constructor(
     todo!()
 }
 
+#[allow(non_snake_case)]
+fn object_proto_valueOf(
+    this_ref: JSRef,
+    _method_name: String,
+    _arguments: Vec<Interpreted>,
+    _heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    Ok(Interpreted::from(this_ref))
+}
+
 fn object_object_is(
     _this_ref: JSRef,
     _method_name: String,
@@ -127,11 +137,18 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut object_proto = JSObject::new();
     object_proto.proto = Heap::NULL;
 
-    let to_string_ref = heap.alloc(JSObject::from_func(object_proto_toString));
-    object_proto.set_hidden("toString", Content::from(to_string_ref))?;
-
-    let dbg_ref = heap.alloc(JSObject::from_func(object_proto_dbg));
-    object_proto.set_system("dbg", Content::from(dbg_ref))?;
+    object_proto.set_system(
+        "dbg",
+        Content::from(heap.alloc(JSObject::from_func(object_proto_dbg)))
+    )?;
+    object_proto.set_hidden(
+        "toString",
+        Content::from(heap.alloc(JSObject::from_func(object_proto_toString)))
+    )?;
+    object_proto.set_hidden(
+        "valueOf",
+        Content::from(heap.alloc(JSObject::from_func(object_proto_valueOf)))
+    )?;
 
     *heap.get_mut(Heap::OBJECT_PROTO) = object_proto;
 
