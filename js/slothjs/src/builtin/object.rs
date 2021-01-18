@@ -38,10 +38,19 @@ fn object_proto_dbg(
 fn object_constructor(
     _this_ref: JSRef,
     _method_name: String,
-    _arguments: Vec<Interpreted>,
-    _heap: &mut Heap
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
-    todo!()
+    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let object_ref = match argument.to_value(heap)? {
+        JSValue::Undefined | JSValue::Ref(Heap::NULL) =>
+            heap.alloc(JSObject::new()),
+        JSValue::Bool(_) => todo!(),
+        JSValue::Number(_) => todo!(),
+        JSValue::String(_) => todo!(),
+        JSValue::Ref(r) => r,
+    };
+    Ok(Interpreted::from(object_ref))
 }
 
 #[allow(non_snake_case)]

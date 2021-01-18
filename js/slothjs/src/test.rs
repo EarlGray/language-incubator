@@ -591,17 +591,19 @@ fn test_builtin_object() {
     assert!( evalbool("Object.is(Object.__proto__.__proto__, Object.prototype)") );
     assert!( evalbool("Object.is(Object.__proto__.__proto__.__proto__, null)") );
 
-    /*
     // constructor
     assert_eval!( "Object(null)",     {} );
     assert_eval!( "Object(undefined)", {} );
-    assert_eval!( "Object({one: 1})", {"one": 1} );
-    assert_eval!( "Object(1) instanceof Number", true );
+    assert_eval!( "var a = {one: 1}; Object(a) == a", true );
+    //assert_eval!( "Object(1) instanceof Number", true );
+    //assert_eval!( "Object(false) instanceof Boolean", true );
 
+    /*
     assert_eval!( "new Object(null)",     {} );
     assert_eval!( "new Object(undefined)", {} );
     assert_eval!( "new Object({one: 1})", {"one": 1} );
     assert_eval!( "new Object(1) instanceof Number", true );
+    assert_eval!( "new Object(true) instanceof Boolean", true );
     */
 
     // Object.defineProperty
@@ -680,6 +682,8 @@ fn test_builtin_function() {
 /*
 #[test]
 fn test_builtin_boolean() {
+    assert_eval!("true instanceof Boolean", false);
+
     assert_eval!("var b = new Boolean(false); !!b",     false);
     assert_eval!("var b = new Boolean(); !!b",          false);
     assert_eval!("var b = new Boolean(undefined); !!b", false);
