@@ -1,5 +1,6 @@
 use crate::object;
 use crate::object::{
+    Access,
     Content,
     Interpreted,
     JSObject,
@@ -152,6 +153,7 @@ impl Interpretable for Expr {
             Expr::Conditional(expr) =>          expr.interpret(heap),
             Expr::Unary(expr) =>                expr.interpret(heap),
             Expr::Function(expr) =>             expr.interpret(heap),
+            Expr::New(expr) =>                  expr.interpret(heap),
             Expr::This =>                       heap.interpret_this(),
         }
     }
@@ -362,6 +364,35 @@ impl Interpretable for CallExpression {
     }
 }
 
+impl Interpretable for NewExpression {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let NewExpression(callee_expr, argument_exprs) = self;
+
+        let arguments = argument_exprs.iter()
+            .map(|expr| expr.interpret(heap))
+            .collect::<Result<Vec<Interpreted>, Exception>>()?;
+
+        let callee = callee_expr.interpret(heap)?;
+        let funcref = callee.to_ref(heap)?;
+        let prototype_ref = heap.get_mut(funcref).get_value("prototype")
+            .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".to_string()))?
+            .to_ref()?;
+
+        // allocate the object
+        let mut object = JSObject::new();
+        object.proto = prototype_ref;
+
+        let object_ref = heap.alloc(object);
+
+        // call its constructor
+        let result = heap.execute(funcref, object_ref, "<constructor>", arguments)?;
+        match result {
+            Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),
+            _ => Ok(Interpreted::from(object_ref)),
+        }
+    }
+}
+
 impl Interpretable for FunctionExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let closure = object::Closure {
@@ -373,6 +404,11 @@ impl Interpretable for FunctionExpression {
 
         let function_object = JSObject::from_closure(closure);
         let function_ref = heap.alloc(function_object);
+
+        let prototype_ref = heap.alloc(JSObject::new());
+        heap.get_mut(function_ref).set("prototype", Content::from(prototype_ref), Access::WRITE)?;
+        heap.get_mut(prototype_ref).set_hidden("constructor", Content::from(function_ref))?;
+
         Ok(Interpreted::from(function_ref))
     }
 }

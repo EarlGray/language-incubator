@@ -316,6 +316,18 @@ impl TryFrom<&JSON> for Expr {
                 let expr = MemberExpression(Box::new(object), Box::new(property), computed);
                 Expr::Member(expr)
             }
+            "NewExpression" => {
+                let jcallee = json_get(jexpr, "callee")?;
+                let callee = Expr::try_from(jcallee)?;
+
+                let jarguments = json_get_array(jexpr, "arguments")?;
+                let arguments = jarguments.iter()
+                    .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
+                    .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>()?;
+
+                let expr = NewExpression(Box::new(callee), arguments);
+                Expr::New(expr)
+            }
             "ObjectExpression" => {
                 let expr = ObjectExpression::try_from(jexpr)?;
                 Expr::Object(expr)

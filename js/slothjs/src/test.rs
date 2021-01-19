@@ -281,7 +281,7 @@ fn test_binary_operations() {
 
 #[test]
 fn test_member_expression() {
-    //assert_eq!( eval("['zero', 'one', 'two'][2]"),      JSON::from("two"));
+    assert_eq!( eval("['zero', 'one', 'two'][2]"),      JSON::from("two"));
     assert_eq!( eval("let o = {one: 1}; o.one"),        JSON::from(1.0));
     assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
     assert_eq!( eval("let o = {'o e': 1}; o['o e']"),   JSON::from(1.0));
@@ -467,6 +467,7 @@ fn test_unary_operations() {
     assert!( evalbool("let v = +'false'; v != v") );
     assert_eval!( "let a = []; +a",          0.0 );
     assert_eval!( "let a = [1]; +a",         1.0 );
+    assert_eval!( "let a = +[1, 2]; a != a",  true);
 
     assert_eq!( eval("-'1'"),               JSON::from(-1.0) );
 
@@ -524,19 +525,23 @@ fn test_functions() {
         twice(12)
     "#, 24.0);
 
+    // a function returns a value
     assert_eval!( "(function () { return true; })()",   true );
 
+    // return returns immediately
     assert!( evalbool(r#"
         let func = function() { return true; return false; };
         func()
     "#));
 
+    // the arguments are always fresh
     assert_eq!( eval(r#"
         let twice = function(x) { return x + x; };
         twice(12)
         twice('a')
     "#), JSON::from("aa"));
 
+    // function scope
     assert_eq!( eval(r#"
         let x = 1;
         twice = function(x) { return x + x; };
@@ -544,15 +549,24 @@ fn test_functions() {
         x
     "#), JSON::from(1.0));
 
+    // Function.length
     assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
+
+    // recursive functions
     assert_eval!(r#"
         var gcd = function(a, b) { return (a == b ? a : (a < b ? gcd(a, b-a) : gcd(a-b, b))); };
         gcd(12, 15)
     "#, 3.0);
 
-    assert_eq!( eval(r#"
-        (function(x) { return x + x; })(12)
-    "#), JSON::from(24.0));
+    // immediate/anonymous function call
+    assert_eval!( "(function(x) { return x + x; })(12)",   24.0);
+
+    // closures
+    assert_eval!(r#"
+        let adder = function(y) { return function(x) { return x + y; } };
+        let add3 = adder(3);
+        add3(4)
+    "#, 7.0);
 
     /*
     // FunctionDeclaration
@@ -562,11 +576,6 @@ fn test_functions() {
     "#), JSON::from(144.0));
     */
 
-    assert_eval!(r#"
-        let adder = function(y) { return function(x) { return x + y; } };
-        let add3 = adder(3);
-        add3(4)
-    "#, 7.0);
 }
 
 #[test]
@@ -598,13 +607,11 @@ fn test_builtin_object() {
     //assert_eval!( "Object(1) instanceof Number", true );
     //assert_eval!( "Object(false) instanceof Boolean", true );
 
-    /*
     assert_eval!( "new Object(null)",     {} );
     assert_eval!( "new Object(undefined)", {} );
-    assert_eval!( "new Object({one: 1})", {"one": 1} );
-    assert_eval!( "new Object(1) instanceof Number", true );
-    assert_eval!( "new Object(true) instanceof Boolean", true );
-    */
+    assert_eval!( "new Object({one: 1})", {"one": 1.0} );
+    //assert_eval!( "new Object(1) instanceof Number", true );
+    //assert_eval!( "new Object(true) instanceof Boolean", true );
 
     // Object.defineProperty
 
@@ -679,7 +686,7 @@ fn test_builtin_function() {
     //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
 }
 
-/*
+/*  TODO
 #[test]
 fn test_builtin_boolean() {
     assert_eval!("true instanceof Boolean", false);
@@ -733,6 +740,35 @@ fn test_objects() {
     );
 
     assert_exception!( "a.one = 1", Exception::ReferenceNotFound );
+
+    // NewExpression
+    assert_eval!("new Object()",    {});
+    assert_eval!(r#"
+        let HasOne = function() { this.one = 1; }
+        let obj = new HasOne()
+        obj.one
+    "#, 1.0);
+    assert_eval!(r#"
+        let HasOne = function() { this.one = 1; }
+        let obj1 = new HasOne()
+        let obj2 = new HasOne()
+        obj2.one = 2;
+        obj1.one + obj2.one
+    "#, 3.0);
+    assert_eval!(r#"
+        let Class = function() { return {one: 1}; }
+        let obj = new Class()
+        obj.one
+    "#, 1.0);
+    /* // TODO: property lookup on the prototype chain
+    assert_eval!(r#"
+        let HasOne = function() { this.one = 1; }
+        let obj1 = new HasOne()
+        let obj2 = new HasOne()
+        HasOne.prototype.two = 2
+        obj1.two + obj2.two
+    "#, 4.0);
+    */
 }
 
 #[test]
@@ -792,12 +828,12 @@ fn test_this() {
         });
         obj.one
     "#, 1.0);
+    */
     assert_eval!(r#"
         let Class = function() { this.prop = true; }
         let obj = new Class();
         obj.prop
     "#, true);
-    */
 }
 
 #[test]

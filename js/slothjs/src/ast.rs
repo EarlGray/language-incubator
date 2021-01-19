@@ -90,6 +90,7 @@ pub enum Expr {
     Unary(UnaryExpression),
     Function(FunctionExpression),
     This,
+    New(NewExpression),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -134,6 +135,9 @@ pub struct FunctionExpression {
 
 // TODO: enum { AssignmentPattern, Identifier, BindingPattern }
 pub type FunctionParameter = Identifier;
+
+#[derive(Clone, Debug)]
+pub struct NewExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
