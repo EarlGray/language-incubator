@@ -38,8 +38,36 @@
 * TODO ForInExpression
 * TODO =Symbol= primitive
 * TODO builtin =Object=
+** TODO static methods
+*** DONE [2021-01-05 Tue] .getOwnPropertyDescriptor
+*** DONE [2021-01-08 Fri] .is()
+*** DONE [2021-01-18 Mon] Object() constructor
+*** TODO 
+** TODO Object.prototype
+*** DONE [2021-01-05 Tue] create it!
+*** DONE [2021-01-08 Fri] .constructor
+*** DONE [2021-01-18 Mon] .valueOf()
+*** TODO ...everything else
 * TODO builtin =Function=
+** DONE [2021-01-06 Wed] =src/builtin/function.rs=
+** TODO static methods
+** TODO Function.prototype
+*** DONE [2021-01-17 Sun] .constructor
+*** TODO .call()
+*** TODO .apply()
+*** TODO .bind()
+*** TODO ...everything else
 * TODO builtin =Array=
+** DONE [2021-01-10 Sun] =src/builtin/array.rs=
+** DONE [2021-01-15 Fri] (de)serialization
+** TODO Array static methods
+*** TODO Array.from
+*** TODO Array.of
+*** TODO Array.isArray()
+** TODO Array.prototype
+*** DONE [2021-01-16 Sat] .toString()
+*** TODO .length
+*** TODO ...everything else
 * TODO builtin =JSON=
 * TODO builtin functions
 ** TODO =parseInt=
@@ -53,22 +81,45 @@
 ** TODO =Number=
 ** TODO =String=
 *** TODO string indexing
+*** TODO =src/builtin/string.rs=
+*** TODO String() constructor; Object("string")
+*** TODO check escape notation
+*** TODO static methods
+**** TODO String.fromCharCode()
+**** TODO String.fromCodePoint()
+**** TODO String.raw()
+*** TODO prototype
+**** TODO .length
+**** TODO .charAt()
+**** TODO .concat()
+**** TODO .includes()
+**** TODO .endsWith()
+**** TODO .indexOf()
+**** TODO .lastIndexOf()
+**** TODO ...
 ** TODO =Boolean=
+*** TODO scaffolding in =src/builtin/boolean.rs=
+*** TODO Boolean constructor, =Object(true)=
+*** TODO Boolean.prototype
+**** TODO .valueOf
+**** TODO .toString
 * DONE [2021-01-01 Fri] builtin function calls
 ** DONE [2021-01-01 Fri] CallExpression
 * TODO user functions
 ** TODO FunctionExpression
-*** TODO =arguments=
 *** DONE [2021-01-06 Wed] function scope
-*** TODO closures
+*** DONE [2021-01-17 Sun] closures
+*** TODO =arguments=
 ** DONE [2021-01-06 Wed] ReturnExpression
 ** TODO FunctionDeclaration
 ** TODO recursive functions
+*** DONE [2021-01-17 Sun] make them work
 *** TODO limit call stack, throw StackOverflow
 * TODO user objects
 ** DONE [2021-01-09 Sat] prototype chain
-** TODO ThisExpression
-** TODO NewExpression
+** DONE [2021-01-17 Sun] ThisExpression
+** DONE [2021-01-18 Mon] NewExpression
+** TODO properties lookup on the chain
 ** TODO properties, =get=, =set=
 
 * TODO the endgoal: be able to run Esprima internally
