@@ -170,11 +170,11 @@ fn test_binary_operations() {
     assert!( evalbool("'2' == 2") );
     assert!( !evalbool("0 == null") );
     assert!( evalbool("0 == false") );
-    //assert!( evalbool("0 == []") );
-    //assert!( !evalbool("[] == []") );
-    //assert!( !evalbool("0 == {}") );
-    //assert!( !evalbool("{} == {}") );
-    //assert!( evalbool("var a = {}; a == a") );
+    assert!( evalbool("0 == []") );
+    assert!( !evalbool("[] == []") );
+    assert!( !evalbool("0 == {}") );
+    assert!( !evalbool("({} == {})") );
+    assert!( evalbool("var a = {}; a == a") );
     assert!( evalbool("null == null") );
     assert!( evalbool("null == undefined") );
     assert!( !evalbool("NaN == NaN") );
@@ -184,27 +184,26 @@ fn test_binary_operations() {
     assert!( !evalbool("'2' != 2") );
     assert!( evalbool("0 != null") );
     assert!( !evalbool("0 != false") );
-    //assert!( !evalbool("0 != []") );
-    //assert!( evalbool("[] != []") );
-    //assert!( evalbool("0 != {}") );
+    assert!( !evalbool("0 != []") );
+    assert!( evalbool("[] != []") );
+    assert!( evalbool("0 != {}") );
     assert!( !evalbool("null != null") );
     assert!( !evalbool("null != undefined") );
     assert!( evalbool("NaN != NaN") );
 
-    /*
     assert!( evalbool("2 !== 3") );
     assert!( evalbool("2 === 2") );
+    assert!( evalbool("+0 === -0") );
+    assert!( !evalbool("NaN === NaN") );
     assert!( !evalbool("2 === 3") );
     assert!( !evalbool("'2' === 2") );
     assert!( !evalbool("0 === null") );
     assert!( !evalbool("0 === false") );
-    assert!( !evalbool("0 == []") );
+    assert!( !evalbool("0 === []") );
     assert!( !evalbool("[] === []") );
     assert!( !evalbool("0 === {}") );
     assert!( evalbool("null === null") );
     assert!( !evalbool("null === undefined") );
-    assert!( !evalbool("NaN === NaN") );
-    */
 
     assert!( !evalbool("'a' < 'a'") );
     assert!( evalbool("1 < 2") );

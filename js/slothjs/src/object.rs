@@ -202,6 +202,12 @@ impl JSValue {
         }
     }
 
+    /// Strict Equality, `===`
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#strict_equality_using>
+    pub fn strict_eq(&self, other: &JSValue, _heap: &Heap) -> bool {
+        self == other
+    }
+
     pub fn numerically<F>(&self, other: &JSValue, heap: &Heap, op: F) -> JSValue
         where F: Fn(f64, f64) -> f64
     {

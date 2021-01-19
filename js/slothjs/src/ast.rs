@@ -146,6 +146,8 @@ pub enum BinOp {
     Star,
     EqEq,
     NotEq,
+    EqEqEq,
+    NotEqEq,
     Less,
     /*
     InstanceOf,
@@ -156,8 +158,6 @@ pub enum BinOp {
     Pipe,
     Hat,
     Ampersand,
-    EqEqEq,
-    NotEqEq,
     Greater,
     LtEq,
     LtLt,

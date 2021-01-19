@@ -12,21 +12,37 @@
 * TODO BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
-** TODO ~===~
-** TODO ~+~ between all types
+** DONE [2021-01-13 Wed] ~+~ between all types
+** DONE [2021-01-19 Tue] ~===~
+** TODO =instanceof=
+** TODO =in=
+** TODO =/=
+** TODO =%=
+** TODO =**=
+** TODO =|=
+** TODO =^=
+** TODO =<=
+** TODO ~<=~
+** TODO =<<=
+** TODO =>>=
+** TODO =>>>=
+* TODO LogicalExpression...
+** TODO &&
+** TODO ||
 * TODO AssignmentExpression
 ** DONE [2020-12-21 Mon] ~=~
 ** DONE [2021-01-02 Sat] ~+=~
-** TODO ~-=~
-** TODO ~*=~
+** DONE [2021-01-15 Fri] ~-=~
+** DONE [2021-01-14 Thu] ~*=~
 ** TODO ~/=~
 ** TODO ~&=~
 ** TODO ~|=~
 * TODO SwitchStatement
 * TODO UpdateExpression
+* TODO BreakStatement, ContinueStatement
 * TODO WhileStatement
 * TODO DoWhileStatement
-* TODO BreakStatement, ContinueStatement
+* TODO ForInExpression
 * DONE [2021-01-04 Mon] UnaryExpression
 ** DONE [2021-01-03 Sun] everything, except...
 ** DONE [2021-01-04 Mon] =delete=
@@ -35,7 +51,6 @@
 ** TODO stacktraces with source locations
 ** TODO =throw=
 ** TODO =Error= objects
-* TODO ForInExpression
 * TODO =Symbol= primitive
 * TODO builtin =Object=
 ** TODO static methods
@@ -69,12 +84,13 @@
 *** TODO .length
 *** TODO ...everything else
 * TODO builtin =JSON=
+* TODO builtin arrays
+** DONE [2021-01-11 Mon] ArrayExpression
+** DONE [2021-01-11 Mon] array members get/assign
 * TODO builtin functions
 ** TODO =parseInt=
 ** TODO =eval=
 ** TODO =isNaN=
-* TODO ArrayExpression
-* TODO assignment support for array members
 * TODO builtin =assert= object
 * TODO builtin =console=
 * TODO builtin primitive wrappers

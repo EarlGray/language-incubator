@@ -395,10 +395,12 @@ impl TryFrom<&JSON> for BinaryExpression {
             "-" => BinOp::Minus,
             "*" => BinOp::Star,
             "==" => BinOp::EqEq,
+            "===" => BinOp::EqEqEq,
             "!=" => BinOp::NotEq,
+            "!==" => BinOp::NotEqEq,
             "<" => BinOp::Less,
             _ => return Err(ParseError::UnexpectedValue{
-                want: "+|==",
+                want: "+|-|*|==|===|!=|<",
                 value: jexpr.get("operator").unwrap().clone(),
             }),
         };

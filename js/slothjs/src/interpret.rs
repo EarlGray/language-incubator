@@ -195,6 +195,8 @@ impl Interpretable for BinaryExpression {
         let result = match op {
             BinOp::EqEq => JSValue::from(JSValue::loose_eq(&lval, &rval, heap)),
             BinOp::NotEq => JSValue::from(!JSValue::loose_eq(&lval, &rval, heap)),
+            BinOp::EqEqEq => JSValue::from(JSValue::strict_eq(&lval, &rval, heap)),
+            BinOp::NotEqEq => JSValue::from(!JSValue::strict_eq(&lval, &rval, heap)),
             BinOp::Less => JSValue::less(&lval, &rval, heap),
             BinOp::Plus => JSValue::plus(&lval, &rval, heap)?,
             BinOp::Minus => JSValue::minus(&lval, &rval, heap)?,
