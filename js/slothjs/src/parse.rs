@@ -305,6 +305,10 @@ impl TryFrom<&JSON> for Expr {
                 let expr = Literal(jval.clone());
                 Expr::Literal(expr)
             }
+            "LogicalExpression" => {
+                let expr = LogicalExpression::try_from(jexpr)?;
+                Expr::LogicalOp(expr)
+            }
             "MemberExpression" => {
                 let computed = json_get_bool(jexpr, "computed")?;
 
@@ -405,6 +409,29 @@ impl TryFrom<&JSON> for BinaryExpression {
             }),
         };
         Ok(BinaryExpression( Box::new(left), op, Box::new(right) ))
+    }
+}
+
+impl TryFrom<&JSON> for LogicalExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jleft = json_get(jexpr, "left")?;
+        let left = Expr::try_from(jleft)?;
+
+        let jright = json_get(jexpr, "right")?;
+        let right = Expr::try_from(jright)?;
+
+        let opstr = json_get_str(jexpr, "operator")?;
+        let op = match opstr {
+            "&&" => BoolOp::And,
+            "||" => BoolOp::Or,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "&& or ||",
+                value: jexpr.get("operator").unwrap().clone(),
+            }),
+        };
+        Ok(LogicalExpression( Box::new(left), op, Box::new(right) ))
     }
 }
 

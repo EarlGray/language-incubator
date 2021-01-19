@@ -26,9 +26,9 @@
 ** TODO =<<=
 ** TODO =>>=
 ** TODO =>>>=
-* TODO LogicalExpression...
-** TODO &&
-** TODO ||
+* DONE [2021-01-19 Tue] LogicalExpression...
+** DONE [2021-01-19 Tue] &&
+** DONE [2021-01-19 Tue] ||
 * TODO AssignmentExpression
 ** DONE [2020-12-21 Mon] ~=~
 ** DONE [2021-01-02 Sat] ~+=~

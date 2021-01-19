@@ -81,6 +81,7 @@ pub enum Expr {
     Literal(Literal),
     Identifier(Identifier),
     BinaryOp(BinaryExpression),
+    LogicalOp(LogicalExpression),
     Call(CallExpression),
     Array(ArrayExpression),
     Object(ObjectExpression),
@@ -101,6 +102,9 @@ pub struct Identifier(pub String);
 
 #[derive(Clone, Debug)]
 pub struct BinaryExpression(pub Box<Expr>, pub BinOp, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct LogicalExpression(pub Box<Expr>, pub BoolOp, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
 pub struct CallExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
@@ -165,6 +169,9 @@ pub enum BinOp {
     GtGtGt
      */
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BoolOp { And, Or }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssignOp(pub Option<BinOp>);

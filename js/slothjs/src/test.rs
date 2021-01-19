@@ -263,19 +263,19 @@ fn test_binary_operations() {
     assert_eq!( eval("0xA5 >>> 4"), JSValue::from(0xA));
     */
 
-    /*
-    assert!( evalbool("true && true") );
-    assert!( !evalbool("true && false") );
+    assert_eval!( "true && true", true );
+    assert_eval!( "true && false", false );
+    assert_eval!( "1 && 2",     2.0 );
+    assert_eval!( "0 && 1",     0.0 );
+    assert_eval!( "var a; (a = 0) && (a = 1)",  0.0);
+    assert_eval!( "var a; (a = 1) && (a = 2)",  2.0);
 
-    assert_eq!( eval("1 && 2"), JSValue::from(2) );
-    assert_eq!( eval("0 && 1"), JSValue::from(0) );
-
-    assert!( evalbool("true || false") );
-    assert!( evalbool("false || false") );
-
-    assert_eq!( eval("null || 'a'"), JSValue::from("a") );
-    assert_eq!( eval("'a' || 'b'"), JSValue::from("a") );
-     */
+    assert_eval!( "true || false", true );
+    assert_eval!( "false || false", false );
+    assert_eval!("null || 'a'",     "a" );
+    assert_eval!("'a' || 'b'",      "a");
+    assert_eval!( "var a; (a = 0) || (a = 1)",  1.0);
+    assert_eval!( "var a; (a = 1) || (a = 2)",  1.0);
 }
 
 #[test]

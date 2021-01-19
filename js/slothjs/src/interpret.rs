@@ -145,6 +145,7 @@ impl Interpretable for Expr {
             Expr::Literal(expr) =>              expr.interpret(heap),
             Expr::Identifier(expr) =>           expr.interpret(heap),
             Expr::BinaryOp(expr) =>             expr.interpret(heap),
+            Expr::LogicalOp(expr) =>            expr.interpret(heap),
             Expr::Call(expr) =>                 expr.interpret(heap),
             Expr::Array(expr) =>                expr.interpret(heap),
             Expr::Member(expr) =>               expr.interpret(heap),
@@ -184,6 +185,20 @@ impl Interpretable for ConditionalExpression {
         } else {
             elseexpr.interpret(heap)
         }
+    }
+}
+
+impl Interpretable for LogicalExpression {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let LogicalExpression(lexpr, op, rexpr) = self;
+        let lval = lexpr.interpret(heap)?.to_value(heap)?;
+        let value = match (lval.boolify(heap), op) {
+            (true, BoolOp::And) |
+            (false, BoolOp::Or) =>
+                rexpr.interpret(heap)?.to_value(heap)?,
+            _ => lval,
+        };
+        Ok(Interpreted::Value(value))
     }
 }
 
