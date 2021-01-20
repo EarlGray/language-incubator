@@ -45,7 +45,8 @@ fn object_constructor(
     let object_ref = match argument.to_value(heap)? {
         JSValue::Undefined | JSValue::Ref(Heap::NULL) =>
             heap.alloc(JSObject::new()),
-        JSValue::Bool(_) => todo!(),
+        JSValue::Bool(b) =>
+            heap.alloc(JSObject::from_bool(b)),
         JSValue::Number(_) => todo!(),
         JSValue::String(_) => todo!(),
         JSValue::Ref(r) => r,

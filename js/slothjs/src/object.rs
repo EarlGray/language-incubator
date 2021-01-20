@@ -150,6 +150,7 @@ impl JSValue {
             JSValue::Undefined => false,
             JSValue::String(s) => s.len() > 0,
             JSValue::Ref(Heap::NULL) => false,
+            JSValue::Ref(_) => true,
             _ =>
                 if let Some(n) = self.numberify(heap) {
                     !(n == 0.0 || f64::is_nan(n))
@@ -366,6 +367,14 @@ impl JSObject {
         JSObject{
             proto: Heap::ARRAY_PROTO,
             value: ObjectValue::Array(JSArray{ storage: values }),
+            properties: HashMap::new(),
+        }
+    }
+
+    pub fn from_bool(value: bool) -> JSObject {
+        JSObject{
+            proto: Heap::BOOLEAN_PROTO,
+            value: ObjectValue::Boolean(value),
             properties: HashMap::new(),
         }
     }

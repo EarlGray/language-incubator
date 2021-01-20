@@ -37,7 +37,8 @@ impl Heap {
     pub const OBJECT_PROTO: JSRef = JSRef(2);
     pub const FUNCTION_PROTO: JSRef = JSRef(3);
     pub const ARRAY_PROTO: JSRef = JSRef(4);
-    const USERSTART: usize = 5;
+    pub const BOOLEAN_PROTO: JSRef = JSRef(5);
+    const USERSTART: usize = 6;
 
     pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";

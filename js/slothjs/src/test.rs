@@ -477,6 +477,8 @@ fn test_unary_operations() {
     assert!( evalbool("!!'yes'") );
     assert!( evalbool("!!'0'") );
     assert!( evalbool("!!'{}'") );
+    assert!( evalbool("!!{}") );
+    assert!( evalbool("!![]") );
     assert!( !evalbool("!!''") );
     assert!( evalbool("!undefined") );
 
@@ -487,9 +489,9 @@ fn test_unary_operations() {
     assert_eval!("typeof {}",          "object");
     assert_eval!("typeof null",        "object");
     assert_eval!("typeof []",          "object");
+    assert_eval!("typeof new Boolean()",    "object");
     assert_eval!("typeof (function(){})",   "function");
     assert_eval!("typeof parseInt",         "function");
-    //assert_eq!( eval("typeof new Boolean()"),     "object");
 
     assert_eq!( eval("~-1"),                JSON::from(0.0));
     assert_eq!( eval("~-2"),                JSON::from(1.0));
@@ -689,20 +691,19 @@ fn test_builtin_function() {
     //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
 }
 
-/*  TODO
 #[test]
 fn test_builtin_boolean() {
-    assert_eval!("true instanceof Boolean", false);
+    //assert_eval!("true instanceof Boolean", false);
 
-    assert_eval!("var b = new Boolean(false); !!b",     false);
-    assert_eval!("var b = new Boolean(); !!b",          false);
-    assert_eval!("var b = new Boolean(undefined); !!b", false);
-    assert_eval!("var b = new Boolean(null); !!b",      false);
-    assert_eval!("var b = new Boolean(NaN); !!b",       false);
+    assert_eval!("var b = new Boolean(false); b.valueOf()",     false);
+    assert_eval!("var b = new Boolean(); b.valueOf()",          false);
+    assert_eval!("var b = new Boolean(undefined); b.valueOf()", false);
+    assert_eval!("var b = new Boolean(null); b.valueOf()",      false);
+    assert_eval!("var b = new Boolean(NaN); b.valueOf()",       false);
 
-    assert_eval!("var b = new Boolean(true); !!b",          true);
-    assert_eval!("var b = new Boolean(new Boolean()); !!b", true);
-    assert_eval!("var b = new Boolean([]); !!b",            true);
+    assert_eval!("var b = new Boolean(true); b.valueOf()",          true);
+    assert_eval!("var b = new Boolean(new Boolean()); b.valueOf()", true);
+    assert_eval!("var b = new Boolean([]); b.valueOf()",            true);
 
     assert_eval!("Boolean(false)",  false);
     assert_eval!("Boolean(-0)",     false);
@@ -711,17 +712,22 @@ fn test_builtin_boolean() {
 
     assert_eval!("Boolean([])",             true);
     assert_eval!("Boolean(new Boolean())",  true);
-    assert_eval!("Boolean(new String(''))",  true);
+    //assert_eval!("Boolean(new String(''))",  true);
+
+    assert_eval!("+(new Boolean())",    0.0);
+    assert_eval!("Object(true).valueOf()",    true);
+    assert_eval!("Object(false).valueOf()",    false);
 
     // Boolean.prototype.toString()
-    assert_eval!("true.toString()",  "true");
+    assert_eval!("new Boolean().toString()",  "false");
+    // auto-objectification:
+    assert_eval!("true.toString()",   "true");
     assert_eval!("false.toString()",  "false");
 
     // Boolean.prototype.valueOf()
     assert_eval!("new Boolean().valueOf()", false);
     assert_eval!("new Boolean(1).valueOf()", true);
 }
-*/
 
 #[test]
 fn test_objects() {

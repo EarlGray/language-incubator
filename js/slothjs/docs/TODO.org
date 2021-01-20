@@ -94,6 +94,12 @@
 * TODO builtin =assert= object
 * TODO builtin =console=
 * TODO builtin primitive wrappers
+** DONE [2021-01-20 Wed] =Boolean=
+*** DONE [2021-01-20 Wed] scaffolding in =src/builtin/boolean.rs=
+*** DONE [2021-01-20 Wed] Boolean constructor, =Object(true)=
+*** DONE [2021-01-20 Wed] Boolean.prototype
+**** DONE [2021-01-20 Wed] .valueOf
+**** DONE [2021-01-20 Wed] .toString
 ** TODO =Number=
 ** TODO =String=
 *** TODO string indexing
@@ -113,12 +119,6 @@
 **** TODO .indexOf()
 **** TODO .lastIndexOf()
 **** TODO ...
-** TODO =Boolean=
-*** TODO scaffolding in =src/builtin/boolean.rs=
-*** TODO Boolean constructor, =Object(true)=
-*** TODO Boolean.prototype
-**** TODO .valueOf
-**** TODO .toString
 * DONE [2021-01-01 Fri] function calls
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~

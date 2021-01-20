@@ -25,6 +25,7 @@ pub enum Exception {
     TypeErrorCannotAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
     TypeErrorNotArraylike(Interpreted),
+    TypeErrorInstanceRequired(Interpreted, String),
 
     JumpReturn(Interpreted),
 }

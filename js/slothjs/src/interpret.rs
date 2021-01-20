@@ -260,6 +260,12 @@ impl Interpretable for MemberExpression {
 
         // get the object reference for member computation:
         let objresult = objexpr.interpret(heap)?;
+        let objresult = match objresult {
+            // autowrap primitive values into Boolean/String/Number
+            Interpreted::Value(JSValue::Bool(b)) =>
+                Interpreted::from(heap.alloc(JSObject::from_bool(b))),
+            _ => objresult,
+        };
         let objref = objresult.to_ref(heap).map_err(|_| {
             Exception::ReferenceNotAnObject(objresult.clone())
         })?;
