@@ -68,8 +68,8 @@
 ** TODO static methods
 ** TODO Function.prototype
 *** DONE [2021-01-17 Sun] .constructor
-*** TODO .call()
-*** TODO .apply()
+*** DONE [2021-01-20 Wed] .call()
+*** DONE [2021-01-20 Wed] .apply()
 *** TODO .bind()
 *** TODO ...everything else
 * TODO builtin =Array=
@@ -119,8 +119,10 @@
 *** TODO Boolean.prototype
 **** TODO .valueOf
 **** TODO .toString
-* DONE [2021-01-01 Fri] builtin function calls
+* DONE [2021-01-01 Fri] function calls
 ** DONE [2021-01-01 Fri] CallExpression
+** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
+** TODO array member calls: ~a[0]()~
 * TODO user functions
 ** TODO FunctionExpression
 *** DONE [2021-01-06 Wed] function scope

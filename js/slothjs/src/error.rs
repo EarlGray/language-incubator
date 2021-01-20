@@ -24,6 +24,7 @@ pub enum Exception {
     TypeErrorGetProperty(Interpreted, String),
     TypeErrorCannotAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
+    TypeErrorNotArraylike(Interpreted),
 
     JumpReturn(Interpreted),
 }

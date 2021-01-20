@@ -783,15 +783,6 @@ fn test_this() {
         test.func()
     "#, 42.0 );
 
-    /*
-    assert_eval!(r#"
-        var o = {f: function() { return this.a + this.b; }}
-        var p = Object.create(o)
-        p.a = 1
-        p.b = 4
-        p.f()
-    "#, 5.0 );
-
     // call
     assert_eval!(r#"
         const add = function(c, d) { return this.a + this.b + c + d }
@@ -805,6 +796,15 @@ fn test_this() {
         var o = {a: 1, b: 3}
         f.apply(o, [5, 7])
     "#, 16.0);
+
+    /*
+    assert_eval!(r#"
+        var o = {f: function() { return this.a + this.b; }}
+        var p = Object.create(o)
+        p.a = 1
+        p.b = 4
+        p.f()
+    "#, 5.0 );
 
     // bind
     assert_eval!(r#"

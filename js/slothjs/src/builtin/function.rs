@@ -20,11 +20,54 @@ fn function_constructor(
     todo!()
 }
 
+fn function_proto_call(
+    this_ref: JSRef,
+    method_name: String,
+    mut arguments: Vec<Interpreted>,
+    heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    arguments.rotate_left(1);
+    let this_arg = arguments.pop()
+        .unwrap_or(Interpreted::VOID);
+    let bound_this = this_arg.to_ref(heap)?;
+    heap.execute(this_ref, bound_this, &method_name, arguments)
+}
+
+fn function_proto_apply(
+    this_ref: JSRef,
+    method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    let this_arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let bound_this = this_arg.to_ref(heap)?;
+    let call_args = match arguments.get(1) {
+        // TODO: convert from everything array-like.
+        Some(object) => {
+            let objref = object.to_ref(heap)?;
+            if let Some(array) = heap.get(objref).as_array() {
+                array.storage.iter()
+                    .map(|val| Interpreted::Value(val.clone()))
+                    .collect()
+            } else {
+                return Err(Exception::TypeErrorNotArraylike(object.clone()))
+            }
+        }
+        None => Vec::new()
+    };
+    heap.execute(this_ref, bound_this, &method_name, call_args)
+}
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     /* the Function.prototype */
     let mut function_proto = JSObject::new();
     function_proto.proto = Heap::OBJECT_PROTO;
+
+    let func_call_ref = heap.alloc(JSObject::from_func(function_proto_call));
+    function_proto.set_hidden("call", Content::from(func_call_ref))?;
+
+    let func_apply_ref = heap.alloc(JSObject::from_func(function_proto_apply));
+    function_proto.set_hidden("apply", Content::from(func_apply_ref))?;
 
     *heap.get_mut(Heap::FUNCTION_PROTO) = function_proto;
 
