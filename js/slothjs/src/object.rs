@@ -167,10 +167,11 @@ impl JSValue {
             JSValue::Number(_) => "number",
             JSValue::Bool(_) => "boolean",
             JSValue::Ref(r) => {
-                if let Some(v) = heap.get(*r).to_primitive(heap) {
-                    v.type_of(heap)
-                } else {
-                    "object"
+                match heap.get(*r).value {
+                    ObjectValue::Closure(_) |
+                    ObjectValue::VMCall(_) =>
+                        "function",
+                    _ => "object"
                 }
             }
         }

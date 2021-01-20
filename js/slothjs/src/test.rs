@@ -480,12 +480,16 @@ fn test_unary_operations() {
     assert!( !evalbool("!!''") );
     assert!( evalbool("!undefined") );
 
-    assert_eq!( eval("typeof undefined"),   JSON::from("undefined"));
-    assert_eq!( eval("typeof 1"),           JSON::from("number"));
-    assert_eq!( eval("typeof ''"),          JSON::from("string"));
-    assert_eq!( eval("typeof {}"),          JSON::from("object"));
-    assert_eq!( eval("typeof null"),        JSON::from("object"));
-    //assert_eq!( eval("typeof []"),          JSON::from("object"));
+    assert_eval!("typeof undefined",   "undefined");
+    assert_eval!("typeof 1",           "number");
+    assert_eval!("typeof true",        "boolean");
+    assert_eval!("typeof ''",          "string");
+    assert_eval!("typeof {}",          "object");
+    assert_eval!("typeof null",        "object");
+    assert_eval!("typeof []",          "object");
+    assert_eval!("typeof (function(){})",   "function");
+    assert_eval!("typeof parseInt",         "function");
+    //assert_eq!( eval("typeof new Boolean()"),     "object");
 
     assert_eq!( eval("~-1"),                JSON::from(0.0));
     assert_eq!( eval("~-2"),                JSON::from(1.0));
