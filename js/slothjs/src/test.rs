@@ -619,16 +619,68 @@ fn test_builtin_object() {
     //assert_eval!( "new Object(true) instanceof Boolean", true );
 
     // Object.defineProperty
+    assert_eval!(r#"
+        var obj = {};
+        Object.defineProperty(obj, 'prop', {value: 42});
+        var d = Object.getOwnPropertyDescriptor(obj, 'prop');
+        !d.enumerable && !d.writable && !d.configurable
+    "#, true);
+    assert_eval!(r#"
+        var obj = {};
+        Object.defineProperty(obj, 'prop', {});
+        // `value` defaults to undefined:
+        obj.prop === undefined
+    "#, true);
+    assert_eval!(r#"
+        var obj = {};
+        Object.defineProperty(obj, 'prop', {value: 42, enumerable: true});
+        var d = Object.getOwnPropertyDescriptor(obj, 'prop');
+        d.enumerable && !d.writable && !d.configurable
+    "#, true);
+    assert_eval!(r#"
+        var obj = {};
+        Object.defineProperty(obj, 'prop', {enumerable: true});
+        var d = Object.getOwnPropertyDescriptor(obj, 'prop');
+        d.enumerable && !d.writable && !d.configurable
+    "#, true);
+    /*
+    assert_eval!(r#"
+        var obj = { val: 42 };
+        Object.defineProperty(obj, 'prop', {
+            get: function() { return this.val; },
+            enumerable: true
+        });
+        var d = Object.getOwnPropertyDescriptor(obj, 'prop');
+        (obj.prop == 42) && (d.set == undefined) &&
+            d.enumerable && !d.writable && !d.configurable
+    "#, true);
+    assert_eval!(r#"
+        var obj = { val: false };
+        Object.defineProperty(obj, 'prop', {
+            set: function(val) { this.val = val; },
+            dreck: true,
+        });
+        obj.prop = true;
+        obj.val
+    "#, true);
+    */
+    assert_exception!(r#"
+        var obj = { val: 42 };
+        Object.defineProperty(obj, 'prop', {
+            get: function() { return this.val; },
+            writable: true
+        })
+    "#, Exception::TypeErrorInvalidDescriptor);
 
     // Object.getOwnPropertyDescriptor
-    assert_eval!(
-        "Object.getOwnPropertyDescriptor(Object, 'prototype')",
-        {"writable": false, "configurable": false, "enumerable": false, "value": {}}
-    );
-    assert_eval!(
-        "Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor')",
-        {"configurable": true, "enumerable": false, "value": {}, "writable": true}
-    );
+    assert_eval!(r#"
+        var d = Object.getOwnPropertyDescriptor(Object, 'prototype');
+        !d.writable && !d.configurable && !d.enumerable
+    "#, true);
+    assert_eval!(r#"
+        var d = Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor');
+        d.configurable && !d.enumerable && d.writable
+    "#, true);
 
     // Object.is
     assert!( evalbool("Object.is(null, null)") );

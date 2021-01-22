@@ -2,6 +2,7 @@
 
 //use crate::object;
 use crate::object::{
+    Access,
     Content,
     Interpreted,
     JSObject,
@@ -142,6 +143,63 @@ fn object_object_getOwnPropertyDescriptor(
     Ok(Interpreted::from(descriptor_ref))
 }
 
+#[allow(non_snake_case)]
+fn object_object_defineProperty(
+    _this_ref: JSRef,
+    _method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap
+) -> Result<Interpreted, Exception> {
+    let objref = arguments.get(0)
+        .unwrap_or(&Interpreted::VOID)
+        .to_ref(heap)?;
+
+    let prop = arguments.get(1)
+        .unwrap_or(&Interpreted::VOID)
+        .to_value(heap)?
+        .stringify(heap)?;
+
+    let descref = arguments.get(2)
+        .unwrap_or(&Interpreted::VOID)
+        .to_ref(heap)?;
+    let descriptor = heap.get(descref);
+
+    let configurable = descriptor.get_value("configurable")
+        .unwrap_or(&JSValue::from(false))
+        .boolify(heap);
+    let enumerable = descriptor.get_value("enumerable")
+        .unwrap_or(&JSValue::from(false))
+        .boolify(heap);
+    let has_value = descriptor.get_value("value").is_some()
+        || descriptor.get_value("writable").is_some();
+    let has_get = descriptor.get_value("get").is_some();
+    let has_set = descriptor.get_value("set").is_some();
+    if has_get || has_set {
+        if has_value {
+            let what = Interpreted::from(descref);
+            return Err(Exception::TypeErrorInvalidDescriptor(what));
+        }
+
+        todo!()
+    } else {
+        let value = descriptor.get_value("value")
+            .unwrap_or(&JSValue::Undefined)
+            .clone();
+        let writable = descriptor.get_value("writable")
+            .unwrap_or(&JSValue::from(false))
+            .boolify(heap);
+        let mut access = Access::empty();
+        if configurable { access = access | Access::CONF }
+        if enumerable { access = access | Access::ENUM }
+        if writable { access = access | Access::WRITE }
+
+        heap.get_mut(objref)
+            .set(&prop, Content::Value(value), access)?;
+
+        Ok(Interpreted::VOID)
+    }
+}
+
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     /* Object.prototype */
     let mut object_proto = JSObject::new();
@@ -169,6 +227,9 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
 
     let is_ref = heap.alloc(JSObject::from_func(object_object_is));
     object_object.set_hidden("is", Content::from(is_ref))?;
+
+    let defprop_ref = heap.alloc(JSObject::from_func(object_object_defineProperty));
+    object_object.set_hidden("defineProperty", Content::from(defprop_ref))?;
 
     let gop_ref = heap.alloc(JSObject::from_func(object_object_getOwnPropertyDescriptor));
     object_object.set_hidden(

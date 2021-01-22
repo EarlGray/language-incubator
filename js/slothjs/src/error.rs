@@ -26,6 +26,7 @@ pub enum Exception {
     TypeErrorNotCallable(Interpreted),
     TypeErrorNotArraylike(Interpreted),
     TypeErrorInstanceRequired(Interpreted, String),
+    TypeErrorInvalidDescriptor(Interpreted),
 
     JumpReturn(Interpreted),
 }
