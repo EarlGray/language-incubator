@@ -140,5 +140,30 @@
 ** TODO properties lookup on the chain
 ** TODO properties, =get=, =set=
 
-* TODO the endgoal: be able to run Esprima internally
+* MAYBE optimizations
+** TODO set up microbenchmarks
+** MAYBE Intern all property names
+   *Why*: all properties are currently stored by a =String= key.
+   This means that each property key is 24 bytes and contains a pointer to its
+   UTF8 buffer. A comparison of two keys means chasing two pointers and reading
+   unknown extents of memory.
+   *Interning*: all keys will become integer handles for interned strings. Each
+   key lookup will be an int comparison.
+   *Bonus*: =Symbol= will correspond to interned keys naturally.
+** MAYBE Track hidden classes, especially after calling constructors
+   *Why*: HashMap is not always the best storage; vector can be better.
+   Abstracting property names into a hidden class can leave each object with a
+   single vector of values and a pointer to the hidden class with the value
+   description vector.
+   Work: need to convert HashMap-based objects into class-based objects and back.
+** MAYBE Frozen/sealed objects to store their properties in a vector.
+   *Why*: frozen/sealed objects are by definition non-extensible.
+   Attaching a hidden class looks like a good idea.
+** MAYBE Bytecode compilation
+   *Why*: AST-based interpretation is dumb.
+* TODO garbage collection
+* TODO the **endgoal**: be able to run Esprima internally
 * TODO =eval=
+
+
+#+TODO: TODO MAYBE | DONE
