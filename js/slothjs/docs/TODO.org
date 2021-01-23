@@ -2,6 +2,8 @@
 * DONE [2020-12-21 Mon] IfStatement
 * DONE [2020-12-21 Mon] ConditinalExpression
 * DONE [2020-12-22 Tue] ForStatement
+* DONE [2021-01-23 Sat] WhileStatement
+* DONE [2021-01-23 Sat] DoWhileStatement
 * DONE [2020-12-26 Sat] mutable values and assignment
 * DONE [2021-01-14 Thu] rewrite the =Heap= to be =Vec<JSObject>=
 * DONE [2020-12-31 Thu] make it a library
@@ -9,6 +11,7 @@
 * TODO move tests to =tests/=
 * TODO =let= variables, block scope
 * TODO =const= values
+* DONE [2021-01-23 Sat] UpdateExpression
 * DONE [2021-01-19 Tue] LogicalExpression...
 ** DONE [2021-01-19 Tue] &&
 ** DONE [2021-01-19 Tue] ||
@@ -38,10 +41,7 @@
 ** TODO ~&=~
 ** TODO ~|=~
 * TODO SwitchStatement
-* DONE [2021-01-23 Sat] UpdateExpression
 * TODO BreakStatement, ContinueStatement
-* DONE [2021-01-23 Sat] WhileStatement
-* TODO DoWhileStatement
 * TODO ForInExpression
 * DONE [2021-01-04 Mon] UnaryExpression
 ** DONE [2021-01-03 Sun] everything, except...

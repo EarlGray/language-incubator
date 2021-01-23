@@ -78,30 +78,41 @@ impl TryFrom<&JSON> for Statement {
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
         let typ = json_get_str(json, "type")?;
         match typ {
-            "BlockStatement" => Ok(Statement::Block(
-                BlockStatement::try_from(json)?
-            )),
-            "EmptyStatement" =>
-                Ok(Statement::Empty),
-            "ExpressionStatement" => Ok(Statement::Expr(
-                ExpressionStatement::try_from(json)?
-            )),
+            "BlockStatement" => {
+                let stmt = BlockStatement::try_from(json)?;
+                Ok(Statement::Block(stmt))
+            }
+            "DoWhileStatement" => {
+                let mut stmt = ForStatement::try_from(json)?;
+                stmt.init = stmt.body.clone();
+                Ok(Statement::For(Box::new(stmt)))
+            },
+            "EmptyStatement" => Ok(Statement::Empty),
+            "ExpressionStatement" => {
+                let stmt = ExpressionStatement::try_from(json)?;
+                Ok(Statement::Expr(stmt))
+            }
             "ForStatement" |
-            "WhileStatement" => Ok(Statement::For(Box::new(
-                ForStatement::try_from(json)?
-            ))),
-            "FunctionDeclaration" => Ok(Statement::FunctionDeclaration(
-                FunctionDeclaration::try_from(json)?
-            )),
-            "IfStatement" => Ok(Statement::If(Box::new({
-                IfStatement::try_from(json)?
-            }))),
-            "ReturnStatement" => Ok(Statement::Return(
-                ReturnStatement::try_from(json)?
-            )),
-            "VariableDeclaration" => Ok(Statement::VariableDeclaration(
-                VariableDeclaration::try_from(json)?
-            )),
+            "WhileStatement" => {
+                let stmt = ForStatement::try_from(json)?;
+                Ok(Statement::For(Box::new(stmt)))
+            }
+            "FunctionDeclaration" => {
+                let decl = FunctionDeclaration::try_from(json)?;
+                Ok(Statement::FunctionDeclaration(decl))
+            }
+            "IfStatement" => {
+                let stmt = IfStatement::try_from(json)?;
+                Ok(Statement::If(Box::new(stmt)))
+            }
+            "ReturnStatement" => {
+                let stmt = ReturnStatement::try_from(json)?;
+                Ok(Statement::Return(stmt))
+            }
+            "VariableDeclaration" => {
+                let decl = VariableDeclaration::try_from(json)?;
+                Ok(Statement::VariableDeclaration(decl))
+            }
             _ => Err(ParseError::UnknownType{ value: json.clone() }),
         }
     }
@@ -147,7 +158,8 @@ impl TryFrom<&JSON> for ForStatement {
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
         let for_ok = json_expect_str(json, "type", "ForStatement");
         let while_ok = json_expect_str(json, "type", "WhileStatement");
-        while_ok.or(for_ok)?;
+        let dowhile_ok = json_expect_str(json, "type", "DoWhileStatement");
+        while_ok.or(for_ok).or(dowhile_ok)?;
 
         let init = match json.get("init") {
             Some(jinit) if !jinit.is_null() =>

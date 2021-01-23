@@ -371,35 +371,35 @@ fn test_conditionals() {
 #[test]
 fn test_loops() {
     // for (<init>; <test>; <update)
-    assert_eq!( eval(r#"
+    assert_eval!(r#"
         var a = 0;
         for (var i = 0; i < 5; i++) {
             a = a + 1;
         }
         a
-    "#), JSON::from(5.0));
+    "#, 5.0);
 
-    assert!( evalbool(r#"
+    assert_eval!(r#"
         let a = true;
         for (; false; ) a = false;
         a
-    "#));
+    "#, true);
 
     // while
-    assert!( evalbool(r#"
+    assert_eval!(r#"
         let a = false;
         while (!a) { a = true }
         a
-    "#));
+    "#, true);
 
-    /*
     // do while
-    assert!( evalbool(r#"
+    assert_eval!(r#"
         let a = false;
         do { a = true } while (0);
         a
-    "#));
+    "#, true);
 
+    /*
     // break
     assert!( evalbool(r#"
         for (;;) break;
