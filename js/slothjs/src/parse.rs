@@ -86,7 +86,8 @@ impl TryFrom<&JSON> for Statement {
             "ExpressionStatement" => Ok(Statement::Expr(
                 ExpressionStatement::try_from(json)?
             )),
-            "ForStatement" => Ok(Statement::For(Box::new(
+            "ForStatement" |
+            "WhileStatement" => Ok(Statement::For(Box::new(
                 ForStatement::try_from(json)?
             ))),
             "FunctionDeclaration" => Ok(Statement::FunctionDeclaration(
@@ -144,7 +145,9 @@ impl TryFrom<&JSON> for ForStatement {
     type Error = ParseError<JSON>;
 
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
-        json_expect_str(json, "type", "ForStatement")?;
+        let for_ok = json_expect_str(json, "type", "ForStatement");
+        let while_ok = json_expect_str(json, "type", "WhileStatement");
+        while_ok.or(for_ok)?;
 
         let init = match json.get("init") {
             Some(jinit) if !jinit.is_null() =>

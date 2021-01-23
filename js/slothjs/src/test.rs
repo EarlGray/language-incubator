@@ -385,7 +385,6 @@ fn test_loops() {
         a
     "#));
 
-    /*
     // while
     assert!( evalbool(r#"
         let a = false;
@@ -393,6 +392,7 @@ fn test_loops() {
         a
     "#));
 
+    /*
     // do while
     assert!( evalbool(r#"
         let a = false;

@@ -40,7 +40,7 @@
 * TODO SwitchStatement
 * DONE [2021-01-23 Sat] UpdateExpression
 * TODO BreakStatement, ContinueStatement
-* TODO WhileStatement
+* DONE [2021-01-23 Sat] WhileStatement
 * TODO DoWhileStatement
 * TODO ForInExpression
 * DONE [2021-01-04 Mon] UnaryExpression
