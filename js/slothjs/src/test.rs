@@ -415,10 +415,9 @@ fn test_loops() {
         a
     "#));
 
-    /*
     // labeled break
     assert_eval!("c = 0; label: { ++c; break label; ++c; }; c", 1.0);
-    assert!( evalbool(r#"
+    assert_eval!(r#"
         let a = false;
         label: do {
             a = true;
@@ -426,8 +425,11 @@ fn test_loops() {
             a = false;
         } while (0);
         a
-    "#));
+    "#, true);
 
+    // TODO: labeled continue
+
+    /*
     assert_eq!( eval(r#"
         let obj = {one:1, two: 2, three: 3};
         let sum = 0;

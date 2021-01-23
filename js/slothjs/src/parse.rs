@@ -113,6 +113,10 @@ impl TryFrom<&JSON> for Statement {
                 let stmt = IfStatement::try_from(json)?;
                 Ok(Statement::If(Box::new(stmt)))
             }
+            "LabeledStatement" => {
+                let stmt = LabelStatement::try_from(json)?;
+                Ok(Statement::Label(stmt))
+            }
             "ReturnStatement" => {
                 let stmt = ReturnStatement::try_from(json)?;
                 Ok(Statement::Return(stmt))
@@ -219,6 +223,22 @@ impl TryFrom<&JSON> for ContinueStatement {
         };
 
         Ok(ContinueStatement(label))
+    }
+}
+
+impl TryFrom<&JSON> for LabelStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "LabeledStatement")?;
+
+        let jlabel = json_get(value, "label")?;
+        let label = Identifier::try_from(jlabel)?;
+
+        let jbody = json_get(value, "body")?;
+        let body = Statement::try_from(jbody)?;
+
+        Ok(LabelStatement(label, Box::new(body)))
     }
 }
 

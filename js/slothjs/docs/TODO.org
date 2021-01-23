@@ -42,6 +42,11 @@
 ** TODO ~|=~
 * TODO SwitchStatement
 * TODO BreakStatement, ContinueStatement
+** DONE [2021-01-23 Sat] BreakStatement
+** DONE [2021-01-23 Sat] ContinueStatement
+** DONE [2021-01-23 Sat] LabeledStatement
+** DONE [2021-01-23 Sat] labeled break
+** TODO labeled continue
 * TODO ForInExpression
 * DONE [2021-01-04 Mon] UnaryExpression
 ** DONE [2021-01-03 Sun] everything, except...

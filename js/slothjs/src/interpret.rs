@@ -42,6 +42,7 @@ impl Interpretable for Statement {
             Statement::For(stmt)                    => stmt.interpret(heap),
             Statement::Break(stmt)                  => stmt.interpret(heap),
             Statement::Continue(stmt)               => stmt.interpret(heap),
+            Statement::Label(stmt)                  => stmt.interpret(heap),
             Statement::Return(stmt)                 => stmt.interpret(heap),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
             Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
@@ -118,6 +119,21 @@ impl Interpretable for ContinueStatement {
     fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
         let ContinueStatement(maybe_label) = self;
         Err(Exception::JumpContinue(maybe_label.clone()))
+    }
+}
+
+impl Interpretable for LabelStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let LabelStatement(label, body) = self;
+
+        let result = body.interpret(heap);
+        match result {
+            Err(Exception::JumpBreak(Some(target))) if &target == label =>
+                Ok(Interpreted::VOID),
+            Err(Exception::JumpContinue(Some(target))) if &target == label =>
+                todo!(),
+            _ => result,
+        }
     }
 }
 
