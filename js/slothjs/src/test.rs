@@ -554,8 +554,10 @@ fn test_functions() {
         x
     "#), JSON::from(1.0));
 
-    // Function.length
-    assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
+    // `arguments`
+    assert_eval!("(function() { return arguments; })(1, 2)",  [1.0, 2.0]);
+    assert_eval!("(function() { return typeof arguments; })()",  "object");
+    assert_eval!("(function(arguments){ return arguments; })(true)", true);
 
     // recursive functions
     assert_eval!(r#"
@@ -741,6 +743,15 @@ fn test_builtin_function() {
         json!({"writable": true, "enumerable": false, "configurable": true,  "value": {}})
     );
     //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
+
+    // Function.length
+    assert_eval!("var sqr = function(x) { return x*x; }; sqr.length",  1.0);
+
+    // Function.prototype.call()
+    assert_eval!(r#"
+        var a = [function() { return 8; }, function() { return 12; }];
+        a[1].call()
+    "#, 12.0);
 }
 
 #[test]

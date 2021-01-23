@@ -26,10 +26,12 @@ fn function_proto_call(
     mut arguments: Vec<Interpreted>,
     heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
+    if arguments.len() == 0 {
+        arguments.push(Interpreted::VOID);
+    }
     arguments.rotate_left(1);
-    let this_arg = arguments.pop()
-        .unwrap_or(Interpreted::VOID);
-    let bound_this = this_arg.to_ref(heap)?;
+    let this_arg = arguments.pop().unwrap();
+    let bound_this = this_arg.to_ref(heap).unwrap_or(Heap::NULL);
     heap.execute(this_ref, bound_this, &method_name, arguments)
 }
 

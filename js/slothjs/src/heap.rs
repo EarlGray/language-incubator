@@ -159,11 +159,21 @@ impl Heap {
         let old_scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
 
         let mut scope_object = JSObject::new();
+
+        // `arguments`
+        let argv = values.iter()
+            .map(|v| v.to_value(self))
+            .collect::<Result<Vec<JSValue>, Exception>>()?;
+        let arguments_ref = self.alloc(JSObject::from_array(argv));
+        scope_object.set_nonconf("arguments", Content::from(arguments_ref))?;
+
+        // set each argument
         for (i, param) in params.iter().enumerate() {
             let name = &param.0;
             let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
             scope_object.set_nonconf(name, Content::Value(value))?;
         }
+
         scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref))?;
         scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref))?;
 
@@ -213,7 +223,7 @@ impl Heap {
         func_ref: JSRef,
         this_ref: JSRef,
         method_name: &str,
-        arguments: Vec<Interpreted>
+        arguments: Vec<Interpreted>,
     ) -> Result<Interpreted, Exception> {
         match self.get(func_ref).value.clone() {
             ObjectValue::VMCall(vmcall) => {

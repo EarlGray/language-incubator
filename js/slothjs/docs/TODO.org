@@ -9,6 +9,9 @@
 * TODO move tests to =tests/=
 * TODO =let= variables, block scope
 * TODO =const= values
+* DONE [2021-01-19 Tue] LogicalExpression...
+** DONE [2021-01-19 Tue] &&
+** DONE [2021-01-19 Tue] ||
 * TODO BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
@@ -26,9 +29,6 @@
 ** TODO =<<=
 ** TODO =>>=
 ** TODO =>>>=
-* DONE [2021-01-19 Tue] LogicalExpression...
-** DONE [2021-01-19 Tue] &&
-** DONE [2021-01-19 Tue] ||
 * TODO AssignmentExpression
 ** DONE [2020-12-21 Mon] ~=~
 ** DONE [2021-01-02 Sat] ~+=~
@@ -124,10 +124,10 @@
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
 ** TODO array member calls: ~a[0]()~
 * TODO user functions
-** TODO FunctionExpression
+** DONE FunctionExpression
 *** DONE [2021-01-06 Wed] function scope
 *** DONE [2021-01-17 Sun] closures
-*** TODO =arguments=
+*** DONE [2021-01-23 Sat] =arguments=
 ** DONE [2021-01-06 Wed] ReturnExpression
 ** TODO FunctionDeclaration
 ** TODO recursive functions
