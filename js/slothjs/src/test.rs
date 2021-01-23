@@ -550,7 +550,7 @@ fn test_functions() {
     // function scope
     assert_eval!(r#"
         let x = 'outer';
-        twice = function(x) { return x + x; };
+        function twice(x) { return x + x; };
         twice('inner')
         x
     "#, "outer");
@@ -580,13 +580,11 @@ fn test_functions() {
         add3(4)
     "#, 7.0);
 
-    /*
     // FunctionDeclaration
-    assert_eq!(evalbool(r#"
+    assert_eval!(r#"
         function sqr(x) { return x * x; };
         sqr(12)
-    "#), JSON::from(144.0));
-    */
+    "#, 144.0);
 
 }
 

@@ -42,6 +42,7 @@ impl Interpretable for Statement {
             Statement::For(stmt)                    => stmt.interpret(heap),
             Statement::Return(stmt)                 => stmt.interpret(heap),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
+            Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
         }
     }
 }
@@ -127,14 +128,26 @@ impl Interpretable for VariableDeclaration {
             heap.declare_var(Some(self.kind), name)?;
             if let Some(init) = optinit {
                 let value = init.to_value(heap)?;
-                heap.scope_mut().update(name, value).or_else(|e|
-                    match e {
-                        Exception::TypeErrorSetReadonly(_, _) => Ok(()),
-                        _ => Err(e)
-                    }
-                )?;
+                heap.scope_mut()
+                    .update(name, value)
+                    .or_else(crate::error::ignore_set_readonly)?;
             }
         }
+        Ok(Interpreted::VOID)
+    }
+}
+
+impl Interpretable for FunctionDeclaration {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let function_ref = self.function.interpret(heap)?;
+
+        let name = &self.id.0;
+        heap.declare_var(Some(DeclarationKind::Var), name)?;
+
+        let value = function_ref.to_value(heap)?;
+        heap.scope_mut()
+            .update(name, value)
+            .or_else(crate::error::ignore_set_readonly)?;
         Ok(Interpreted::VOID)
     }
 }

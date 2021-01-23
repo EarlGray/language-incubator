@@ -30,3 +30,10 @@ pub enum Exception {
 
     JumpReturn(Interpreted),
 }
+
+pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
+    match e {
+        Exception::TypeErrorSetReadonly(_, _) => Ok(()),
+        _ => Err(e),
+    }
+}

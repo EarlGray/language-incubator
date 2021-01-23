@@ -122,17 +122,18 @@
 * DONE [2021-01-01 Fri] function calls
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
-** TODO array member calls: ~a[0]()~
+** DONE [2021-01-23 Sat] array member calls: ~a[0]()~
 * TODO user functions
 ** DONE FunctionExpression
 *** DONE [2021-01-06 Wed] function scope
 *** DONE [2021-01-17 Sun] closures
 *** DONE [2021-01-23 Sat] =arguments=
 ** DONE [2021-01-06 Wed] ReturnExpression
-** TODO FunctionDeclaration
+** DONE [2021-01-23 Sat] FunctionDeclaration
 ** TODO recursive functions
 *** DONE [2021-01-17 Sun] make them work
 *** TODO limit call stack, throw StackOverflow
+*** MAYBE tail call optimization
 * TODO user objects
 ** DONE [2021-01-09 Sat] prototype chain
 ** DONE [2021-01-17 Sun] ThisExpression

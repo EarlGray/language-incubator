@@ -89,6 +89,9 @@ impl TryFrom<&JSON> for Statement {
             "ForStatement" => Ok(Statement::For(Box::new(
                 ForStatement::try_from(json)?
             ))),
+            "FunctionDeclaration" => Ok(Statement::FunctionDeclaration(
+                FunctionDeclaration::try_from(json)?
+            )),
             "IfStatement" => Ok(Statement::If(Box::new({
                 IfStatement::try_from(json)?
             }))),
@@ -225,6 +228,19 @@ impl TryFrom<&JSON> for VariableDeclaration {
             declarations.push(VariableDeclarator{ name, init });
         }
         Ok(VariableDeclaration{ kind, declarations })
+    }
+}
+
+impl TryFrom<&JSON> for FunctionDeclaration {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "FunctionDeclaration")?;
+
+        let function = FunctionExpression::try_from(value)?;
+        let id = function.id.clone()
+            .ok_or(ParseError::ObjectWithout{ attr: "id", value: value.clone()})?;
+        Ok(FunctionDeclaration{ id, function })
     }
 }
 
@@ -526,8 +542,8 @@ impl TryFrom<&JSON> for FunctionExpression {
             id,
             params,
             body: Box::new(body),
-            generator: json_get_bool(jexpr, "generator").unwrap_or(false),
-            expression: json_get_bool(jexpr, "expression").unwrap_or(false),
+            is_generator: json_get_bool(jexpr, "generator").unwrap_or(false),
+            is_expression: json_get_bool(jexpr, "expression").unwrap_or(false),
             is_async: json_get_bool(jexpr, "async").unwrap_or(false),
         })
     }

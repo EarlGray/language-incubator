@@ -17,6 +17,7 @@ pub enum Statement {
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
+    FunctionDeclaration(FunctionDeclaration),
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +46,13 @@ pub enum DeclarationKind { Var, Let, Const }
 pub struct VariableDeclaration {
     pub kind: DeclarationKind,
     pub declarations: Vec<VariableDeclarator>,
+}
+
+// ==============================================
+#[derive(Clone, Debug)]
+pub struct FunctionDeclaration {
+    pub id: Identifier,     // might be different from function.id
+    pub function: FunctionExpression,
 }
 
 // ==============================================
@@ -132,8 +140,8 @@ pub struct FunctionExpression {
     pub id: Option<Identifier>,
     pub params: Vec<FunctionParameter>,
     pub body: Box<BlockStatement>,
-    pub generator: bool,
-    pub expression: bool,
+    pub is_generator: bool,
+    pub is_expression: bool,
     pub is_async: bool,
 }
 
