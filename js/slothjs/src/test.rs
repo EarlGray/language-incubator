@@ -510,13 +510,14 @@ fn test_unary_operations() {
     assert!( evalbool("let a = {one: 1}; delete a['one']") );
     assert_eq!( eval("let a = {one: 1}; delete a.two; a"),   json!({"one": 1.0}) );
     assert!( evalbool("let a = {one: 1}; delete a.two") );
-    //assert!( !evalbool("delete undefined") );   // global.undefined is not configurable
-    //assert!( !evalbool("var a = 1; delete a")); // vars are not configurable
-    assert!( evalbool("a = 1; delete a") );     // but these are.
-    assert!( evalbool("delete 0") );            // don't ask.
-    //assert!( evalbool("delete x") );
-    // assert!( evalbool("let a = ['one', 'two']; delete a[2]") );
-    // assert!( evalbool("let a = ['one', 'two']; delete a[1]") );
+    assert_eval!( "delete undefined",     false ); // global.undefined is not configurable
+    assert_eval!( "var a = 1; delete a",  false); // vars are not configurable
+    assert_eval!( "a = 1; delete a",      true ); // but these are.
+    assert_eval!( "delete 0",             true ); // don't ask.
+    //assert_eval!( "delete x", true );
+    //assert_eval!( "let a = ['one', 'two']; delete a[2]", true );
+    //assert_eval!("let a = ['one', 'two']; delete a[1]", true);
+    //assert_eval!("let a = ['one', 'two']; delete a[0]; a[0] === undefined", true);
 }
 
 #[test]
@@ -534,25 +535,25 @@ fn test_functions() {
     assert_eval!( "(function () { return true; })()",   true );
 
     // return returns immediately
-    assert!( evalbool(r#"
+    assert_eval!(r#"
         let func = function() { return true; return false; };
         func()
-    "#));
+    "#, true);
 
     // the arguments are always fresh
-    assert_eq!( eval(r#"
+    assert_eval!(r#"
         let twice = function(x) { return x + x; };
         twice(12)
         twice('a')
-    "#), JSON::from("aa"));
+    "#, "aa");
 
     // function scope
-    assert_eq!( eval(r#"
-        let x = 1;
+    assert_eval!(r#"
+        let x = 'outer';
         twice = function(x) { return x + x; };
-        twice(12)
+        twice('inner')
         x
-    "#), JSON::from(1.0));
+    "#, "outer");
 
     // `arguments`
     assert_eval!("(function() { return arguments; })(1, 2)",  [1.0, 2.0]);
@@ -567,6 +568,10 @@ fn test_functions() {
 
     // immediate/anonymous function call
     assert_eval!( "(function(x) { return x + x; })(12)",   24.0);
+    assert_eval!(r#"
+        let a = [function() { return 8; }, function() { return 12; }];
+        a[0]()
+    "#, 8.0);
 
     // closures
     assert_eval!(r#"

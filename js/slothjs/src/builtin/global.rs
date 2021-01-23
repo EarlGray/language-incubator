@@ -62,8 +62,8 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
 
     let global = heap.get_mut(Heap::GLOBAL);
 
-    global.set_readonly("NaN", Content::from(f64::NAN))?;
-    global.set_readonly("undefined", Content::from(JSValue::Undefined))?;
+    global.set_system("NaN", Content::from(f64::NAN))?;
+    global.set_system("undefined", Content::from(JSValue::Undefined))?;
 
     global.set_hidden("parseInt", Content::from(parse_int_ref))?;
 

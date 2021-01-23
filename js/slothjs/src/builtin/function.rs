@@ -29,7 +29,7 @@ fn function_proto_call(
     if arguments.len() == 0 {
         arguments.push(Interpreted::VOID);
     }
-    arguments.rotate_left(1);
+    arguments.rotate_left(1);   // [this, arg1, .. , argN] => [arg1, .. , argN, this]
     let this_arg = arguments.pop().unwrap();
     let bound_this = this_arg.to_ref(heap).unwrap_or(Heap::NULL);
     heap.execute(this_ref, bound_this, &method_name, arguments)

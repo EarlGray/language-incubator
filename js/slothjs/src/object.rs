@@ -800,10 +800,18 @@ impl Interpreted {
     pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
         match self {
             Interpreted::Member{ of, name } => {
-                heap.get_mut(*of).properties.remove(name);
-                // TODO: do not remove non-configurable properties
-                // TODO: do not remove global/functions variables
-                Ok(())
+                let object = heap.get_mut(*of);
+                let configurable = match object.properties.get(name) {
+                    Some(p) => p.access.configurable(),
+                    None => return Ok(()),
+                };
+                if configurable {
+                    object.properties.remove(name);
+                    Ok(())
+                } else {
+                    let what = Interpreted::from(*of);
+                    Err(Exception::TypeErrorNotConfigurable(what, name.to_string()))
+                }
             }
             _ => Ok(()),
         }

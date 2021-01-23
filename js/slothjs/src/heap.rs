@@ -12,7 +12,6 @@ use crate::object::{
     Content,
     Interpreted,
     ObjectValue,
-    Property,
     JSON,
     JSObject,
     JSValue,
@@ -208,7 +207,7 @@ impl Heap {
     pub fn lookup_protochain(&self, mut objref: JSRef, propname: &str) -> Option<Interpreted> {
         while objref != Heap::NULL {
             let object = self.get(objref);
-            if object.properties.contains_key(propname) {
+            if object.get_value(propname).is_some() {
                 return Some(Interpreted::member(objref, propname));
             }
 
@@ -269,8 +268,8 @@ impl Heap {
             Some(_) => unreachable!(),
             None => return Err(Exception::TypeErrorNotCallable(callee.clone()))
         };
-        let funcobj_ref = match self.get(of).properties.get(&name) {
-            Some(Property{ content: Content::Value(JSValue::Ref(func_ref)), ..}) => *func_ref,
+        let funcobj_ref = match self.get(of).get_value(&name) {
+            Some(JSValue::Ref(func_ref)) => *func_ref,
             _ => return Err(Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))
         };
 
