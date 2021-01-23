@@ -40,6 +40,8 @@ impl Interpretable for Statement {
             Statement::Block(stmt)                  => stmt.interpret(heap),
             Statement::If(stmt)                     => stmt.interpret(heap),
             Statement::For(stmt)                    => stmt.interpret(heap),
+            Statement::Break(stmt)                  => stmt.interpret(heap),
+            Statement::Continue(stmt)               => stmt.interpret(heap),
             Statement::Return(stmt)                 => stmt.interpret(heap),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
             Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
@@ -88,7 +90,13 @@ impl Interpretable for ForStatement {
             if !testval { break }
 
             // body
-            self.body.interpret(heap)?;
+            let result = self.body.interpret(heap);
+            match result {
+                Ok(_) => (),
+                Err(Exception::JumpContinue(None)) => continue,
+                Err(Exception::JumpBreak(None)) => break,
+                Err(e) => return Err(e),
+            };
 
             // update
             if let Some(updateexpr) = self.update.as_ref() {
@@ -96,6 +104,20 @@ impl Interpretable for ForStatement {
             }
         }
         Ok(Interpreted::VOID)
+    }
+}
+
+impl Interpretable for BreakStatement {
+    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let BreakStatement(maybe_label) = self;
+        Err(Exception::JumpBreak(maybe_label.clone()))
+    }
+}
+
+impl Interpretable for ContinueStatement {
+    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let ContinueStatement(maybe_label) = self;
+        Err(Exception::JumpContinue(maybe_label.clone()))
     }
 }
 

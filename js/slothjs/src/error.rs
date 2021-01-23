@@ -1,4 +1,5 @@
 use crate::object::{Interpreted, JSON};
+use crate::ast::Identifier;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
@@ -29,6 +30,8 @@ pub enum Exception {
     TypeErrorInvalidDescriptor(Interpreted),
 
     JumpReturn(Interpreted),
+    JumpBreak(Option<Identifier>),
+    JumpContinue(Option<Identifier>),
 }
 
 pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {

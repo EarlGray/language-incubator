@@ -82,6 +82,14 @@ impl TryFrom<&JSON> for Statement {
                 let stmt = BlockStatement::try_from(json)?;
                 Ok(Statement::Block(stmt))
             }
+            "BreakStatement" => {
+                let stmt = BreakStatement::try_from(json)?;
+                Ok(Statement::Break(stmt))
+            }
+            "ContinueStatement" => {
+                let stmt = ContinueStatement::try_from(json)?;
+                Ok(Statement::Continue(stmt))
+            }
             "DoWhileStatement" => {
                 let mut stmt = ForStatement::try_from(json)?;
                 stmt.init = stmt.body.clone();
@@ -179,6 +187,38 @@ impl TryFrom<&JSON> for ForStatement {
         let jbody = json_get(json, "body")?;
         let body = Statement::try_from(jbody)?;
         Ok(ForStatement{ init, test, update, body })
+    }
+}
+
+impl TryFrom<&JSON> for BreakStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "BreakStatement")?;
+
+        let label = match value.get("label") {
+            Some(JSON::Null) => None,
+            Some(jlabel) => Some(Identifier::try_from(jlabel)?),
+            _ => None,
+        };
+
+        Ok(BreakStatement(label))
+    }
+}
+
+impl TryFrom<&JSON> for ContinueStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "ContinueStatement")?;
+
+        let label = match value.get("label") {
+            Some(JSON::Null) => None,
+            Some(jlabel) => Some(Identifier::try_from(jlabel)?),
+            _ => None,
+        };
+
+        Ok(ContinueStatement(label))
     }
 }
 

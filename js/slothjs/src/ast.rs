@@ -14,6 +14,8 @@ pub enum Statement {
     If(Box<IfStatement>),
     For(Box<ForStatement>),
     Return(ReturnStatement),
+    Break(BreakStatement),
+    Continue(ContinueStatement),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -78,6 +80,13 @@ pub struct ForStatement {
     pub update: Option<Expr>,
     pub body: Statement,
 }
+
+// ==============================================
+#[derive(Clone, Debug)]
+pub struct BreakStatement(pub Option<Identifier>);
+
+#[derive(Clone, Debug)]
+pub struct ContinueStatement(pub Option<Identifier>);
 
 // ==============================================
 #[derive(Clone, Debug)]

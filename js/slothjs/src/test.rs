@@ -399,12 +399,9 @@ fn test_loops() {
         a
     "#, true);
 
-    /*
     // break
-    assert!( evalbool(r#"
-        for (;;) break;
-        true
-    "#));
+    assert_eval!("for (;;) break; true", true);
+    assert_eval!("c = 0; i = 5; while (--i) { ++c; break; ++c }; c", 1.0);
 
     // continue
     assert!( evalbool(r#"
@@ -418,7 +415,9 @@ fn test_loops() {
         a
     "#));
 
-    // labelled break
+    /*
+    // labeled break
+    assert_eval!("c = 0; label: { ++c; break label; ++c; }; c", 1.0);
     assert!( evalbool(r#"
         let a = false;
         label: do {
