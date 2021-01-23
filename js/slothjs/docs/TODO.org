@@ -38,7 +38,7 @@
 ** TODO ~&=~
 ** TODO ~|=~
 * TODO SwitchStatement
-* TODO UpdateExpression
+* DONE [2021-01-23 Sat] UpdateExpression
 * TODO BreakStatement, ContinueStatement
 * TODO WhileStatement
 * TODO DoWhileStatement

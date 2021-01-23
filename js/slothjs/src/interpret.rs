@@ -166,6 +166,7 @@ impl Interpretable for Expr {
             Expr::Assign(expr) =>               expr.interpret(heap),
             Expr::Conditional(expr) =>          expr.interpret(heap),
             Expr::Unary(expr) =>                expr.interpret(heap),
+            Expr::Update(expr) =>               expr.interpret(heap),
             Expr::Function(expr) =>             expr.interpret(heap),
             Expr::New(expr) =>                  expr.interpret(heap),
             Expr::This =>                       heap.interpret_this(),
@@ -253,6 +254,31 @@ impl Interpretable for UnaryExpression {
             UnOp::Void => JSValue::Undefined,
         };
         Ok(Interpreted::Value(value))
+    }
+}
+
+impl Interpretable for UpdateExpression {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let UpdateExpression(op, prefix, argexpr) = self;
+        let assignee = argexpr.interpret(heap)?;
+        let oldvalue = assignee.to_value(heap)?;
+        let oldnum = oldvalue.numberify(heap).unwrap_or(f64::NAN);
+
+        let newnum = match op {
+            UpdOp::Increment => oldnum + 1.0,
+            UpdOp::Decrement => oldnum - 1.0,
+        };
+
+        match assignee {
+            Interpreted::Member{of, name} => {
+                heap.get_mut(of)
+                    .update(&name, JSValue::from(newnum))
+                    .or_else(crate::error::ignore_set_readonly)?;
+            }
+            _ => return Err(Exception::TypeErrorCannotAssign(assignee))
+        }
+        let resnum = if *prefix { newnum } else { oldnum };
+        Ok(Interpreted::from(resnum))
     }
 }
 
@@ -363,12 +389,9 @@ impl Interpretable for AssignmentExpression {
             match assignee {
                 Interpreted::Member{of, name} => {
                     let value = value.to_value(heap)?;
-                    heap.get_mut(of).update(&name, value.clone()).or_else(|e|
-                        match e {
-                            Exception::TypeErrorSetReadonly(_, _) => Ok(()),
-                            _ => Err(e)
-                        }
-                    )?;
+                    heap.get_mut(of)
+                        .update(&name, value.clone())
+                        .or_else(crate::error::ignore_set_readonly)?;
                     Ok(Interpreted::Value(value))
                 }
                 _ => Err(Exception::TypeErrorCannotAssign(assignee))

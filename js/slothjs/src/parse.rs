@@ -357,6 +357,10 @@ impl TryFrom<&JSON> for Expr {
                 let expr = UnaryExpression::try_from(jexpr)?;
                 Expr::Unary(expr)
             }
+            "UpdateExpression" => {
+                let expr = UpdateExpression::try_from(jexpr)?;
+                Expr::Update(expr)
+            }
             _ =>
                 return Err(ParseError::UnknownType{ value: jexpr.clone() }),
         };
@@ -396,6 +400,28 @@ impl TryFrom<&JSON> for UnaryExpression {
         let argument = Expr::try_from(jargument)?;
 
         Ok(UnaryExpression(op, Box::new(argument)))
+    }
+}
+
+impl TryFrom<&JSON> for UpdateExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jargument = json_get(jexpr, "argument")?;
+        let argument = Expr::try_from(jargument)?;
+
+        let prefix = json_get_bool(jexpr, "prefix")?;
+        let operator = json_get_str(jexpr, "operator")?;
+
+        let op = match operator {
+            "++" => UpdOp::Increment,
+            "--" => UpdOp::Decrement,
+            _ => return Err(ParseError::UnexpectedValue{
+                want: "++ or --",
+                value: jexpr.clone(),
+            })
+        };
+        Ok(UpdateExpression(op, prefix, Box::new(argument)))
     }
 }
 

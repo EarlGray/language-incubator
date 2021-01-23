@@ -97,6 +97,7 @@ pub enum Expr {
     Assign(AssignmentExpression),
     Conditional(ConditionalExpression),
     Unary(UnaryExpression),
+    Update(UpdateExpression),
     Function(FunctionExpression),
     This,
     New(NewExpression),
@@ -115,6 +116,12 @@ pub struct BinaryExpression(pub Box<Expr>, pub BinOp, pub Box<Expr>);
 pub struct LogicalExpression(pub Box<Expr>, pub BoolOp, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
+pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct UpdateExpression(pub UpdOp, pub bool, pub Box<Expr>);
+
+#[derive(Clone, Debug)]
 pub struct CallExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
 
 #[derive(Clone, Debug)]
@@ -131,9 +138,6 @@ pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
 pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
-
-#[derive(Clone, Debug)]
-pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
@@ -193,4 +197,10 @@ pub enum UnOp {
     Typeof,
     Void,
     Delete,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdOp {
+    Increment,
+    Decrement,
 }

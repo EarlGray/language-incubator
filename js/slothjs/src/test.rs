@@ -373,7 +373,7 @@ fn test_loops() {
     // for (<init>; <test>; <update)
     assert_eq!( eval(r#"
         var a = 0;
-        for (var i = 0; i < 5; i += 1) {
+        for (var i = 0; i < 5; i++) {
             a = a + 1;
         }
         a
@@ -518,6 +518,26 @@ fn test_unary_operations() {
     //assert_eval!( "let a = ['one', 'two']; delete a[2]", true );
     //assert_eval!("let a = ['one', 'two']; delete a[1]", true);
     //assert_eval!("let a = ['one', 'two']; delete a[0]; a[0] === undefined", true);
+}
+
+#[test]
+fn test_update_operations() {
+    assert_eval!("var a = 0; ++a", 1.0);
+    assert_eval!("var a = 1; ++a; a", 2.0);
+    assert_eval!("var a = 0; a++", 0.0);
+    assert_eval!("var a = 0; a++; a", 1.0);
+    assert_eval!("var a = 1; --a", 0.0);
+    assert_eval!("var a = 1; --a; a", 0.0);
+    assert_eval!("var a = 1; a--", 1.0);
+    assert_eval!("var a = 1; a--; a", 0.0);
+
+    assert_eval!("var a = false; ++a",  1.0);
+    assert_eval!("var a = false; ++a; a", 1.0);
+    assert_eval!("var a = [2]; ++a",    3.0);
+    assert_eval!("var a = {}; ++a",     (f64::NAN));
+    assert_eval!("var a = 'nope'; ++a", (f64::NAN));
+    assert_eval!("var a = '5'; ++a",    6.0);
+    assert_eval!("++undefined",         (f64::NAN));
 }
 
 #[test]
