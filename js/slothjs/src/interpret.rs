@@ -76,20 +76,11 @@ impl Interpretable for IfStatement {
     }
 }
 
-impl Interpretable for ForStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        self.init.interpret(heap)?;
-        loop {
-            // test
-            let testval = match self.test.as_ref() {
-                None => true,
-                Some(testexpr) => {
-                    let result = testexpr.interpret(heap)?;
-                    result.to_value(heap)?.boolify(heap)
-                }
-            };
-            if !testval { break }
-
+impl ForStatement {
+    /// `do_loop()` executes the loop except its `init` statement.
+    /// `init` must be interpreted before this, if needed.
+    fn do_loop(&self, heap: &mut Heap) -> Result<(), Exception> {
+        while self.should_iterate(heap)? {
             // body
             let result = self.body.interpret(heap);
             match result {
@@ -99,11 +90,33 @@ impl Interpretable for ForStatement {
                 Err(e) => return Err(e),
             };
 
-            // update
-            if let Some(updateexpr) = self.update.as_ref() {
-                updateexpr.interpret(heap)?;
+            self.do_update(heap)?;
+        }
+        Ok(())
+    }
+
+    fn should_iterate(&self, heap: &mut Heap) -> Result<bool, Exception> {
+        match self.test.as_ref() {
+            None => Ok(true),
+            Some(testexpr) => {
+                let result = testexpr.interpret(heap)?;
+                Ok(result.to_value(heap)?.boolify(heap))
             }
         }
+    }
+
+    fn do_update(&self, heap: &mut Heap) -> Result<(), Exception> {
+        if let Some(updateexpr) = self.update.as_ref() {
+            updateexpr.interpret(heap)?;
+        }
+        Ok(())
+    }
+}
+
+impl Interpretable for ForStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        self.init.interpret(heap)?;
+        self.do_loop(heap)?;
         Ok(Interpreted::VOID)
     }
 }
@@ -122,16 +135,41 @@ impl Interpretable for ContinueStatement {
     }
 }
 
+impl LabelStatement {
+    fn continue_loop(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let LabelStatement(label, body) = self;
+        loop {
+            // must be a loop to continue
+            let loop_stmt = match &**body {
+                Statement::For(stmt) => stmt,
+                _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone()))
+            };
+
+            loop_stmt.do_update(heap)?;
+            let result = loop_stmt.do_loop(heap);
+            match result {
+                Err(Exception::JumpContinue(Some(target))) if &target == label => continue,
+                Err(Exception::JumpBreak(Some(target))) if &target == label => break,
+                Err(e) => return Err(e),
+                Ok(()) => break,
+            }
+        }
+        Ok(Interpreted::VOID)
+    }
+}
+
 impl Interpretable for LabelStatement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let LabelStatement(label, body) = self;
 
         let result = body.interpret(heap);
         match result {
-            Err(Exception::JumpBreak(Some(target))) if &target == label =>
-                Ok(Interpreted::VOID),
-            Err(Exception::JumpContinue(Some(target))) if &target == label =>
-                todo!(),
+            Err(Exception::JumpBreak(Some(target))) if &target == label => {
+                Ok(Interpreted::VOID)
+            }
+            Err(Exception::JumpContinue(Some(target))) if &target == label => {
+                self.continue_loop(heap)
+            }
             _ => result,
         }
     }

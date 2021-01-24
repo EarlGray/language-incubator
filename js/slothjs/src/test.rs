@@ -16,7 +16,7 @@ const ESPARSE: &str = "./node_modules/.bin/esparse";
 
 fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let mut child = Command::new(ESPARSE)
-        .arg("--loc")
+        //.arg("--loc")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -427,7 +427,22 @@ fn test_loops() {
         a
     "#, true);
 
-    // TODO: labeled continue
+    // labeled continue
+    assert_eval!(r#"
+        c = 0;
+        outer:
+        for (var i = 0; i < 2; ++i) {
+            for (var j = 0; j < 10; ++j) {
+                ++c;
+                continue outer;
+            }
+        }
+        c
+    "#, 2.0);
+    assert_exception!(
+        "c = 0; label: { ++c; continue label; ++c; }",
+        Exception::SyntaxErrorContinueLabelNotALoop
+    );
 
     /*
     assert_eq!( eval(r#"
