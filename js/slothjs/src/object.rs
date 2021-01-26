@@ -240,15 +240,23 @@ impl JSValue {
         Ok(JSValue::numerically(self, other, heap, |a, b| a - b))
     }
 
-
-    pub fn less(&self, other: &JSValue, heap: &Heap) -> JSValue {
+    pub fn compare<
+        StrCmpFn: Fn(&str, &str) -> bool,
+        NumCmpFn: Fn(f64, f64) -> bool,
+    >(
+        &self,
+        other: &JSValue,
+        heap: &Heap,
+        stringly: StrCmpFn,
+        numberly: NumCmpFn,
+    ) -> JSValue {
         // TODO: Abstract Relational Comparison
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
-            return JSValue::from(lstr < rstr);
+            return JSValue::from(stringly(lstr, rstr));
         };
         let lnum = self.numberify(heap).unwrap_or(f64::NAN);
         let rnum = other.numberify(heap).unwrap_or(f64::NAN);
-        JSValue::from(lnum < rnum)
+        JSValue::from(numberly(lnum, rnum))
     }
 }
 

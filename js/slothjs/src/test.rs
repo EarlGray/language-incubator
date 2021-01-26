@@ -137,7 +137,7 @@ fn test_literals() {
 }
 
 #[test]
-fn test_binary_operations() {
+fn test_binary_addition() {
     // O_o
     assert_eq!( eval("2 + 2"),          JSON::from(4.0) );
     assert_eq!( eval("'1' + '2'"),      JSON::from("12") );
@@ -152,7 +152,10 @@ fn test_binary_operations() {
     assert_eval!( "({} + {})",     "[object Object][object Object]" );
     assert_eval!( "({} + [])",     "[object Object]" ); // expression
     assert_eval!( "{} +[]",         0.0 );              // two statements
+}
 
+#[test]
+fn test_binary_subtraction() {
     assert_eval!( "5 - 3",  2.0 );
     assert_eval!( "3.5 - 5",  (-1.5) );
     assert_eval!( "5 - 'hello'",  (f64::NAN) );
@@ -162,9 +165,10 @@ fn test_binary_operations() {
     assert_eval!( "'lol' * 3",  (f64::NAN) );
     assert_eval!( "'2' * '3'",  6.0 );
     assert_eval!( "3 * null",   0.0 );
+}
 
-
-    // o_O
+#[test]
+fn test_binary_loose_equality() {
     assert!( evalbool("2 == 2") );
     assert!( !evalbool("2 == 3") );
     assert!( evalbool("'2' == 2") );
@@ -190,7 +194,10 @@ fn test_binary_operations() {
     assert!( !evalbool("null != null") );
     assert!( !evalbool("null != undefined") );
     assert!( evalbool("NaN != NaN") );
+}
 
+#[test]
+fn test_binary_strict_equality() {
     assert!( evalbool("2 !== 3") );
     assert!( evalbool("2 === 2") );
     assert!( evalbool("+0 === -0") );
@@ -204,46 +211,90 @@ fn test_binary_operations() {
     assert!( !evalbool("0 === {}") );
     assert!( evalbool("null === null") );
     assert!( !evalbool("null === undefined") );
+}
 
-    assert!( !evalbool("'a' < 'a'") );
-    assert!( evalbool("1 < 2") );
-    assert!( !evalbool("'113' < 13") );
-    assert!( evalbool("'0' < '00'") );
-    assert!( !evalbool("'0' < 0") );
-    assert!( evalbool("'a' < 'b'") );
-    assert!( !evalbool("'aa' < 'a'") );
-    assert!( evalbool("null < 1") );
-    assert!( !evalbool("undefined < 1") );
-    assert!( !evalbool("NaN < 3") );
-    assert!( !evalbool("NaN < NaN") );
-    assert!( !evalbool("undefined < NaN") );
-    //assert!( evalbool("[1, 1] < [2]") );
+#[test]
+fn test_binary_compare_less() {
+    assert_eval!("1 < 2", true);
+    assert_eval!("'0' < '00'", true);
+    assert_eval!("'a' < 'b'", true);
+    assert_eval!("null < 1", true);
+    //assert_eval!("[1, 1] < [2]", true);
 
-    /*
-    assert!( !evalbool("'a' > 'a'") );
-    assert!( !evalbool("1 > 2") );
-    assert!( evalbool("'113' > 13") );
-    assert!( !evalbool("'0' > '00'") );
-    assert!( !evalbool("'0' > 0") );
-    assert!( !evalbool("'a' > 'b'") );
-    assert!( evalbool("'aa' > 'a'") );
-    assert!( !evalbool("null > 1") );
-    */
+    assert_eval!("'a' < 'a'", false);
+    assert_eval!("'113' < 13", false);
+    assert_eval!("'0' < 0", false);
+    assert_eval!("'aa' < 'a'", false);
+    assert_eval!("undefined < 1", false);
+    assert_eval!("NaN < 3", false);
+    assert_eval!("NaN < NaN", false);
+    assert_eval!("undefined < NaN", false);
 
-    /*
-    assert!( evalbool("1 <= 2") );
-    assert!( !evalbool("2 <= 1") );
-    assert!( evalbool("2 <= 2") );
-    assert!( !evalbool("undefined <= undefined") );
-    */
+    assert_eval!("1 <= 2", true);
+    assert_eval!("2 <= 2", true);
+    assert_eval!("2 <= 1", false);
+    assert_eval!("undefined <= undefined", false);
+}
 
-    /*
+#[test]
+fn test_binary_compare_greater() {
+    assert_eval!("'113' > 13", true);
+    assert_eval!("'aa' > 'a'", true);
+
+    assert_eval!("'a' > 'a'", false);
+    assert_eval!("1 > 2", false);
+    assert_eval!("'0' > '00'", false);
+    assert_eval!("'0' > 0", false);
+    assert_eval!("'a' > 'b'", false);
+    assert_eval!("null > 1", false);
+
+    assert_eval!("2 >= 1", true);
+    assert_eval!("1 >= 2", false);
+    assert_eval!("2 >= 2", true);
+    assert_eval!("NaN >= NaN", false);
+    assert_eval!("undefined >= undefined", false);
+}
+
+/*
+#[test]
+fn test_binary_instanceof() {
+    assert_eval!("({} instanceof Object)", true);
+    assert_eval!("[] instanceof Array", true);
+    assert_eval!("({} instanceof Boolean)", false);
+    assert_eval!("true instanceof Boolean", false);
+    assert_eval!("Object(false) instanceof Boolean", true);
+    assert_eval!("Object(false) instanceof Array", false);
+    assert_eval!(r#"
+        let Class = function() {};
+        let obj = new Class();
+        (obj instanceof Class) && !({} instanceof Class)
+    "#, true);
+    assert_eval!(r#"
+        let Class = function() {};
+        let obj = new Class();
+        (obj instanceof Class) && !({} instanceof Class)
+    "#, true);
+    assert_eval!(r#"
+        let Class = function() {};
+        let Subclass = function() {};
+        Subclass.prototype = Object.create(Class)
+        let obj = new Class();
+        (obj instanceof Class) && !(obj instanceof Subclass)
+    "#, true);
+    assert_eval!(r#"
+        let Class = function() {};
+        let Subclass = function() {};
+        Subclass.prototype = Object.create(Class)
+        let obj = new Subclass();
+        (obj instanceof Class) && (obj instanceof Subclass)
+    "#, true);
+}
+
+#[test]
+fn test_binary_in() {
     assert!( evalbool("1 in [1, 2, 3]") );
     assert!( !evalbool("0 in [1, 2, 3]") );
 
-    assert!( evalbool("{} instanceof Object") );
-    assert_eq!( eval("5 - 3"), JSValue::from(2) );
-    assert!( evalbool("isNaN('a' - 3)"));
 
     assert_eq!( eval("6 / 3"), JSValue::from(2) );
 
@@ -261,8 +312,11 @@ fn test_binary_operations() {
     assert_eq!( eval("0xA5 >> 4"), JSValue::from(0xA));
 
     assert_eq!( eval("0xA5 >>> 4"), JSValue::from(0xA));
-    */
+}
+*/
 
+#[test]
+fn test_binary_logical() {
     assert_eval!( "true && true", true );
     assert_eval!( "true && false", false );
     assert_eval!( "1 && 2",     2.0 );

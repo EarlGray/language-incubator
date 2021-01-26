@@ -4,6 +4,12 @@
 * DONE [2020-12-22 Tue] ForStatement
 * DONE [2021-01-23 Sat] WhileStatement
 * DONE [2021-01-23 Sat] DoWhileStatement
+* DONE [2021-01-24 Sun] BreakStatement, ContinueStatement
+** DONE [2021-01-23 Sat] BreakStatement
+** DONE [2021-01-23 Sat] ContinueStatement
+** DONE [2021-01-23 Sat] LabeledStatement
+** DONE [2021-01-23 Sat] labeled break
+** DONE [2021-01-24 Sun] labeled continue
 * DONE [2020-12-26 Sat] mutable values and assignment
 * DONE [2021-01-14 Thu] rewrite the =Heap= to be =Vec<JSObject>=
 * DONE [2020-12-31 Thu] make it a library
@@ -15,11 +21,17 @@
 * DONE [2021-01-19 Tue] LogicalExpression...
 ** DONE [2021-01-19 Tue] &&
 ** DONE [2021-01-19 Tue] ||
+* DONE [2021-01-04 Mon] UnaryExpression
+** DONE [2021-01-03 Sun] everything, except...
+** DONE [2021-01-04 Mon] =delete=
 * TODO BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
 ** DONE [2021-01-13 Wed] ~+~ between all types
 ** DONE [2021-01-19 Tue] ~===~
+** DONE [2021-01-26 Tue] =<=
+** DONE [2021-01-26 Tue] ~<=~
+** DONE [2021-01-26 Tue] ~>~
 ** TODO =instanceof=
 ** TODO =in=
 ** TODO =/=
@@ -27,8 +39,6 @@
 ** TODO =**=
 ** TODO =|=
 ** TODO =^=
-** TODO =<=
-** TODO ~<=~
 ** TODO =<<=
 ** TODO =>>=
 ** TODO =>>>=
@@ -41,16 +51,7 @@
 ** TODO ~&=~
 ** TODO ~|=~
 * TODO SwitchStatement
-* DONE [2021-01-24 Sun] BreakStatement, ContinueStatement
-** DONE [2021-01-23 Sat] BreakStatement
-** DONE [2021-01-23 Sat] ContinueStatement
-** DONE [2021-01-23 Sat] LabeledStatement
-** DONE [2021-01-23 Sat] labeled break
-** DONE [2021-01-24 Sun] labeled continue
 * TODO ForInExpression
-* DONE [2021-01-04 Mon] UnaryExpression
-** DONE [2021-01-03 Sun] everything, except...
-** DONE [2021-01-04 Mon] =delete=
 * TODO user exceptions
 ** TODO =try=, =catch=, =finally=
 ** TODO stacktraces with source locations
