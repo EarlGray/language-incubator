@@ -121,6 +121,10 @@ impl TryFrom<&JSON> for Statement {
                 let stmt = ReturnStatement::try_from(json)?;
                 Ok(Statement::Return(stmt))
             }
+            "ThrowStatement" => {
+                let stmt = ThrowStatement::try_from(json)?;
+                Ok(Statement::Throw(stmt))
+            }
             "VariableDeclaration" => {
                 let decl = VariableDeclaration::try_from(json)?;
                 Ok(Statement::VariableDeclaration(decl))
@@ -265,6 +269,17 @@ impl TryFrom<&JSON> for ReturnStatement {
     }
 }
 
+impl TryFrom<&JSON> for ThrowStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(value: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(value, "type", "ThrowStatement")?;
+
+        let jargument = json_get(value, "argument")?;
+        let argument = Expr::try_from(jargument)?;
+        Ok(ThrowStatement(argument))
+    }
+}
 
 impl TryFrom<&JSON> for VariableDeclaration {
     type Error = ParseError<JSON>;

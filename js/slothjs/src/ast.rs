@@ -17,6 +17,7 @@ pub enum Statement {
     Break(BreakStatement),
     Continue(ContinueStatement),
     Label(LabelStatement),
+    Throw(ThrowStatement),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -96,6 +97,9 @@ pub struct LabelStatement(pub Identifier, pub Box<Statement>);
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct ReturnStatement(pub Option<Expr>);
+
+#[derive(Clone, Debug)]
+pub struct ThrowStatement(pub Expr);
 
 // ==============================================
 #[derive(Debug, Clone)]

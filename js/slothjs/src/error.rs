@@ -1,4 +1,4 @@
-use crate::object::{Interpreted, JSON};
+use crate::object::{Interpreted, JSON, JSValue};
 use crate::ast::Identifier;
 
 #[allow(dead_code)]
@@ -33,6 +33,8 @@ pub enum Exception {
     JumpReturn(Interpreted),
     JumpBreak(Option<Identifier>),
     JumpContinue(Option<Identifier>),
+
+    UserThrown(JSValue),
 }
 
 pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {

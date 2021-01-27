@@ -44,6 +44,7 @@ impl Interpretable for Statement {
             Statement::Continue(stmt)               => stmt.interpret(heap),
             Statement::Label(stmt)                  => stmt.interpret(heap),
             Statement::Return(stmt)                 => stmt.interpret(heap),
+            Statement::Throw(stmt)                  => stmt.interpret(heap),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
             Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
         }
@@ -191,6 +192,15 @@ impl Interpretable for ReturnStatement {
             Some(argexpr) => argexpr.interpret(heap)?,
         };
         Err(Exception::JumpReturn(returned))
+    }
+}
+
+impl Interpretable for ThrowStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let ThrowStatement(exc_expr) = self;
+        let exc_value = exc_expr.interpret(heap)?;
+        let exc_value = exc_value.to_value(heap)?;
+        Err(Exception::UserThrown(exc_value))
     }
 }
 

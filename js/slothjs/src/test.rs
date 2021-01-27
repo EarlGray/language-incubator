@@ -510,20 +510,23 @@ fn test_loops() {
      */
 }
 
-/*
 #[test]
 fn test_exceptions() {
-    assert!(evalbool(r#"
-        let a = false;
+    assert_exception!("throw ''", Exception::UserThrown);
+    assert_eval!("try { nosuch; } catch (e) {}", );
+    /*
+    assert_eval!(r#"
+        let a = false, b = true;
         try {
             throw '';
+            b = false;
         } catch (e) {
             a = true;
         }
-        a
-    "#));
+        a && b
+    "#, true));
+    */
 }
-*/
 
 #[test]
 fn test_unary_operations() {
