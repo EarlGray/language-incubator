@@ -41,6 +41,28 @@ fn json_get_array<'a>(
     jarray.as_array().ok_or(ParseError::ShouldBeArray{ value: jarray.clone() })
 }
 
+/// maps `null` into None, an object into Some(T) using a closure.
+fn json_map_object<'a, T, F>(
+    json: &'a JSON,
+    action: F,
+) -> Result<Option<T>, ParseError<JSON>>
+where
+    F: Fn(&JSON) -> Result<T, ParseError<JSON>>
+{
+    match json {
+        JSON::Null => Ok(None),
+        JSON::Object(_) => {
+            let value = action(json)?;
+            Ok(Some(value))
+        }
+        _ => {
+            let want = "null | object";
+            let value = json.clone();
+            Err(ParseError::UnexpectedValue{want, value})
+        }
+    }
+}
+
 fn json_expect_str<'a>(
     json: &'a JSON,
     property: &'static str,
@@ -124,6 +146,10 @@ impl TryFrom<&JSON> for Statement {
             "ThrowStatement" => {
                 let stmt = ThrowStatement::try_from(json)?;
                 Ok(Statement::Throw(stmt))
+            }
+            "TryStatement" => {
+                let stmt = TryStatement::try_from(json)?;
+                Ok(Statement::Try(stmt))
             }
             "VariableDeclaration" => {
                 let decl = VariableDeclaration::try_from(json)?;
@@ -253,17 +279,10 @@ impl TryFrom<&JSON> for ReturnStatement {
         json_expect_str(value, "type", "ReturnStatement")?;
 
         let jargument = json_get(value, "argument")?;
-        let argument = match jargument {
-            JSON::Object(_) => {
-                let argexpr = Expr::try_from(jargument)?;
-                Some(argexpr)
-            }
-            JSON::Null => None,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "null | object",
-                value: jargument.clone(),
-            })
-        };
+        let argument = json_map_object(
+            jargument,
+            |jobject| Expr::try_from(jobject)
+        )?;
 
         Ok(ReturnStatement(argument))
     }
@@ -278,6 +297,36 @@ impl TryFrom<&JSON> for ThrowStatement {
         let jargument = json_get(value, "argument")?;
         let argument = Expr::try_from(jargument)?;
         Ok(ThrowStatement(argument))
+    }
+}
+
+impl TryFrom<&JSON> for TryStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jstmt: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(jstmt, "type", "TryStatement")?;
+
+        let jblock = json_get(jstmt, "block")?;
+        let block = BlockStatement::try_from(jblock)?;
+
+        let jhandler = json_get(jstmt, "handler")?;
+        let handler = json_map_object(jhandler, |jobject| {
+            let jparam = json_get(jobject, "param")?;
+            let param = Identifier::try_from(jparam)?;
+
+            let jbody = json_get(jobject, "body")?;
+            let body = BlockStatement::try_from(jbody)?;
+
+            Ok(CatchClause{param, body})
+        })?;
+
+        let jfinalizer = json_get(jstmt, "finalizer")?;
+        let finalizer = json_map_object(
+            jfinalizer,
+            |jobject| BlockStatement::try_from(jobject)
+        )?;
+
+        Ok(TryStatement{block, handler, finalizer})
     }
 }
 
@@ -303,8 +352,7 @@ impl TryFrom<&JSON> for VariableDeclaration {
             json_expect_str(decl, "type", "VariableDeclarator")?;
 
             let jid = json_get(decl, "id")?;
-            json_expect_str(jid, "type", "Identifier")?;
-            let name = json_get_str(jid, "name")?.to_string();
+            let name = Identifier::try_from(jid)?;
 
             let jinit = json_get(decl, "init")?;
             let init = match jinit {

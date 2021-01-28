@@ -18,6 +18,7 @@ pub enum Statement {
     Continue(ContinueStatement),
     Label(LabelStatement),
     Throw(ThrowStatement),
+    Try(TryStatement),
 
     // TODO: move declarations out?
     VariableDeclaration(VariableDeclaration),
@@ -39,7 +40,7 @@ pub struct ExpressionStatement {
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct VariableDeclarator {
-    pub name: String,
+    pub name: Pattern,
     pub init: Option<Box<Expr>>,
 }
 
@@ -90,7 +91,6 @@ pub struct BreakStatement(pub Option<Identifier>);
 #[derive(Clone, Debug)]
 pub struct ContinueStatement(pub Option<Identifier>);
 
-// ==============================================
 #[derive(Clone, Debug)]
 pub struct LabelStatement(pub Identifier, pub Box<Statement>);
 
@@ -98,8 +98,22 @@ pub struct LabelStatement(pub Identifier, pub Box<Statement>);
 #[derive(Clone, Debug)]
 pub struct ReturnStatement(pub Option<Expr>);
 
+// ==============================================
 #[derive(Clone, Debug)]
 pub struct ThrowStatement(pub Expr);
+
+#[derive(Clone, Debug)]
+pub struct TryStatement{
+    pub block: BlockStatement,
+    pub handler: Option<CatchClause>,
+    pub finalizer: Option<BlockStatement>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CatchClause{
+    pub param: Pattern,
+    pub body: BlockStatement,
+}
 
 // ==============================================
 #[derive(Debug, Clone)]
@@ -160,7 +174,7 @@ pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
     pub id: Option<Identifier>,
-    pub params: Vec<FunctionParameter>,
+    pub params: Vec<Pattern>,
     pub body: Box<BlockStatement>,
     pub is_generator: bool,
     pub is_expression: bool,
@@ -168,7 +182,7 @@ pub struct FunctionExpression {
 }
 
 // TODO: enum { AssignmentPattern, Identifier, BindingPattern }
-pub type FunctionParameter = Identifier;
+pub type Pattern = Identifier;
 
 #[derive(Clone, Debug)]
 pub struct NewExpression(pub Box<Expr>, pub Vec<Box<Expr>>);

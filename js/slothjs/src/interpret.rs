@@ -45,6 +45,7 @@ impl Interpretable for Statement {
             Statement::Label(stmt)                  => stmt.interpret(heap),
             Statement::Return(stmt)                 => stmt.interpret(heap),
             Statement::Throw(stmt)                  => stmt.interpret(heap),
+            Statement::Try(stmt)                    => stmt.interpret(heap),
             Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
             Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
         }
@@ -86,7 +87,7 @@ impl ForStatement {
             let result = self.body.interpret(heap);
             match result {
                 Ok(_) => (),
-                Err(Exception::JumpContinue(None)) => continue,
+                Err(Exception::JumpContinue(None)) => (),
                 Err(Exception::JumpBreak(None)) => break,
                 Err(e) => return Err(e),
             };
@@ -204,13 +205,50 @@ impl Interpretable for ThrowStatement {
     }
 }
 
+impl TryStatement {
+    fn run_finalizer(&self, heap: &mut Heap) -> Result<(), Exception> {
+        if let Some(finalizer) = self.finalizer.as_ref() {
+            finalizer.interpret(heap)?;
+        }
+        Ok(())
+    }
+}
+
+impl Interpretable for TryStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let result = self.block.interpret(heap);
+        match &result {
+            Ok(_) |
+            Err(Exception::JumpReturn(_)) |
+            Err(Exception::JumpBreak(_)) |
+            Err(Exception::JumpContinue(_))
+            => {
+                self.run_finalizer(heap)?;
+                result
+            }
+            Err(_err) => {
+                let result = match &self.handler {
+                    None => result,
+                    Some(catch) => {
+                        // TODO: let $(catch.param) = $(err)
+                        // TODO: error mapping into Javascript
+                        catch.body.interpret(heap)
+                    }
+                };
+                self.run_finalizer(heap)?;
+                result
+            }
+        }
+    }
+}
+
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
             let optinit = decl.init.as_ref()
                 .map(|initexpr| initexpr.interpret(heap))
                 .transpose()?;
-            let name = &decl.name;
+            let name = &decl.name.0;
             heap.declare_var(Some(self.kind), name)?;
             if let Some(init) = optinit {
                 let value = init.to_value(heap)?;

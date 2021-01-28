@@ -513,8 +513,17 @@ fn test_loops() {
 #[test]
 fn test_exceptions() {
     assert_exception!("throw ''", Exception::UserThrown);
-    assert_eval!("try { nosuch; } catch (e) {}", );
-    /*
+    assert_eval!("try { nosuch; } catch(e) {}; true", true);
+    assert_eval!("try { lol.whut; } catch(e) {}; true", true);
+    assert_eval!("try { whut(); } catch(e) {}; true", true);
+    assert_eval!("try { Boolean.prototype.valueOf.call({}); } catch(e) {}; true", true);
+    assert_exception!(r#"
+        try {
+            throw 1;
+        } catch (e) {
+            throw 2;
+        };
+    "#, Exception::UserThrown);
     assert_eval!(r#"
         let a = false, b = true;
         try {
@@ -524,7 +533,55 @@ fn test_exceptions() {
             a = true;
         }
         a && b
-    "#, true));
+    "#, true);
+    assert_eval!(r#"
+        var c = 0;
+        try {
+            for (var i = 0; i < 5; ++i) {
+                throw i;
+                c += i;
+            }
+        } catch(e) {
+            c = true;
+        }
+        c
+    "#, true);
+    assert_eval!(r#"
+        var c = 0;
+        for (var i = 0; i < 5; ++i) {
+            try {
+                if (i == 1) continue;
+                if (i == 2) throw '?';
+                if (i == 4) break;
+                c += i;
+            } catch(e) {
+                c += 100;
+            }
+        }
+        c
+    "#, 103.0);
+    assert_eval!(r#"
+        var c = 0;
+        for (var i = 0; i < 5; ++i) {
+            try {
+                if (i == 1) continue;
+                if (i == 2) throw '?';
+                if (i == 4) break;
+                c += i;
+            }
+            catch(e) {}
+            finally { c += 100; }
+        }
+        c
+    "#, 503.0);
+    /* TODO: let-variables and block scope
+    assert_eval!(r#"
+        function throws() { throw true; }
+        var a = 0;
+        try { throws(); a = false; }
+        catch(e) { a = e };
+        a
+    "#, true);
     */
 }
 
