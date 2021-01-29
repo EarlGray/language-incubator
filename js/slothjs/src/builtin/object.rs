@@ -1,6 +1,5 @@
 /// The implementation of the Object object
 
-//use crate::object;
 use crate::object::{
     Access,
     Content,
@@ -43,14 +42,10 @@ fn object_constructor(
     heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
     let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let object_ref = match argument.to_value(heap)? {
-        JSValue::Undefined | JSValue::Ref(Heap::NULL) =>
-            heap.alloc(JSObject::new()),
-        JSValue::Bool(b) =>
-            heap.alloc(JSObject::from_bool(b)),
-        JSValue::Number(_) => todo!(),
-        JSValue::String(_) => todo!(),
-        JSValue::Ref(r) => r,
+    let value = argument.to_value(heap)?;
+    let object_ref = match value.objectify(heap) {
+        Heap::NULL => heap.alloc(JSObject::new()),
+        href => href
     };
     Ok(Interpreted::from(object_ref))
 }
@@ -62,6 +57,7 @@ fn object_proto_valueOf(
     _arguments: Vec<Interpreted>,
     _heap: &mut Heap
 ) -> Result<Interpreted, Exception> {
+    // primitive wrappers are handled by their own `.valueOf()`
     Ok(Interpreted::from(this_ref))
 }
 
@@ -83,19 +79,15 @@ fn object_object_is(
         (Ok(Number(lnum)), Ok(Number(rnum))) =>
             if f64::abs(lnum) == 0.0 && f64::abs(rnum) == 0.0 {
                 f64::is_sign_positive(lnum) == f64::is_sign_positive(rnum)
-            } else if f64::is_nan(lnum) && f64::is_nan(rnum) {
-                true
-            } else if lnum == rnum {
-                true
             } else {
-                false
+                (f64::is_nan(lnum) && f64::is_nan(rnum)) || lnum == rnum
             },
         _ => match (left.to_ref(heap), right.to_ref(heap)) {
             (Ok(lref), Ok(rref)) => lref == rref,
             _ => false
             }
     };
-    Ok(Interpreted::Value(JSValue::Bool(answer)))
+    Ok(Interpreted::from(answer))
 }
 
 #[allow(non_snake_case)]

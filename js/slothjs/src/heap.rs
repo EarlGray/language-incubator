@@ -76,6 +76,17 @@ impl Heap {
         JSRef(ind)
     }
 
+    /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true` calls.
+    pub(crate) fn smells_fresh(&self, objref: JSRef) -> bool {
+        match objref {
+            Heap::NULL => false,
+            _ => match self.get(objref) {
+                JSObject{ value: ObjectValue::None, properties, ..} if properties.len() == 0 => true,
+                _ => false,
+            }
+        }
+    }
+
     /// Find out what `this` currently is.
     pub fn interpret_this(&mut self) -> Result<Interpreted, Exception> {
         let this_ref = self.lookup_var(Self::SCOPE_THIS)

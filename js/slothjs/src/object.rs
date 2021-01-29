@@ -145,6 +145,7 @@ impl JSValue {
     }
 
     /// boolify() treats everythings as a truthy value.
+    /// ES5: ToBoolean
     pub fn boolify(&self, heap: &Heap) -> bool {
         match self {
             JSValue::Undefined => false,
@@ -157,6 +158,23 @@ impl JSValue {
                 } else {
                     true
                 }
+        }
+    }
+
+    /// objectify() wraps a primitive into its object:
+    /// - `undefined` becomes `null`
+    /// - `bool`/`number`/`string` becomes `Boolean`/`Number`/`String`
+    /// - objects just return their reference.
+    pub fn objectify(&self, heap: &mut Heap) -> JSRef {
+        match self {
+            JSValue::Undefined => Heap::NULL,
+            JSValue::Bool(b) =>
+                heap.alloc(JSObject::from_bool(*b)),
+            JSValue::Number(_n) =>
+                todo!(),    // TODO: Number object
+            JSValue::String(_s) =>
+                todo!(),    // TODO: String object
+            JSValue::Ref(r) => *r,
         }
     }
 

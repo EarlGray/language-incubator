@@ -20,7 +20,7 @@ pub enum Exception {
     SyntaxError(ParseError<JSON>),
     SyntaxErrorContinueLabelNotALoop(Identifier),
     ReferenceNotAnObject(Interpreted),
-    ReferenceNotFound(String),
+    ReferenceNotFound(Identifier),
     TypeErrorSetReadonly(Interpreted, String),
     TypeErrorNotConfigurable(Interpreted, String),
     TypeErrorGetProperty(Interpreted, String),
@@ -30,6 +30,7 @@ pub enum Exception {
     TypeErrorInstanceRequired(Interpreted, String),
     TypeErrorInvalidDescriptor(Interpreted),
 
+    // nonlocal transfers of control, "abrupt completions"
     JumpReturn(Interpreted),
     JumpBreak(Option<Identifier>),
     JumpContinue(Option<Identifier>),

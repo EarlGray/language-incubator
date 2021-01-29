@@ -310,7 +310,7 @@ impl Interpretable for Identifier {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let name = &self.0;
         heap.lookup_var(name)
-            .ok_or(Exception::ReferenceNotFound(name.to_string()))
+            .ok_or(Exception::ReferenceNotFound(self.clone()))
     }
 }
 
@@ -426,16 +426,13 @@ impl Interpretable for MemberExpression {
 
         // get the object reference for member computation:
         let objresult = objexpr.interpret(heap)?;
-        let objresult = match objresult {
-            // autowrap primitive values into Boolean/String/Number
-            Interpreted::Value(JSValue::Bool(b)) =>
-                Interpreted::from(heap.alloc(JSObject::from_bool(b))),
-            _ => objresult,
+        let objref = match objresult.to_value(heap)? {
+            JSValue::Undefined =>
+                return Err(Exception::ReferenceNotAnObject(objresult.clone())),
+            value => value.objectify(heap)
         };
-        let objref = objresult.to_ref(heap).map_err(|_| {
-            Exception::ReferenceNotAnObject(objresult.clone())
-        })?;
 
+        // TODO: __proto__ as (getPrototypeOf, setPrototypeOf) property
         if &propname == "__proto__" {
             let proto = heap.get(objref).proto;
             return Ok(Interpreted::from(proto));
@@ -501,7 +498,9 @@ impl Interpretable for AssignmentExpression {
             };
             match assignee {
                 Interpreted::Member{of, name} => {
-                    heap.get_mut(of).update(&name, newvalue.clone())?;
+                    heap.get_mut(of)
+                        .update(&name, newvalue.clone())
+                        .or_else(crate::error::ignore_set_readonly)?;
                     Ok(Interpreted::Value(newvalue))
                 }
                 _ => Err(Exception::TypeErrorCannotAssign(assignee.clone()))

@@ -194,6 +194,9 @@ fn test_binary_loose_equality() {
     assert!( !evalbool("null != null") );
     assert!( !evalbool("null != undefined") );
     assert!( evalbool("NaN != NaN") );
+
+    assert_eval!("Object(false) == false", true);
+    assert_eval!("Object(undefined) == null", false);
 }
 
 #[test]
@@ -370,6 +373,9 @@ fn test_assignment() {
     assert_eq!( eval("var a = 6; a ^= 9; a"),            JSValue::from(15));
     assert_eq!( eval("var a = 3; a |= 6; a"),            JSValue::from(7));
     */
+    // Assignment of read-only variables:
+    assert_eval!("undefined = 5; typeof undefined", "undefined");
+    assert_eval!("undefined += 1; typeof undefined", "undefined");
 }
 
 #[test]
@@ -581,6 +587,12 @@ fn test_exceptions() {
         try { throws(); a = false; }
         catch(e) { a = e };
         a
+    "#, true);
+    // catch-variable is block scope:
+    assert_eval!(r#"
+        var e = true;
+        try { throw false; } catch(e) {};
+        e
     "#, true);
     */
 }
@@ -939,6 +951,7 @@ fn test_builtin_boolean() {
     // auto-objectification:
     assert_eval!("true.toString()",   "true");
     assert_eval!("false.toString()",  "false");
+    assert_eval!("var a = {b: true}; a.b.toString()",  "true");
 
     // Boolean.prototype.valueOf()
     assert_eval!("new Boolean().valueOf()", false);

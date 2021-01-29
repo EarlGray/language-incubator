@@ -20,8 +20,7 @@ fn boolean_constructor(
     let arg = arg.to_value(heap)?;
     let arg = arg.boolify(heap);
 
-    let is_new = (this_ref != Heap::NULL) && (heap.get(this_ref).properties.len() == 0);
-    if !is_new {
+    if !heap.smells_fresh(this_ref) {
         return Ok(Interpreted::from(arg));
     }
 
