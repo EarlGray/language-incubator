@@ -662,6 +662,32 @@ impl JSObject {
         }
         Ok(s)
     }
+
+    pub fn protochain<'a>(&self, heap: &'a Heap) -> ProtoChainIter<'a> {
+        ProtoChainIter {
+            heap,
+            protoref: self.proto,
+        }
+    }
+}
+
+pub struct ProtoChainIter<'a> {
+    heap: &'a Heap,
+    protoref: JSRef,
+}
+
+impl<'a> Iterator for ProtoChainIter<'a> {
+    type Item = JSRef;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.protoref {
+            Heap::NULL => None,
+            prevref => {
+                self.protoref = self.heap.get(prevref).proto;
+                Some(prevref)
+            }
+        }
+    }
 }
 
 /// `ObjectValue` is used:

@@ -22,6 +22,25 @@ use crate::object::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JSRef(usize);
 
+impl JSRef {
+    pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> Result<bool, Exception> {
+        let protoref = heap
+            .get(constructor)
+            .get_value("prototype")
+            .ok_or(Exception::TypeErrorNotCallable(Interpreted::from(
+                constructor,
+            )))?
+            .to_ref()?;
+
+        let found = heap
+            .get(*self)
+            .protochain(heap)
+            .find(|pref| *pref == protoref)
+            .is_some();
+        Ok(found)
+    }
+}
+
 /// Runtime heap
 pub struct Heap(Vec<JSObject>);
 

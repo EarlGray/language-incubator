@@ -258,7 +258,6 @@ fn test_binary_compare_greater() {
     assert_eval!("undefined >= undefined", false);
 }
 
-/*
 #[test]
 fn test_binary_instanceof() {
     assert_eval!("({} instanceof Object)", true);
@@ -272,11 +271,7 @@ fn test_binary_instanceof() {
         let obj = new Class();
         (obj instanceof Class) && !({} instanceof Class)
     "#, true);
-    assert_eval!(r#"
-        let Class = function() {};
-        let obj = new Class();
-        (obj instanceof Class) && !({} instanceof Class)
-    "#, true);
+    /*
     assert_eval!(r#"
         let Class = function() {};
         let Subclass = function() {};
@@ -291,8 +286,10 @@ fn test_binary_instanceof() {
         let obj = new Subclass();
         (obj instanceof Class) && (obj instanceof Subclass)
     "#, true);
+    */
 }
 
+/*
 #[test]
 fn test_binary_in() {
     assert!( evalbool("1 in [1, 2, 3]") );

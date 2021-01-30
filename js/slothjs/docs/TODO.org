@@ -32,7 +32,7 @@
 ** DONE [2021-01-26 Tue] =<=
 ** DONE [2021-01-26 Tue] ~<=~
 ** DONE [2021-01-26 Tue] ~>~
-** TODO =instanceof=
+** DONE [2021-01-30 Sat] =instanceof=
 ** TODO =in=
 ** TODO =/=
 ** TODO =%=
@@ -53,9 +53,9 @@
 * TODO SwitchStatement
 * TODO ForInExpression
 * TODO user exceptions
-** TODO =try=, =catch=, =finally=
+** DONE [2021-01-27 Wed] =throw=
+** DONE [2021-01-28 Thu] =try=, =catch=, =finally=
 ** TODO stacktraces with source locations
-** TODO =throw=
 ** TODO =Error= objects
 * TODO =Symbol= primitive
 * TODO builtin =Object=

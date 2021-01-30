@@ -605,9 +605,10 @@ impl TryFrom<&JSON> for BinaryExpression {
             ">" => BinOp::Greater,
             "<=" => BinOp::LtEq,
             ">=" => BinOp::GtEq,
+            "instanceof" => BinOp::InstanceOf,
             _ => {
                 return Err(ParseError::UnexpectedValue {
-                    want: "+|-|*|==|===|!=|<|>|<=|>=",
+                    want: "+|-|*|==|===|!=|<|>|<=|>=|instanceof",
                     value: jexpr.get("operator").unwrap().clone(),
                 })
             }

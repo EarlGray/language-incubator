@@ -204,8 +204,8 @@ pub enum BinOp {
     Greater,
     LtEq,
     GtEq,
-    /*
     InstanceOf,
+    /*
     In,
     Slash,
     Percent,

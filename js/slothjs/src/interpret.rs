@@ -350,6 +350,14 @@ impl Interpretable for BinaryExpression {
             BinOp::Plus => JSValue::plus(&lval, &rval, heap)?,
             BinOp::Minus => JSValue::minus(&lval, &rval, heap)?,
             BinOp::Star => JSValue::numerically(&lval, &rval, heap, |a, b| a * b),
+            BinOp::InstanceOf => {
+                let constructor = rval.to_ref()?;
+                let found = match lval.to_ref() {
+                    Err(_) => false,
+                    Ok(objref) => objref.isinstance(constructor, heap)?,
+                };
+                JSValue::from(found)
+            }
         };
         Ok(Interpreted::Value(result))
     }
