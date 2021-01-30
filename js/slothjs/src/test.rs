@@ -502,14 +502,33 @@ fn test_loops() {
     );
 
     /*
-    assert_eq!( eval(r#"
+    // ForInStatement
+    assert_eval!(r#"
         let obj = {one:1, two: 2, three: 3};
         let sum = 0;
-        for (let prop in obj) {
-            sum = sum + obj[prop];
-        }
+        for (let prop in obj) sum += obj[prop];
         sum
-    "#), JSValue::from(6));
+    "#, 6.0);
+    assert_eval!(r#"
+        let obj = {two: 2, three: 3};
+        Object.defineProperty(obj, 'one', {value: 1}); // non-enumerable
+        for (let prop in obj) sum += obj[prop];
+        sum
+    "#, 5.0);
+    assert_eval!(r#"
+        function Class() {};
+        Class.prototype.one = 1;
+        var obj = Class();
+        obj.two = 2;
+        for (let prop in obj) sum += obj[prop];
+        sum
+    "#, 3.0);
+    assert_eval!(r#"
+        var a = ['a', 'b', 'c'];
+        var s = '';
+        for (var k in a) s += a[k];
+        s
+    "#, "abc");
      */
 }
 
