@@ -1,20 +1,20 @@
+use crate::object::{
+    Content,
+    Interpreted,
+    ObjectValue,
+};
 use crate::{
     Exception,
     Heap,
     JSObject,
     JSRef,
 };
-use crate::object::{
-    Content,
-    Interpreted,
-    ObjectValue,
-};
 
 fn boolean_constructor(
     this_ref: JSRef,
     _method_name: String,
     arguments: Vec<Interpreted>,
-    heap: &mut Heap
+    heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
     let arg = arg.to_value(heap)?;
@@ -33,7 +33,8 @@ fn object_to_bool(this_ref: JSRef, heap: &Heap) -> Result<bool, Exception> {
         ObjectValue::Boolean(b) => Ok(b),
         _ => {
             let what = Interpreted::from(this_ref);
-            Err(Exception::TypeErrorInstanceRequired(what, "Boolean".to_string()))
+            let of = "Boolean".to_string();
+            Err(Exception::TypeErrorInstanceRequired(what, of))
         }
     }
 }
@@ -43,7 +44,7 @@ fn boolean_proto_toString(
     this_ref: JSRef,
     _method_name: String,
     _arguments: Vec<Interpreted>,
-    heap: &mut Heap
+    heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let b = object_to_bool(this_ref, heap)?;
     Ok(Interpreted::from(if b { "true" } else { "false" }))
@@ -54,7 +55,7 @@ fn boolean_proto_valueOf(
     this_ref: JSRef,
     _method_name: String,
     _arguments: Vec<Interpreted>,
-    heap: &mut Heap
+    heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let b = object_to_bool(this_ref, heap)?;
     Ok(Interpreted::from(b))
@@ -75,10 +76,11 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     /* the Boolean object */
     let mut the_boolean = JSObject::from_func(boolean_constructor);
     the_boolean.set_system("prototype", Content::from(Heap::BOOLEAN_PROTO))?;
-   
+
     let the_boolean_ref = heap.alloc(the_boolean);
 
-    heap.get_mut(Heap::BOOLEAN_PROTO).set_hidden("constructor", Content::from(the_boolean_ref))?;
+    heap.get_mut(Heap::BOOLEAN_PROTO)
+        .set_hidden("constructor", Content::from(the_boolean_ref))?;
 
     Ok(the_boolean_ref)
 }

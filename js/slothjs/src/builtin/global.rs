@@ -1,13 +1,13 @@
 use crate::error::Exception;
+use crate::heap::{
+    Heap,
+    JSRef,
+};
 use crate::object::{
     Content,
     Interpreted,
     JSObject,
     JSValue,
-};
-use crate::heap::{
-    Heap,
-    JSRef,
 };
 
 /*
@@ -17,12 +17,12 @@ fn parse_int(
     _this_ref: JSRef,
     _method_name: String,
     arguments: Vec<Interpreted>,
-    heap: &mut Heap
+    heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
     if let JSValue::Number(_) = value {
-        return Ok(Interpreted::Value(value))
+        return Ok(Interpreted::Value(value));
     }
 
     let value = value.stringify(heap)?;

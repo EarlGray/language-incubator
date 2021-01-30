@@ -2,7 +2,7 @@ use crate::object::JSON;
 
 // ==============================================
 pub struct Program {
-    pub body: Vec<Statement>,   // TODO: Either<Statement, Directive>
+    pub body: Vec<Statement>, // TODO: Either<Statement, Directive>
 }
 
 // ==============================================
@@ -45,7 +45,11 @@ pub struct VariableDeclarator {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum DeclarationKind { Var, Let, Const }
+pub enum DeclarationKind {
+    Var,
+    Let,
+    Const,
+}
 
 #[derive(Clone, Debug)]
 pub struct VariableDeclaration {
@@ -56,7 +60,7 @@ pub struct VariableDeclaration {
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct FunctionDeclaration {
-    pub id: Identifier,     // might be different from function.id
+    pub id: Identifier, // might be different from function.id
     pub function: FunctionExpression,
 }
 
@@ -103,14 +107,14 @@ pub struct ReturnStatement(pub Option<Expr>);
 pub struct ThrowStatement(pub Expr);
 
 #[derive(Clone, Debug)]
-pub struct TryStatement{
+pub struct TryStatement {
     pub block: BlockStatement,
     pub handler: Option<CatchClause>,
     pub finalizer: Option<BlockStatement>,
 }
 
 #[derive(Clone, Debug)]
-pub struct CatchClause{
+pub struct CatchClause {
     pub param: Pattern,
     pub body: BlockStatement,
 }
@@ -216,7 +220,10 @@ pub enum BinOp {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum BoolOp { And, Or }
+pub enum BoolOp {
+    And,
+    Or,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssignOp(pub Option<BinOp>);

@@ -1,3 +1,6 @@
+use crate::ast::*;
+use crate::error::Exception;
+use crate::heap::Heap;
 use crate::object;
 use crate::object::{
     Access,
@@ -5,18 +8,13 @@ use crate::object::{
     Interpreted,
     JSObject,
     JSValue,
-};
-use crate::heap::Heap;
-use crate::error::Exception;
-use crate::ast::*;      // yes, EVERYTHING
-
+}; // yes, EVERYTHING
 
 // ==============================================
 
 pub trait Interpretable {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception>;
 }
-
 
 // ==============================================
 
@@ -35,23 +33,22 @@ impl Interpretable for Program {
 impl Interpretable for Statement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         match self {
-            Statement::Empty                        => Ok(Interpreted::VOID),
-            Statement::Expr(stmt)                   => stmt.interpret(heap),
-            Statement::Block(stmt)                  => stmt.interpret(heap),
-            Statement::If(stmt)                     => stmt.interpret(heap),
-            Statement::For(stmt)                    => stmt.interpret(heap),
-            Statement::Break(stmt)                  => stmt.interpret(heap),
-            Statement::Continue(stmt)               => stmt.interpret(heap),
-            Statement::Label(stmt)                  => stmt.interpret(heap),
-            Statement::Return(stmt)                 => stmt.interpret(heap),
-            Statement::Throw(stmt)                  => stmt.interpret(heap),
-            Statement::Try(stmt)                    => stmt.interpret(heap),
-            Statement::VariableDeclaration(stmt)    => stmt.interpret(heap),
-            Statement::FunctionDeclaration(stmt)    => stmt.interpret(heap),
+            Statement::Empty => Ok(Interpreted::VOID),
+            Statement::Expr(stmt) => stmt.interpret(heap),
+            Statement::Block(stmt) => stmt.interpret(heap),
+            Statement::If(stmt) => stmt.interpret(heap),
+            Statement::For(stmt) => stmt.interpret(heap),
+            Statement::Break(stmt) => stmt.interpret(heap),
+            Statement::Continue(stmt) => stmt.interpret(heap),
+            Statement::Label(stmt) => stmt.interpret(heap),
+            Statement::Return(stmt) => stmt.interpret(heap),
+            Statement::Throw(stmt) => stmt.interpret(heap),
+            Statement::Try(stmt) => stmt.interpret(heap),
+            Statement::VariableDeclaration(stmt) => stmt.interpret(heap),
+            Statement::FunctionDeclaration(stmt) => stmt.interpret(heap),
         }
     }
 }
-
 
 // ==============================================
 
@@ -144,7 +141,7 @@ impl LabelStatement {
             // must be a loop to continue
             let loop_stmt = match &**body {
                 Statement::For(stmt) => stmt,
-                _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone()))
+                _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone())),
             };
 
             loop_stmt.do_update(heap)?;
@@ -166,9 +163,7 @@ impl Interpretable for LabelStatement {
 
         let result = body.interpret(heap);
         match result {
-            Err(Exception::JumpBreak(Some(target))) if &target == label => {
-                Ok(Interpreted::VOID)
-            }
+            Err(Exception::JumpBreak(Some(target))) if &target == label => Ok(Interpreted::VOID),
             Err(Exception::JumpContinue(Some(target))) if &target == label => {
                 self.continue_loop(heap)
             }
@@ -218,11 +213,10 @@ impl Interpretable for TryStatement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let result = self.block.interpret(heap);
         match &result {
-            Ok(_) |
-            Err(Exception::JumpReturn(_)) |
-            Err(Exception::JumpBreak(_)) |
-            Err(Exception::JumpContinue(_))
-            => {
+            Ok(_)
+            | Err(Exception::JumpReturn(_))
+            | Err(Exception::JumpBreak(_))
+            | Err(Exception::JumpContinue(_)) => {
                 self.run_finalizer(heap)?;
                 result
             }
@@ -245,7 +239,9 @@ impl Interpretable for TryStatement {
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
-            let optinit = decl.init.as_ref()
+            let optinit = decl
+                .init
+                .as_ref()
                 .map(|initexpr| initexpr.interpret(heap))
                 .transpose()?;
             let name = &decl.name.0;
@@ -279,25 +275,24 @@ impl Interpretable for FunctionDeclaration {
 impl Interpretable for Expr {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         match self {
-            Expr::Literal(expr) =>              expr.interpret(heap),
-            Expr::Identifier(expr) =>           expr.interpret(heap),
-            Expr::BinaryOp(expr) =>             expr.interpret(heap),
-            Expr::LogicalOp(expr) =>            expr.interpret(heap),
-            Expr::Call(expr) =>                 expr.interpret(heap),
-            Expr::Array(expr) =>                expr.interpret(heap),
-            Expr::Member(expr) =>               expr.interpret(heap),
-            Expr::Object(expr) =>               expr.interpret(heap),
-            Expr::Assign(expr) =>               expr.interpret(heap),
-            Expr::Conditional(expr) =>          expr.interpret(heap),
-            Expr::Unary(expr) =>                expr.interpret(heap),
-            Expr::Update(expr) =>               expr.interpret(heap),
-            Expr::Function(expr) =>             expr.interpret(heap),
-            Expr::New(expr) =>                  expr.interpret(heap),
-            Expr::This =>                       heap.interpret_this(),
+            Expr::Literal(expr) => expr.interpret(heap),
+            Expr::Identifier(expr) => expr.interpret(heap),
+            Expr::BinaryOp(expr) => expr.interpret(heap),
+            Expr::LogicalOp(expr) => expr.interpret(heap),
+            Expr::Call(expr) => expr.interpret(heap),
+            Expr::Array(expr) => expr.interpret(heap),
+            Expr::Member(expr) => expr.interpret(heap),
+            Expr::Object(expr) => expr.interpret(heap),
+            Expr::Assign(expr) => expr.interpret(heap),
+            Expr::Conditional(expr) => expr.interpret(heap),
+            Expr::Unary(expr) => expr.interpret(heap),
+            Expr::Update(expr) => expr.interpret(heap),
+            Expr::Function(expr) => expr.interpret(heap),
+            Expr::New(expr) => expr.interpret(heap),
+            Expr::This => heap.interpret_this(),
         }
     }
 }
-
 
 impl Interpretable for Literal {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
@@ -331,9 +326,7 @@ impl Interpretable for LogicalExpression {
         let LogicalExpression(lexpr, op, rexpr) = self;
         let lval = lexpr.interpret(heap)?.to_value(heap)?;
         let value = match (lval.boolify(heap), op) {
-            (true, BoolOp::And) |
-            (false, BoolOp::Or) =>
-                rexpr.interpret(heap)?.to_value(heap)?,
+            (true, BoolOp::And) | (false, BoolOp::Or) => rexpr.interpret(heap)?.to_value(heap)?,
             _ => lval,
         };
         Ok(Interpreted::Value(value))
@@ -370,7 +363,7 @@ impl Interpretable for UnaryExpression {
         let value = match op {
             UnOp::Delete => JSValue::from(arg.delete(heap).is_ok()),
             UnOp::Exclamation => JSValue::Bool(!argvalue.boolify(heap)),
-            UnOp::Minus => JSValue::Number(- argvalue.numberify(heap).unwrap_or(f64::NAN)),
+            UnOp::Minus => JSValue::Number(-argvalue.numberify(heap).unwrap_or(f64::NAN)),
             UnOp::Plus => JSValue::Number(argvalue.numberify(heap).unwrap_or(f64::NAN)),
             UnOp::Typeof => JSValue::from(argvalue.type_of(heap)),
             UnOp::Tilde => {
@@ -397,12 +390,12 @@ impl Interpretable for UpdateExpression {
         };
 
         match assignee {
-            Interpreted::Member{of, name} => {
+            Interpreted::Member { of, name } => {
                 heap.get_mut(of)
                     .update(&name, JSValue::from(newnum))
                     .or_else(crate::error::ignore_set_readonly)?;
             }
-            _ => return Err(Exception::TypeErrorCannotAssign(assignee))
+            _ => return Err(Exception::TypeErrorCannotAssign(assignee)),
         }
         let resnum = if *prefix { newnum } else { oldnum };
         Ok(Interpreted::from(resnum))
@@ -420,16 +413,15 @@ impl Interpretable for MemberExpression {
         } else {
             match &**propexpr {
                 Expr::Identifier(name) => name.0.clone(),
-                _ => panic!("Member(computed=false) property is not an identifier")
+                _ => panic!("Member(computed=false) property is not an identifier"),
             }
         };
 
         // get the object reference for member computation:
         let objresult = objexpr.interpret(heap)?;
         let objref = match objresult.to_value(heap)? {
-            JSValue::Undefined =>
-                return Err(Exception::ReferenceNotAnObject(objresult.clone())),
-            value => value.objectify(heap)
+            JSValue::Undefined => return Err(Exception::ReferenceNotAnObject(objresult.clone())),
+            value => value.objectify(heap),
         };
 
         // TODO: __proto__ as (getPrototypeOf, setPrototypeOf) property
@@ -448,8 +440,7 @@ impl Interpretable for ObjectExpression {
 
         for (key, valexpr) in self.0.iter() {
             let keyname = match key {
-                ObjectKey::Identifier(ident) =>
-                    ident.clone(),
+                ObjectKey::Identifier(ident) => ident.clone(),
                 ObjectKey::Computed(expr) => {
                     let result = expr.interpret(heap)?.to_value(heap)?;
                     result.stringify(heap)?
@@ -468,10 +459,10 @@ impl Interpretable for ObjectExpression {
 impl Interpretable for ArrayExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let ArrayExpression(exprs) = self;
-        let storage = exprs.iter().map(|expr| {
-            let value = expr.interpret(heap)?;
-            value.to_value(heap)
-        }).collect::<Result<Vec<JSValue>, Exception>>()?;
+        let storage = exprs
+            .iter()
+            .map(|expr| expr.interpret(heap)?.to_value(heap))
+            .collect::<Result<Vec<JSValue>, Exception>>()?;
 
         let object = JSObject::from_array(storage);
         let object_ref = heap.alloc(object);
@@ -494,16 +485,19 @@ impl Interpretable for AssignmentExpression {
                 BinOp::Plus => JSValue::plus(&oldvalue, &value, heap)?,
                 BinOp::Minus => JSValue::minus(&oldvalue, &value, heap)?,
                 BinOp::Star => JSValue::numerically(&oldvalue, &value, heap, |a, b| a * b),
-                _ => panic!(format!("Binary operation {:?} cannot be used in assignment", op))
+                _ => panic!(format!(
+                    "Binary operation {:?} cannot be used in assignment",
+                    op
+                )),
             };
             match assignee {
-                Interpreted::Member{of, name} => {
+                Interpreted::Member { of, name } => {
                     heap.get_mut(of)
                         .update(&name, newvalue.clone())
                         .or_else(crate::error::ignore_set_readonly)?;
                     Ok(Interpreted::Value(newvalue))
                 }
-                _ => Err(Exception::TypeErrorCannotAssign(assignee.clone()))
+                _ => Err(Exception::TypeErrorCannotAssign(assignee.clone())),
             }
         } else {
             if let Expr::Identifier(name) = leftexpr.as_ref() {
@@ -513,14 +507,14 @@ impl Interpretable for AssignmentExpression {
             }
             let assignee = leftexpr.interpret(heap)?;
             match assignee {
-                Interpreted::Member{of, name} => {
+                Interpreted::Member { of, name } => {
                     let value = value.to_value(heap)?;
                     heap.get_mut(of)
                         .update(&name, value.clone())
                         .or_else(crate::error::ignore_set_readonly)?;
                     Ok(Interpreted::Value(value))
                 }
-                _ => Err(Exception::TypeErrorCannotAssign(assignee))
+                _ => Err(Exception::TypeErrorCannotAssign(assignee)),
             }
         }
     }
@@ -538,13 +532,12 @@ impl Interpretable for CallExpression {
 
         let callee = callee_expr.interpret(heap)?;
         match &callee {
-            Interpreted::Member{ of, name } =>
-                heap.execute_method(*of, &name, arguments),
+            Interpreted::Member { of, name } => heap.execute_method(*of, &name, arguments),
             Interpreted::Value(JSValue::Ref(funcref)) => {
-                let this_ref = Heap::GLOBAL;  // TODO: figure out what is this
+                let this_ref = Heap::GLOBAL; // TODO: figure out what is this
                 heap.execute(*funcref, this_ref, "<anonymous>", arguments)
             }
-            _ => return Err(Exception::TypeErrorNotCallable(callee.clone()))
+            _ => return Err(Exception::TypeErrorNotCallable(callee.clone())),
         }
     }
 }
@@ -553,13 +546,16 @@ impl Interpretable for NewExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let NewExpression(callee_expr, argument_exprs) = self;
 
-        let arguments = argument_exprs.iter()
+        let arguments = argument_exprs
+            .iter()
             .map(|expr| expr.interpret(heap))
             .collect::<Result<Vec<Interpreted>, Exception>>()?;
 
         let callee = callee_expr.interpret(heap)?;
         let funcref = callee.to_ref(heap)?;
-        let prototype_ref = heap.get_mut(funcref).get_value("prototype")
+        let prototype_ref = heap
+            .get_mut(funcref)
+            .get_value("prototype")
             .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".to_string()))?
             .to_ref()?;
 
@@ -584,15 +580,17 @@ impl Interpretable for FunctionExpression {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
-            captured_scope: heap.local_scope().unwrap_or(Heap::NULL)
+            captured_scope: heap.local_scope().unwrap_or(Heap::NULL),
         };
 
         let function_object = JSObject::from_closure(closure);
         let function_ref = heap.alloc(function_object);
 
         let prototype_ref = heap.alloc(JSObject::new());
-        heap.get_mut(function_ref).set("prototype", Content::from(prototype_ref), Access::WRITE)?;
-        heap.get_mut(prototype_ref).set_hidden("constructor", Content::from(function_ref))?;
+        heap.get_mut(function_ref)
+            .set("prototype", Content::from(prototype_ref), Access::WRITE)?;
+        heap.get_mut(prototype_ref)
+            .set_hidden("constructor", Content::from(function_ref))?;
 
         Ok(Interpreted::from(function_ref))
     }

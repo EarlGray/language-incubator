@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
 
 use bitflags::bitflags;
 use serde_json::json;
 
-use crate::error::Exception;
 use crate::ast;
-use crate::heap::{Heap, JSRef};
+use crate::error::Exception;
+use crate::heap::{
+    Heap,
+    JSRef,
+};
 
 pub type JSON = serde_json::Value;
 
@@ -86,12 +89,9 @@ impl JSValue {
     /// ```
     pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
         match self {
-            JSValue::String(s) =>
-                Ok(JSON::from(s.as_str()).to_string()),
-            JSValue::Ref(heapref) => {
-                heap.get(*heapref).clone().to_string(heap)
-            }
-            _ => self.stringify(heap)
+            JSValue::String(s) => Ok(JSON::from(s.as_str()).to_string()),
+            JSValue::Ref(heapref) => heap.get(*heapref).clone().to_string(heap),
+            _ => self.stringify(heap),
         }
     }
 
@@ -105,16 +105,14 @@ impl JSValue {
             JSValue::Number(n) => Ok(n.to_string()),
             JSValue::String(s) => Ok(s.clone()),
             JSValue::Ref(Heap::NULL) => Ok("null".to_string()),
-            JSValue::Ref(r) => {
-                match heap.lookup_protochain(*r, "toString") {
-                    Some(to_string) => {
-                        let funcref = to_string.to_ref(heap)?;
-                        let result = heap.execute(funcref, *r, "toString", vec![])?;
-                        Ok(result.to_value(heap)?.stringify(heap)?)
-                    }
-                    None => Ok("[object Object]".to_string())
+            JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
+                Some(to_string) => {
+                    let funcref = to_string.to_ref(heap)?;
+                    let result = heap.execute(funcref, *r, "toString", vec![])?;
+                    Ok(result.to_value(heap)?.stringify(heap)?)
                 }
-            }
+                None => Ok("[object Object]".to_string()),
+            },
         }
     }
 
@@ -132,15 +130,15 @@ impl JSValue {
                 let object = heap.get(*r);
                 if let Some(array) = object.as_array() {
                     match &array.storage[..] {
-                        [] => Some(0.0),                // +[]  == 0
-                        [val] => val.numberify(heap),   // +[x] == x
-                        _ => None,                      // +[x, y, ..] == NaN
+                        [] => Some(0.0),              // +[]  == 0
+                        [val] => val.numberify(heap), // +[x] == x
+                        _ => None,                    // +[x, y, ..] == NaN
                     }
                 } else {
                     object.to_primitive(heap).and_then(|v| v.numberify(heap))
                 }
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -152,12 +150,13 @@ impl JSValue {
             JSValue::String(s) => s.len() > 0,
             JSValue::Ref(Heap::NULL) => false,
             JSValue::Ref(_) => true,
-            _ =>
+            _ => {
                 if let Some(n) = self.numberify(heap) {
                     !(n == 0.0 || f64::is_nan(n))
                 } else {
                     true
                 }
+            }
         }
     }
 
@@ -168,12 +167,9 @@ impl JSValue {
     pub fn objectify(&self, heap: &mut Heap) -> JSRef {
         match self {
             JSValue::Undefined => Heap::NULL,
-            JSValue::Bool(b) =>
-                heap.alloc(JSObject::from_bool(*b)),
-            JSValue::Number(_n) =>
-                todo!(),    // TODO: Number object
-            JSValue::String(_s) =>
-                todo!(),    // TODO: String object
+            JSValue::Bool(b) => heap.alloc(JSObject::from_bool(*b)),
+            JSValue::Number(_n) => todo!(), // TODO: Number object
+            JSValue::String(_s) => todo!(), // TODO: String object
             JSValue::Ref(r) => *r,
         }
     }
@@ -185,40 +181,44 @@ impl JSValue {
             JSValue::String(_) => "string",
             JSValue::Number(_) => "number",
             JSValue::Bool(_) => "boolean",
-            JSValue::Ref(r) => {
-                match heap.get(*r).value {
-                    ObjectValue::Closure(_) |
-                    ObjectValue::VMCall(_) =>
-                        "function",
-                    _ => "object"
-                }
-            }
+            JSValue::Ref(r) => match heap.get(*r).value {
+                ObjectValue::Closure(_) | ObjectValue::VMCall(_) => "function",
+                _ => "object",
+            },
         }
     }
 
     /// Abstract Equality Comparison, `==`:
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#Loose_equality_using_>
     pub fn loose_eq(&self, other: &JSValue, heap: &Heap) -> bool {
-        let lval = if self == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { self };
-        let rval = if other == &JSValue::Ref(Heap::NULL) { &JSValue::Undefined } else { other };
+        let lval = if self == &JSValue::NULL {
+            &JSValue::Undefined
+        } else {
+            self
+        };
+        let rval = if other == &JSValue::NULL {
+            &JSValue::Undefined
+        } else {
+            other
+        };
         match (lval, rval) {
             (JSValue::Undefined, JSValue::Undefined) => true,
             (JSValue::Undefined, _) | (_, JSValue::Undefined) => false,
             (JSValue::Number(_), JSValue::Number(_))
-                | (JSValue::String(_), JSValue::String(_))
-                | (JSValue::Bool(_), JSValue::Bool(_))
-                => self == other,
+            | (JSValue::String(_), JSValue::String(_))
+            | (JSValue::Bool(_), JSValue::Bool(_)) => self == other,
             (JSValue::Ref(lref), JSValue::Ref(rref)) if lref == rref => true,
-            (JSValue::Ref(lref), JSValue::Ref(rref)) =>
-                match (heap.get(*lref).to_primitive(heap), heap.get(*rref).to_primitive(heap)) {
-                    (Some(lval), Some(rval)) => (lval == rval),
-                    _ => false,
-                },
-            _ =>
-                match (self.numberify(heap), other.numberify(heap)) {
-                    (Some(lnum), Some(rnum)) => (lnum == rnum),
-                    _ => false,
-                },
+            (JSValue::Ref(lref), JSValue::Ref(rref)) => match (
+                heap.get(*lref).to_primitive(heap),
+                heap.get(*rref).to_primitive(heap),
+            ) {
+                (Some(lval), Some(rval)) => (lval == rval),
+                _ => false,
+            },
+            _ => match (self.numberify(heap), other.numberify(heap)) {
+                (Some(lnum), Some(rnum)) => (lnum == rnum),
+                _ => false,
+            },
         }
     }
 
@@ -229,11 +229,12 @@ impl JSValue {
     }
 
     pub fn numerically<F>(&self, other: &JSValue, heap: &Heap, op: F) -> JSValue
-        where F: Fn(f64, f64) -> f64
+    where
+        F: Fn(f64, f64) -> f64,
     {
         let val = match (self.numberify(heap), other.numberify(heap)) {
             (Some(lnum), Some(rnum)) => op(lnum, rnum),
-            _ => f64::NAN
+            _ => f64::NAN,
         };
         JSValue::Number(val)
     }
@@ -258,10 +259,7 @@ impl JSValue {
         Ok(JSValue::numerically(self, other, heap, |a, b| a - b))
     }
 
-    pub fn compare<
-        StrCmpFn: Fn(&str, &str) -> bool,
-        NumCmpFn: Fn(f64, f64) -> bool,
-    >(
+    pub fn compare<StrCmpFn: Fn(&str, &str) -> bool, NumCmpFn: Fn(f64, f64) -> bool>(
         &self,
         other: &JSValue,
         heap: &Heap,
@@ -279,27 +277,39 @@ impl JSValue {
 }
 
 impl From<bool> for JSValue {
-    fn from(b: bool) -> Self { JSValue::Bool(b) }
+    fn from(b: bool) -> Self {
+        JSValue::Bool(b)
+    }
 }
 
 impl From<JSNumber> for JSValue {
-    fn from(number: JSNumber) -> Self { JSValue::Number(number) }
+    fn from(number: JSNumber) -> Self {
+        JSValue::Number(number)
+    }
 }
 
 impl From<i64> for JSValue {
-    fn from(number: i64) -> Self { JSValue::Number(number as JSNumber) }
+    fn from(number: i64) -> Self {
+        JSValue::Number(number as JSNumber)
+    }
 }
 
 impl From<String> for JSValue {
-    fn from(s: String) -> Self { JSValue::String(s) }
+    fn from(s: String) -> Self {
+        JSValue::String(s)
+    }
 }
 
 impl From<&str> for JSValue {
-    fn from(s: &str) -> Self { JSValue::String(s.to_string()) }
+    fn from(s: &str) -> Self {
+        JSValue::String(s.to_string())
+    }
 }
 
 impl From<JSRef> for JSValue {
-    fn from(r: JSRef) -> Self { JSValue::Ref(r) }
+    fn from(r: JSRef) -> Self {
+        JSValue::Ref(r)
+    }
 }
 
 impl TryFrom<&JSON> for JSValue {
@@ -326,7 +336,7 @@ impl TryFrom<&JSON> for JSValue {
 #[test]
 fn test_numberify() {
     let dummy = Heap::new();
-    assert_eq!( JSValue::from("5").numberify(&dummy),    Some(5.0) );
+    assert_eq!(JSValue::from("5").numberify(&dummy), Some(5.0));
 }
 
 #[test]
@@ -334,17 +344,17 @@ fn test_boolify() {
     let dummy = Heap::new();
 
     // true
-    assert!( JSValue::from(true).boolify(&dummy) );
-    assert!( JSValue::from(1).boolify(&dummy) );
-    assert!( JSValue::from("0").boolify(&dummy) );
+    assert!(JSValue::from(true).boolify(&dummy));
+    assert!(JSValue::from(1).boolify(&dummy));
+    assert!(JSValue::from("0").boolify(&dummy));
     //assert!( JSValue::from(json!([])).boolify(&dummy) );
 
     // false
-    assert!( !JSValue::from(false).boolify(&dummy) );
-    assert!( !JSValue::from(0).boolify(&dummy) );
-    assert!( !JSValue::from(f64::NAN).boolify(&dummy) );
-    assert!( !JSValue::from("").boolify(&dummy) );
-    assert!( !JSValue::NULL.boolify(&dummy) );
+    assert!(!JSValue::from(false).boolify(&dummy));
+    assert!(!JSValue::from(0).boolify(&dummy));
+    assert!(!JSValue::from(f64::NAN).boolify(&dummy));
+    assert!(!JSValue::from("").boolify(&dummy));
+    assert!(!JSValue::NULL.boolify(&dummy));
 }
 
 /// Javascript objects.
@@ -360,7 +370,7 @@ pub struct JSObject {
 
 impl JSObject {
     pub fn new() -> JSObject {
-        JSObject{
+        JSObject {
             proto: Heap::OBJECT_PROTO,
             value: ObjectValue::None,
             properties: HashMap::new(),
@@ -369,7 +379,7 @@ impl JSObject {
 
     /// Wrap the given native call into a Function.
     pub fn from_func(f: NativeFunction) -> JSObject {
-        JSObject{
+        JSObject {
             proto: Heap::FUNCTION_PROTO,
             value: ObjectValue::VMCall(VMCall(f)),
             properties: HashMap::new(),
@@ -379,26 +389,28 @@ impl JSObject {
     /// Wrap the given `closure` into a Function.
     pub fn from_closure(closure: Closure) -> JSObject {
         let params_count = closure.params.len() as f64;
-        let mut function_object = JSObject{
+        let mut function_object = JSObject {
             proto: Heap::FUNCTION_PROTO,
             value: ObjectValue::Closure(Box::new(closure)),
             properties: HashMap::new(),
         };
-        function_object.set_nonconf("length", Content::from(params_count)).unwrap();
+        function_object
+            .set_nonconf("length", Content::from(params_count))
+            .unwrap();
         function_object
     }
 
     /// Wrap the given vector into an Array.
     pub fn from_array(values: Vec<JSValue>) -> JSObject {
-        JSObject{
+        JSObject {
             proto: Heap::ARRAY_PROTO,
-            value: ObjectValue::Array(JSArray{ storage: values }),
+            value: ObjectValue::Array(JSArray { storage: values }),
             properties: HashMap::new(),
         }
     }
 
     pub fn from_bool(value: bool) -> JSObject {
-        JSObject{
+        JSObject {
             proto: Heap::BOOLEAN_PROTO,
             value: ObjectValue::Boolean(value),
             properties: HashMap::new(),
@@ -415,7 +427,6 @@ impl JSObject {
             _ => Option::None,
         }
     }
-
 
     /// It `self` is an Array, give its underlying storage.
     pub fn as_array(&self) -> Option<&JSArray> {
@@ -443,11 +454,11 @@ impl JSObject {
                 }
             }
         }
-        self.properties.get(name).and_then(|prop|
-            match &prop.content {
+        self.properties
+            .get(name)
+            .and_then(|prop| match &prop.content {
                 Content::Value(value) => Some(value),
-            }
-        )
+            })
     }
 
     fn set_maybe_nonwritable(
@@ -472,13 +483,13 @@ impl JSObject {
         match self.properties.get_mut(name) {
             Some(property) => {
                 if property.access != access && !property.access.configurable() {
-                    let what = Interpreted::from("???");  // TODO
+                    let what = Interpreted::from("???"); // TODO
                     let name = name.to_string();
                     return Err(Exception::TypeErrorNotConfigurable(what, name));
                 }
 
                 if !(even_nonwritable || property.access.writable()) {
-                    let what = Interpreted::from("???");  // TODO
+                    let what = Interpreted::from("???"); // TODO
                     let name = name.to_string();
                     return Err(Exception::TypeErrorSetReadonly(what, name));
                 }
@@ -487,8 +498,8 @@ impl JSObject {
                 property.content = content;
             }
             None => {
-                let prop = Property{ content, access };
-                self.properties.insert( name.to_string(), prop);
+                let prop = Property { content, access };
+                self.properties.insert(name.to_string(), prop);
             }
         }
         Ok(())
@@ -501,12 +512,7 @@ impl JSObject {
     /// - if the existing own property is not configurable and the given `access` differs, fail.
     /// - if the existing own property is not writable, fail
     /// - replace `content` and `access` of the property.
-    pub fn set(
-        &mut self,
-        name: &str,
-        content: Content,
-        access: Access
-    ) -> Result<(), Exception> {
+    pub fn set(&mut self, name: &str, content: Content, access: Access) -> Result<(), Exception> {
         self.set_maybe_nonwritable(name, content, access, false)
     }
 
@@ -515,7 +521,7 @@ impl JSObject {
         &mut self,
         name: &str,
         content: Content,
-        access: Access
+        access: Access,
     ) -> Result<(), Exception> {
         self.set_maybe_nonwritable(name, content, access, true)
     }
@@ -526,13 +532,21 @@ impl JSObject {
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
     pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
+        let access = self
+            .properties
+            .get(name)
+            .map(|prop| prop.access)
+            .unwrap_or(Access::all());
         self.set(name, Content::from(value), access)
     }
 
     /// Just like `.update()`, but updates even non-writable properties.
     pub fn update_even_nonwritable(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        let access = self.properties.get(name).map(|prop| prop.access).unwrap_or(Access::all());
+        let access = self
+            .properties
+            .get(name)
+            .map(|prop| prop.access)
+            .unwrap_or(Access::all());
         self.set_even_nonwritable(name, Content::from(value), access)
     }
 
@@ -557,11 +571,12 @@ impl JSObject {
         self.set(name, content, Access::READONLY)
     }
 
-
     /// Create a `JSON` from this `JSObject`.
     pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
         if let Some(array) = self.as_array() {
-            let jvals = array.storage.iter()
+            let jvals = array
+                .storage
+                .iter()
                 .map(|v| v.to_json(heap))
                 .collect::<Result<Vec<_>, Exception>>()?;
             return Ok(JSON::Array(jvals));
@@ -570,7 +585,7 @@ impl JSObject {
         let mut json = json!({});
         for (key, property) in self.properties.iter() {
             if !property.access.enumerable() {
-                continue
+                continue;
             }
 
             let jvalue = property.content.to_value()?.to_json(heap)?;
@@ -603,9 +618,13 @@ impl JSObject {
                 empty = false;
                 let itemstr = item.to_string(heap)?;
                 s.push_str(&itemstr);
-                s.push(','); s.push(' ');
+                s.push(',');
+                s.push(' ');
             }
-            if !empty { s.pop(); s.push(' '); }
+            if !empty {
+                s.pop();
+                s.push(' ');
+            }
         } else {
             s.push('{');
         }
@@ -629,16 +648,21 @@ impl JSObject {
             empty = false;
         }
         if is_array {
-            if !empty { s.pop(); s.pop(); }
+            if !empty {
+                s.pop();
+                s.pop();
+            }
             s.push(']');
         } else {
-            if !empty { s.pop(); s.push(' '); }
+            if !empty {
+                s.pop();
+                s.push(' ');
+            }
             s.push('}');
         }
         Ok(s)
     }
 }
-
 
 /// `ObjectValue` is used:
 /// - as the primitive value of a `Number`/`Boolean`/`String` object;
@@ -678,12 +702,14 @@ pub struct Property {
 impl Property {
     pub fn to_ref(&self) -> Option<JSRef> {
         match self {
-            Property{ content: Content::Value(JSValue::Ref(r)), .. } => Some(*r),
+            Property {
+                content: Content::Value(JSValue::Ref(r)),
+                ..
+            } => Some(*r),
             _ => None,
         }
     }
 }
-
 
 bitflags! {
     pub struct Access: u8 {
@@ -698,11 +724,16 @@ bitflags! {
 }
 
 impl Access {
-    pub fn enumerable(&self) -> bool { self.contains(Access::ENUM) }
-    pub fn configurable(&self) -> bool { self.contains(Access::CONF) }
-    pub fn writable(&self) -> bool { self.contains(Access::WRITE) }
+    pub fn enumerable(&self) -> bool {
+        self.contains(Access::ENUM)
+    }
+    pub fn configurable(&self) -> bool {
+        self.contains(Access::CONF)
+    }
+    pub fn writable(&self) -> bool {
+        self.contains(Access::WRITE)
+    }
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Content {
@@ -724,8 +755,13 @@ impl Content {
     }
 }
 
-impl<T> From<T> for Content where JSValue: From<T> {
-    fn from(x: T) -> Content { Content::Value(JSValue::from(x)) }
+impl<T> From<T> for Content
+where
+    JSValue: From<T>,
+{
+    fn from(x: T) -> Content {
+        Content::Value(JSValue::from(x))
+    }
 }
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.
@@ -733,11 +769,12 @@ impl<T> From<T> for Content where JSValue: From<T> {
 pub struct VMCall(NativeFunction);
 
 impl VMCall {
-    pub fn call(&self,
+    pub fn call(
+        &self,
         this_ref: JSRef,
         method_name: String,
         arguments: Vec<Interpreted>,
-        heap: &mut Heap
+        heap: &mut Heap,
     ) -> Result<Interpreted, Exception> {
         self.0(this_ref, method_name, arguments, heap)
     }
@@ -759,7 +796,6 @@ pub type NativeFunction = fn(
     heap: &'_ mut Heap,
 ) -> Result<Interpreted, Exception>;
 
-
 #[derive(Clone, Debug)]
 pub struct Closure {
     pub id: Option<ast::Identifier>,
@@ -779,7 +815,7 @@ impl JSArray {}
 #[derive(Debug, Clone, PartialEq)]
 pub enum Interpreted {
     /// An object member; might not exist yet.
-    Member{ of: JSRef, name: String },
+    Member { of: JSRef, name: String },
 
     /// A value
     Value(JSValue),
@@ -790,33 +826,34 @@ impl Interpreted {
     pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
 
     pub fn member(of: JSRef, name: &str) -> Interpreted {
-        Interpreted::Member{ of, name: name.to_string() }
+        Interpreted::Member {
+            of,
+            name: name.to_string(),
+        }
     }
 
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
         let value = match self {
-            Interpreted::Value(value) =>
-                value.clone(),
-            Interpreted::Member{of, name} => {
-                match heap.get(*of).get_value(name) {
-                    Some(value) => value.clone(),
-                    None => JSValue::Undefined,
-                }
-            }
+            Interpreted::Value(value) => value.clone(),
+            Interpreted::Member { of, name } => match heap.get(*of).get_value(name) {
+                Some(value) => value.clone(),
+                None => JSValue::Undefined,
+            },
         };
         Ok(value)
     }
 
     pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
         match self {
-            Interpreted::Value(JSValue::Ref(r)) =>
-                Ok(*r),
-            Interpreted::Member{of, name} =>
-                match heap.get(*of).get_value(name) {
-                    Some(JSValue::Ref(r)) => Ok(*r),
-                    _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.to_string()))
-                }
-            _ => Err(Exception::ReferenceNotAnObject(self.clone()))
+            Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
+            Interpreted::Member { of, name } => match heap.get(*of).get_value(name) {
+                Some(JSValue::Ref(r)) => Ok(*r),
+                _ => Err(Exception::TypeErrorGetProperty(
+                    self.clone(),
+                    name.to_string(),
+                )),
+            },
+            _ => Err(Exception::ReferenceNotAnObject(self.clone())),
         }
     }
 
@@ -825,7 +862,7 @@ impl Interpreted {
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete>
     pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
         match self {
-            Interpreted::Member{ of, name } => {
+            Interpreted::Member { of, name } => {
                 let object = heap.get_mut(*of);
                 let configurable = match object.properties.get(name) {
                     Some(p) => p.access.configurable(),
@@ -844,6 +881,11 @@ impl Interpreted {
     }
 }
 
-impl<T> From<T> for Interpreted where JSValue: From<T>  {
-    fn from(value: T) -> Interpreted { Interpreted::Value(JSValue::from(value)) }
+impl<T> From<T> for Interpreted
+where
+    JSValue: From<T>,
+{
+    fn from(value: T) -> Interpreted {
+        Interpreted::Value(JSValue::from(value))
+    }
 }

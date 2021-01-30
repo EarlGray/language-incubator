@@ -1,28 +1,26 @@
 use std::convert::TryFrom;
 
-use crate::builtin;
-use crate::error::Exception;
 use crate::ast::{
     DeclarationKind,
     Identifier,
 };
+use crate::builtin;
+use crate::error::Exception;
+use crate::interpret::Interpretable;
 use crate::object::{
     Access,
     Closure,
     Content,
     Interpreted,
-    ObjectValue,
-    JSON,
     JSObject,
     JSValue,
+    ObjectValue,
+    JSON,
 };
-use crate::interpret::Interpretable;
-
 
 /// A heap reference: a Heap index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JSRef(usize);
-
 
 /// Runtime heap
 pub struct Heap(Vec<JSObject>);
@@ -51,8 +49,7 @@ impl Heap {
         }
 
         let mut heap = Heap(heap_vec);
-        builtin::init(&mut heap)
-            .expect("failed to initialize builtin objects");
+        builtin::init(&mut heap).expect("failed to initialize builtin objects");
         heap
     }
 
@@ -81,15 +78,20 @@ impl Heap {
         match objref {
             Heap::NULL => false,
             _ => match self.get(objref) {
-                JSObject{ value: ObjectValue::None, properties, ..} if properties.len() == 0 => true,
+                JSObject {
+                    value: ObjectValue::None,
+                    properties,
+                    ..
+                } if properties.len() == 0 => true,
                 _ => false,
-            }
+            },
         }
     }
 
     /// Find out what `this` currently is.
     pub fn interpret_this(&mut self) -> Result<Interpreted, Exception> {
-        let this_ref = self.lookup_var(Self::SCOPE_THIS)
+        let this_ref = self
+            .lookup_var(Self::SCOPE_THIS)
             .expect("no this in the current scope")
             .to_ref(self)?;
         Ok(Interpreted::from(this_ref))
@@ -118,12 +120,16 @@ impl Heap {
     pub fn declare_var(
         &mut self,
         kind: Option<DeclarationKind>,
-        name: &str
+        name: &str,
     ) -> Result<(), Exception> {
         // TODO: let and const should be block-scoped
         if !self.scope().properties.contains_key(name) {
             let content = Content::Value(JSValue::Undefined);
-            let access = if kind.is_none() { Access::all() } else { Access::NONCONF };
+            let access = if kind.is_none() {
+                Access::all()
+            } else {
+                Access::NONCONF
+            };
             self.scope_mut().set(name, content, access)?;
         }
         Ok(())
@@ -138,7 +144,9 @@ impl Heap {
             }
 
             // captured scopes lookup
-            let mut scope_ref = local.properties.get(Self::CAPTURED_SCOPE)
+            let mut scope_ref = local
+                .properties
+                .get(Self::CAPTURED_SCOPE)
                 .and_then(|prop| prop.to_ref())
                 .unwrap_or(Heap::NULL);
             while scope_ref != Heap::NULL {
@@ -147,7 +155,9 @@ impl Heap {
                     return Some(Interpreted::member(scope_ref, name));
                 }
 
-                scope_ref = scope.properties.get(Self::CAPTURED_SCOPE)
+                scope_ref = scope
+                    .properties
+                    .get(Self::CAPTURED_SCOPE)
                     .and_then(|prop| prop.to_ref())
                     .unwrap_or(Heap::NULL);
             }
@@ -161,7 +171,8 @@ impl Heap {
         }
     }
 
-    fn push_scope(&mut self,
+    fn push_scope(
+        &mut self,
         params: Vec<Identifier>,
         values: Vec<Interpreted>,
         this_ref: JSRef,
@@ -171,7 +182,8 @@ impl Heap {
         let mut scope_object = JSObject::new();
 
         // `arguments`
-        let argv = values.iter()
+        let argv = values
+            .iter()
             .map(|v| v.to_value(self))
             .collect::<Result<Vec<JSValue>, Exception>>()?;
         let arguments_ref = self.alloc(JSObject::from_array(argv));
@@ -188,20 +200,19 @@ impl Heap {
         scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref))?;
 
         let new_scope_ref = self.alloc(scope_object);
-        self.get_mut(Heap::GLOBAL).update_even_nonwritable(
-            Self::LOCAL_SCOPE,
-            JSValue::Ref(new_scope_ref),
-        )?;
+        self.get_mut(Heap::GLOBAL)
+            .update_even_nonwritable(Self::LOCAL_SCOPE, JSValue::Ref(new_scope_ref))?;
         Ok(new_scope_ref)
     }
 
     fn pop_scope(&mut self) -> Result<(), Exception> {
-        let this_scope_ref = self.local_scope()
-            .expect(".pop_scope without local scope");  // yes, panic, this interpreter is broken.
+        let this_scope_ref = self.local_scope().expect(".pop_scope without local scope"); // yes, panic, this interpreter is broken.
         let this_scope_object = self.get(this_scope_ref);
-        let saved_scope_ref = this_scope_object.properties.get(Self::SAVED_SCOPE)
+        let saved_scope_ref = this_scope_object
+            .properties
+            .get(Self::SAVED_SCOPE)
             .and_then(|prop| prop.to_ref())
-            .expect("saved scope is not a reference");  // yes, panic, this interpreter is broken.
+            .expect("saved scope is not a reference"); // yes, panic, this interpreter is broken.
 
         let global = self.get_mut(Heap::GLOBAL);
         if saved_scope_ref == Heap::GLOBAL {
@@ -229,7 +240,8 @@ impl Heap {
 
     /// Given a `func_ref` to a closure or a native call and a set of arguments,
     /// executes the function. `this_ref` is bound as `this`.
-    pub fn execute(&mut self,
+    pub fn execute(
+        &mut self,
         func_ref: JSRef,
         this_ref: JSRef,
         method_name: &str,
@@ -240,23 +252,23 @@ impl Heap {
                 vmcall.call(this_ref, method_name.to_string(), arguments, self)
             }
             ObjectValue::Closure(closure) => {
-                let Closure{params, body, captured_scope, ..} = &*closure;
+                let Closure {
+                    params,
+                    body,
+                    captured_scope,
+                    ..
+                } = &*closure;
                 let scope = self.push_scope(params.clone(), arguments, this_ref)?;
                 if *captured_scope != Heap::NULL {
-                    self.get_mut(scope).set_system(
-                        Self::CAPTURED_SCOPE,
-                        Content::from(*captured_scope)
-                    )?;
+                    self.get_mut(scope)
+                        .set_system(Self::CAPTURED_SCOPE, Content::from(*captured_scope))?;
                 }
                 let result = body.interpret(self);
                 self.pop_scope()?;
                 match result {
-                    Ok(_) => // BlockStatement result
-                        Ok(Interpreted::VOID),
-                    Err(Exception::JumpReturn(returned)) =>
-                        Ok(returned),
-                    Err(e) =>
-                        Err(e)
+                    Ok(_) => Ok(Interpreted::VOID), // BlockStatement result
+                    Err(Exception::JumpReturn(returned)) => Ok(returned),
+                    Err(e) => Err(e),
                 }
             }
             _ => {
@@ -268,20 +280,25 @@ impl Heap {
 
     /// Performs a method lookup on the prototype chain of `this_ref` for `method_name`,
     /// then runs a found method via `Heap::execute`, binding `this_ref` to `this`.
-    pub fn execute_method(&mut self,
+    pub fn execute_method(
+        &mut self,
         this_ref: JSRef,
         method_name: &str,
         arguments: Vec<Interpreted>,
     ) -> Result<Interpreted, Exception> {
         let callee = Interpreted::member(this_ref, method_name);
         let (of, name) = match self.lookup_protochain(this_ref, method_name) {
-            Some(Interpreted::Member{ of, name }) => (of, name),
+            Some(Interpreted::Member { of, name }) => (of, name),
             Some(_) => unreachable!(),
-            None => return Err(Exception::TypeErrorNotCallable(callee.clone()))
+            None => return Err(Exception::TypeErrorNotCallable(callee.clone())),
         };
         let funcobj_ref = match self.get(of).get_value(&name) {
             Some(JSValue::Ref(func_ref)) => *func_ref,
-            _ => return Err(Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))
+            _ => {
+                return Err(Exception::TypeErrorNotCallable(Interpreted::member(
+                    of, &name,
+                )))
+            }
         };
 
         self.execute(funcobj_ref, this_ref, method_name, arguments)
@@ -297,14 +314,14 @@ impl Heap {
             }
             JSValue::Ref(self.alloc(object))
         } else if let Some(jarray) = json.as_array() {
-            let storage = jarray.iter()
+            let storage = jarray
+                .iter()
                 .map(|jval| self.object_from_json(jval))
                 .collect();
             let object = JSObject::from_array(storage);
             JSValue::Ref(self.alloc(object))
         } else {
-            JSValue::try_from(json)
-                .expect("primitive JSON") // not Object/Array, must be primitive
+            JSValue::try_from(json).expect("primitive JSON") // not Object/Array, must be primitive
         }
     }
 }

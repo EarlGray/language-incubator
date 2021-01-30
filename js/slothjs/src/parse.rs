@@ -1,53 +1,49 @@
 use std::convert::TryFrom;
 
-use crate::ast::*;  // yes, EVERYTHING.
+use crate::ast::*; // yes, EVERYTHING.
+
 use crate::error::ParseError;
 use crate::object::JSON;
-
 
 /*
  *  JSON helpers
  */
 
-fn json_get<'a>(
-    json: &'a JSON,
-    property: &'static str
-) -> Result<&'a JSON, ParseError<JSON>> {
-    json.get(property)
-        .ok_or(ParseError::ObjectWithout{ attr: property, value: json.clone() })
+fn json_get<'a>(json: &'a JSON, property: &'static str) -> Result<&'a JSON, ParseError<JSON>> {
+    json.get(property).ok_or(ParseError::ObjectWithout {
+        attr: property,
+        value: json.clone(),
+    })
 }
 
-fn json_get_bool<'a>(
-    json: &'a JSON,
-    property: &'static str
-) -> Result<bool, ParseError<JSON>> {
+fn json_get_bool<'a>(json: &'a JSON, property: &'static str) -> Result<bool, ParseError<JSON>> {
     let jbool = json_get(json, property)?;
-    jbool.as_bool().ok_or(ParseError::ShouldBeBool{ value: jbool.clone() })
+    jbool.as_bool().ok_or(ParseError::ShouldBeBool {
+        value: jbool.clone(),
+    })
 }
 
-fn json_get_str<'a>(
-    json: &'a JSON,
-    property: &'static str
-) -> Result<&'a str, ParseError<JSON>> {
+fn json_get_str<'a>(json: &'a JSON, property: &'static str) -> Result<&'a str, ParseError<JSON>> {
     let jstr = json_get(json, property)?;
-    jstr.as_str().ok_or(ParseError::ShouldBeString{ value: jstr.clone() })
+    jstr.as_str().ok_or(ParseError::ShouldBeString {
+        value: jstr.clone(),
+    })
 }
 
 fn json_get_array<'a>(
     json: &'a JSON,
-    property: &'static str
+    property: &'static str,
 ) -> Result<&'a Vec<JSON>, ParseError<JSON>> {
     let jarray = json_get(json, property)?;
-    jarray.as_array().ok_or(ParseError::ShouldBeArray{ value: jarray.clone() })
+    jarray.as_array().ok_or(ParseError::ShouldBeArray {
+        value: jarray.clone(),
+    })
 }
 
 /// maps `null` into None, an object into Some(T) using a closure.
-fn json_map_object<'a, T, F>(
-    json: &'a JSON,
-    action: F,
-) -> Result<Option<T>, ParseError<JSON>>
+fn json_map_object<'a, T, F>(json: &'a JSON, action: F) -> Result<Option<T>, ParseError<JSON>>
 where
-    F: Fn(&JSON) -> Result<T, ParseError<JSON>>
+    F: Fn(&JSON) -> Result<T, ParseError<JSON>>,
 {
     match json {
         JSON::Null => Ok(None),
@@ -58,7 +54,7 @@ where
         _ => {
             let want = "null | object";
             let value = json.clone();
-            Err(ParseError::UnexpectedValue{want, value})
+            Err(ParseError::UnexpectedValue { want, value })
         }
     }
 }
@@ -66,14 +62,19 @@ where
 fn json_expect_str<'a>(
     json: &'a JSON,
     property: &'static str,
-    value: &'static str
+    value: &'static str,
 ) -> Result<(), ParseError<JSON>> {
     let jstr = json_get(json, property)?;
-    let got = jstr.as_str().ok_or(ParseError::ShouldBeString{ value: jstr.clone() })?;
+    let got = jstr.as_str().ok_or(ParseError::ShouldBeString {
+        value: jstr.clone(),
+    })?;
     if got == value {
         Ok(())
     } else {
-        Err(ParseError::UnexpectedValue{ want: value, value: jstr.clone(), })
+        Err(ParseError::UnexpectedValue {
+            want: value,
+            value: jstr.clone(),
+        })
     }
 }
 
@@ -90,7 +91,7 @@ impl TryFrom<&JSON> for Program {
             let stmt = Statement::try_from(jstmt)?;
             body.push(stmt);
         }
-        Ok(Program{ body })
+        Ok(Program { body })
     }
 }
 
@@ -116,14 +117,13 @@ impl TryFrom<&JSON> for Statement {
                 let mut stmt = ForStatement::try_from(json)?;
                 stmt.init = stmt.body.clone();
                 Ok(Statement::For(Box::new(stmt)))
-            },
+            }
             "EmptyStatement" => Ok(Statement::Empty),
             "ExpressionStatement" => {
                 let stmt = ExpressionStatement::try_from(json)?;
                 Ok(Statement::Expr(stmt))
             }
-            "ForStatement" |
-            "WhileStatement" => {
+            "ForStatement" | "WhileStatement" => {
                 let stmt = ForStatement::try_from(json)?;
                 Ok(Statement::For(Box::new(stmt)))
             }
@@ -155,7 +155,9 @@ impl TryFrom<&JSON> for Statement {
                 let decl = VariableDeclaration::try_from(json)?;
                 Ok(Statement::VariableDeclaration(decl))
             }
-            _ => Err(ParseError::UnknownType{ value: json.clone() }),
+            _ => Err(ParseError::UnknownType {
+                value: json.clone(),
+            }),
         }
     }
 }
@@ -170,7 +172,7 @@ impl TryFrom<&JSON> for BlockStatement {
             let stmt = Statement::try_from(jstmt)?;
             body.push(stmt);
         }
-        Ok(BlockStatement{ body })
+        Ok(BlockStatement { body })
     }
 }
 
@@ -186,11 +188,15 @@ impl TryFrom<&JSON> for IfStatement {
         let jthen = json_get(value, "consequent")?;
         let consequent = Statement::try_from(jthen)?;
 
-        let alternate = value.get("alternate").and_then(|jelse| {
-            Statement::try_from(jelse).ok()
-        });
+        let alternate = value
+            .get("alternate")
+            .and_then(|jelse| Statement::try_from(jelse).ok());
 
-        Ok(IfStatement{ test, consequent, alternate })
+        Ok(IfStatement {
+            test,
+            consequent,
+            alternate,
+        })
     }
 }
 
@@ -204,23 +210,25 @@ impl TryFrom<&JSON> for ForStatement {
         while_ok.or(for_ok).or(dowhile_ok)?;
 
         let init = match json.get("init") {
-            Some(jinit) if !jinit.is_null() =>
-                Statement::try_from(jinit)?,
+            Some(jinit) if !jinit.is_null() => Statement::try_from(jinit)?,
             _ => Statement::Empty,
         };
         let test = match json.get("test") {
-            Some(jtest) if !jtest.is_null() =>
-                Some(Expr::try_from(jtest)?),
-            _ => None
+            Some(jtest) if !jtest.is_null() => Some(Expr::try_from(jtest)?),
+            _ => None,
         };
         let update = match json.get("update") {
-            Some(jupdate) if !jupdate.is_null() =>
-                Some(Expr::try_from(jupdate)?),
+            Some(jupdate) if !jupdate.is_null() => Some(Expr::try_from(jupdate)?),
             _ => None,
         };
         let jbody = json_get(json, "body")?;
         let body = Statement::try_from(jbody)?;
-        Ok(ForStatement{ init, test, update, body })
+        Ok(ForStatement {
+            init,
+            test,
+            update,
+            body,
+        })
     }
 }
 
@@ -279,10 +287,7 @@ impl TryFrom<&JSON> for ReturnStatement {
         json_expect_str(value, "type", "ReturnStatement")?;
 
         let jargument = json_get(value, "argument")?;
-        let argument = json_map_object(
-            jargument,
-            |jobject| Expr::try_from(jobject)
-        )?;
+        let argument = json_map_object(jargument, |jobject| Expr::try_from(jobject))?;
 
         Ok(ReturnStatement(argument))
     }
@@ -317,16 +322,17 @@ impl TryFrom<&JSON> for TryStatement {
             let jbody = json_get(jobject, "body")?;
             let body = BlockStatement::try_from(jbody)?;
 
-            Ok(CatchClause{param, body})
+            Ok(CatchClause { param, body })
         })?;
 
         let jfinalizer = json_get(jstmt, "finalizer")?;
-        let finalizer = json_map_object(
-            jfinalizer,
-            |jobject| BlockStatement::try_from(jobject)
-        )?;
+        let finalizer = json_map_object(jfinalizer, |jobject| BlockStatement::try_from(jobject))?;
 
-        Ok(TryStatement{block, handler, finalizer})
+        Ok(TryStatement {
+            block,
+            handler,
+            finalizer,
+        })
     }
 }
 
@@ -340,10 +346,12 @@ impl TryFrom<&JSON> for VariableDeclaration {
             "const" => DeclarationKind::Const,
             "let" => DeclarationKind::Let,
             "var" => DeclarationKind::Var,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "const|let|var",
-                value: value.get("kind").unwrap().clone(),
-            }),
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "const|let|var",
+                    value: value.get("kind").unwrap().clone(),
+                })
+            }
         };
         let jdeclarations = json_get_array(value, "declarations")?;
 
@@ -363,9 +371,9 @@ impl TryFrom<&JSON> for VariableDeclaration {
                 }
             };
 
-            declarations.push(VariableDeclarator{ name, init });
+            declarations.push(VariableDeclarator { name, init });
         }
-        Ok(VariableDeclaration{ kind, declarations })
+        Ok(VariableDeclaration { kind, declarations })
     }
 }
 
@@ -376,9 +384,11 @@ impl TryFrom<&JSON> for FunctionDeclaration {
         json_expect_str(value, "type", "FunctionDeclaration")?;
 
         let function = FunctionExpression::try_from(value)?;
-        let id = function.id.clone()
-            .ok_or(ParseError::ObjectWithout{ attr: "id", value: value.clone()})?;
-        Ok(FunctionDeclaration{ id, function })
+        let id = function.id.clone().ok_or(ParseError::ObjectWithout {
+            attr: "id",
+            value: value.clone(),
+        })?;
+        Ok(FunctionDeclaration { id, function })
     }
 }
 
@@ -394,7 +404,6 @@ impl TryFrom<&JSON> for ExpressionStatement {
     }
 }
 
-
 impl TryFrom<&JSON> for Expr {
     type Error = ParseError<JSON>;
 
@@ -404,7 +413,8 @@ impl TryFrom<&JSON> for Expr {
         let expr = match jexpr_ty {
             "ArrayExpression" => {
                 let jelements = json_get_array(jexpr, "elements")?;
-                let elements = jelements.iter()
+                let elements = jelements
+                    .iter()
                     .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
                 let expr = ArrayExpression(elements?);
@@ -423,7 +433,8 @@ impl TryFrom<&JSON> for Expr {
                 let callee = Expr::try_from(jcallee)?;
 
                 let jarguments = json_get_array(jexpr, "arguments")?;
-                let arguments = jarguments.iter()
+                let arguments = jarguments
+                    .iter()
                     .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
 
@@ -442,7 +453,7 @@ impl TryFrom<&JSON> for Expr {
                 let expr = ConditionalExpression(
                     Box::new(condexpr),
                     Box::new(thenexpr),
-                    Box::new(elseexpr)
+                    Box::new(elseexpr),
                 );
                 Expr::Conditional(expr)
             }
@@ -479,7 +490,8 @@ impl TryFrom<&JSON> for Expr {
                 let callee = Expr::try_from(jcallee)?;
 
                 let jarguments = json_get_array(jexpr, "arguments")?;
-                let arguments = jarguments.iter()
+                let arguments = jarguments
+                    .iter()
                     .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
                     .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>()?;
 
@@ -499,8 +511,11 @@ impl TryFrom<&JSON> for Expr {
                 let expr = UpdateExpression::try_from(jexpr)?;
                 Expr::Update(expr)
             }
-            _ =>
-                return Err(ParseError::UnknownType{ value: jexpr.clone() }),
+            _ => {
+                return Err(ParseError::UnknownType {
+                    value: jexpr.clone(),
+                })
+            }
         };
         Ok(expr)
     }
@@ -528,10 +543,12 @@ impl TryFrom<&JSON> for UnaryExpression {
             "delete" => UnOp::Delete,
             "typeof" => UnOp::Typeof,
             "void" => UnOp::Void,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "+ | - | ! | ~ | typeof | void",
-                value: jexpr.clone(),
-            })
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "+ | - | ! | ~ | typeof | void",
+                    value: jexpr.clone(),
+                })
+            }
         };
 
         let jargument = json_get(jexpr, "argument")?;
@@ -554,10 +571,12 @@ impl TryFrom<&JSON> for UpdateExpression {
         let op = match operator {
             "++" => UpdOp::Increment,
             "--" => UpdOp::Decrement,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "++ or --",
-                value: jexpr.clone(),
-            })
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "++ or --",
+                    value: jexpr.clone(),
+                })
+            }
         };
         Ok(UpdateExpression(op, prefix, Box::new(argument)))
     }
@@ -586,12 +605,14 @@ impl TryFrom<&JSON> for BinaryExpression {
             ">" => BinOp::Greater,
             "<=" => BinOp::LtEq,
             ">=" => BinOp::GtEq,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "+|-|*|==|===|!=|<|>|<=|>=",
-                value: jexpr.get("operator").unwrap().clone(),
-            }),
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "+|-|*|==|===|!=|<|>|<=|>=",
+                    value: jexpr.get("operator").unwrap().clone(),
+                })
+            }
         };
-        Ok(BinaryExpression( Box::new(left), op, Box::new(right) ))
+        Ok(BinaryExpression(Box::new(left), op, Box::new(right)))
     }
 }
 
@@ -609,12 +630,14 @@ impl TryFrom<&JSON> for LogicalExpression {
         let op = match opstr {
             "&&" => BoolOp::And,
             "||" => BoolOp::Or,
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "&& or ||",
-                value: jexpr.get("operator").unwrap().clone(),
-            }),
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "&& or ||",
+                    value: jexpr.get("operator").unwrap().clone(),
+                })
+            }
         };
-        Ok(LogicalExpression( Box::new(left), op, Box::new(right) ))
+        Ok(LogicalExpression(Box::new(left), op, Box::new(right)))
     }
 }
 
@@ -634,15 +657,17 @@ impl TryFrom<&JSON> for AssignmentExpression {
             "+=" => Some(BinOp::Plus),
             "-=" => Some(BinOp::Minus),
             "*=" => Some(BinOp::Star),
-            _ => return Err(ParseError::UnexpectedValue{
-                want: "= | +=",
-                value: jexpr.get("operator").unwrap().clone()
-            }),
+            _ => {
+                return Err(ParseError::UnexpectedValue {
+                    want: "= | +=",
+                    value: jexpr.get("operator").unwrap().clone(),
+                })
+            }
         };
         Ok(AssignmentExpression(
             Box::new(left),
             AssignOp(modop),
-            Box::new(right)
+            Box::new(right),
         ))
     }
 }
@@ -665,18 +690,17 @@ impl TryFrom<&JSON> for ObjectExpression {
                 ObjectKey::Computed(keyexpr)
             } else {
                 match keyexpr {
-                    Expr::Identifier(ident) =>
-                        ObjectKey::Identifier(ident.0),
-                    Expr::Literal(jval) =>
-                        match jval.0.as_str() {
-                            Some(val) => ObjectKey::Identifier(val.to_string()),
-                            None => ObjectKey::Identifier(jval.0.to_string()),
-                        }
-                    _ =>
-                        return Err(ParseError::UnexpectedValue{
+                    Expr::Identifier(ident) => ObjectKey::Identifier(ident.0),
+                    Expr::Literal(jval) => match jval.0.as_str() {
+                        Some(val) => ObjectKey::Identifier(val.to_string()),
+                        None => ObjectKey::Identifier(jval.0.to_string()),
+                    },
+                    _ => {
+                        return Err(ParseError::UnexpectedValue {
                             want: "Identifier|Literal",
                             value: jprop.clone(),
                         })
+                    }
                 }
             };
 
@@ -698,14 +722,15 @@ impl TryFrom<&JSON> for FunctionExpression {
             .ok();
 
         let jparams = json_get_array(jexpr, "params")?;
-        let params = jparams.into_iter()
+        let params = jparams
+            .into_iter()
             .map(|jparam| Identifier::try_from(jparam))
             .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
 
         let jbody = json_get(jexpr, "body")?;
         let body = BlockStatement::try_from(jbody)?;
 
-        Ok(FunctionExpression{
+        Ok(FunctionExpression {
             id,
             params,
             body: Box::new(body),

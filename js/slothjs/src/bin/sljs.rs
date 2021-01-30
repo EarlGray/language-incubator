@@ -1,45 +1,49 @@
-/// This is the Javascript interpreter:
-/// ```sh
-/// $ echo "2 + 2" | cargo run --bin sljs
-/// 4
-///
-/// $ cargo run
-/// var a = {one: 1}
-/// a.one
-/// ^D
-/// 1
-/// ```
-///
-/// It bundles Esrpima for parsing and still relies on nodejs
-/// to execute the Esprima parser. It uses $TMPDIR/sljs/ to unpack
-/// its auxiliary files.
+//! This is the Javascript interpreter:
+//! ```sh
+//! $ echo "2 + 2" | cargo run --bin sljs
+//! 4
+//!
+//! $ cargo run
+//! var a = {one: 1}
+//! a.one
+//! ^D
+//! 1
+//! ```
+//!
+//! It bundles Esrpima for parsing and still relies on nodejs
+//! to execute the Esprima parser. It uses $TMPDIR/sljs/ to unpack
+//! its auxiliary files.
 
-use std::fmt::Debug;
 use std::convert::TryFrom;
 use std::env;
-use std::process::{Command, Stdio};
+use std::fmt::Debug;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::{
+    Path,
+    PathBuf,
+};
+use std::process::{
+    Command,
+    Stdio,
+};
 
 use atty::Stream;
 
+use slothjs::error::ParseError;
+use slothjs::interpret::Interpretable;
 use slothjs::{
     Exception,
     Heap,
-    JSON,
     JSValue,
     Program,
+    JSON,
 };
-use slothjs::error::ParseError;
-use slothjs::interpret::Interpretable;
-
 
 const TMPDIRNAME: &str = "sljs";
 const ESPRIMA: &str = include_str!("../../node_modules/esprima/dist/esprima.js");
 const ESPARSE: &str = include_str!("../../node_modules/esprima/bin/esparse.js");
-
 
 fn die<E: Debug>(msg: &str, err: E, errcode: i32) -> ! {
     eprintln!("{}: {:?}", msg, err);
@@ -65,14 +69,12 @@ fn prepare_temporary_directory() -> io::Result<PathBuf> {
 
     let esprima_path = tmpdir.join("esprima.js");
     if !esprima_path.exists() {
-        fs::File::create(&esprima_path)?
-            .write_all(ESPRIMA.as_bytes())?;
+        fs::File::create(&esprima_path)?.write_all(ESPRIMA.as_bytes())?;
     }
 
     let esparse_path = tmpdir.join("esparse.js");
     if !esparse_path.exists() {
-        fs::File::create(&esparse_path)?
-            .write_all(ESPARSE.as_bytes())?;
+        fs::File::create(&esparse_path)?.write_all(ESPARSE.as_bytes())?;
     }
     //eprintln!("esparse_path = {:?}", &esparse_path);
     Ok(esparse_path)
@@ -89,19 +91,16 @@ fn run_esprima(esparse_path: &Path, input: &str) -> io::Result<(String, String)>
         .spawn()?;
 
     {
-        let stdin = esparse.stdin.as_mut()
-            .expect("failed to open stdin");
+        let stdin = esparse.stdin.as_mut().expect("failed to open stdin");
         stdin.write_all(input.as_bytes())?;
     }
 
     let esparse_output = esparse.wait_with_output()?;
 
-    let stdout = String::from_utf8(esparse_output.stdout).map_err(|e| {
-        io::Error::new(io::ErrorKind::InvalidData, e)
-    })?;
-    let stderr = String::from_utf8(esparse_output.stderr).map_err(|e| {
-        io::Error::new(io::ErrorKind::InvalidData, e)
-    })?;
+    let stdout = String::from_utf8(esparse_output.stdout)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let stderr = String::from_utf8(esparse_output.stderr)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let status = esparse_output.status;
     if !status.success() {
         //eprintln!("{}", stderr);
@@ -133,23 +132,18 @@ enum EvalError {
 }
 
 fn evaluate_input(esparse_path: &Path, input: &str, heap: &mut Heap) -> Result<JSValue, EvalError> {
-    let (stdout, _stderr) = run_esprima(esparse_path, input)
-        .map_err(|e| EvalError::Syntax(e))?;
-    let json = serde_json::from_str(&stdout)
-        .map_err(|e| EvalError::JSON(e))?;
-    let ast = Program::try_from(&json)
-        .map_err(|e| EvalError::Parser(e))?;
+    let (stdout, _stderr) = run_esprima(esparse_path, input).map_err(|e| EvalError::Syntax(e))?;
+    let json = serde_json::from_str(&stdout).map_err(|e| EvalError::JSON(e))?;
+    let ast = Program::try_from(&json).map_err(|e| EvalError::Parser(e))?;
 
-    let result = ast.interpret(heap)
-        .map_err(|e| EvalError::Exception(e))?;
+    let result = ast.interpret(heap).map_err(|e| EvalError::Exception(e))?;
 
-    result.to_value(heap)
-        .map_err(|e| EvalError::Value(e))
+    result.to_value(heap).map_err(|e| EvalError::Value(e))
 }
 
 #[allow(unreachable_code)]
 fn batch_main(esparse_path: &Path) -> io::Result<()> {
-    let mut input  = String::new();
+    let mut input = String::new();
     io::stdin().lock().read_to_string(&mut input)?;
 
     let mut heap = Heap::new();
@@ -163,7 +157,8 @@ fn batch_main(esparse_path: &Path) -> io::Result<()> {
         };
         io::Error::from(io::ErrorKind::Other)
     })?;
-    let output = value.to_string(&mut heap)
+    let output = value
+        .to_string(&mut heap)
         .unwrap_or_else(|e| die("Exception", e, 6));
     println!("{}", output);
 
@@ -193,25 +188,22 @@ fn repl_main(esparse_path: &Path) -> io::Result<()> {
 
         // evaluate
         match evaluate_input(esparse_path, &input, &mut heap) {
-            Ok(value) =>
-                match value.to_string(&mut heap) {
-                    Ok(output) => println!("{}", output),
-                    Err(e) => eprintln!("Exception: {:?}", e)
-                },
+            Ok(value) => match value.to_string(&mut heap) {
+                Ok(output) => println!("{}", output),
+                Err(e) => eprintln!("Exception: {:?}", e),
+            },
             Err(EvalError::Syntax(err)) => {
                 eprintln!("SyntaxError: {:?}", err.kind());
                 eprintln!("{}", err.get_ref().unwrap());
             }
-            Err(EvalError::JSON(e)) =>
-                die("JSONError", e, 2),
+            Err(EvalError::JSON(e)) => die("JSONError", e, 2),
             Err(EvalError::Parser(e)) => {
                 eprintln!("ParseError: {:?}", e);
             }
             Err(EvalError::Exception(e)) => {
                 eprintln!("Exception: {:?}", e);
             }
-            Err(EvalError::Value(e)) =>
-                die("ValueError", e, 5),
+            Err(EvalError::Value(e)) => die("ValueError", e, 5),
         };
     }
 

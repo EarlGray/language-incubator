@@ -1,17 +1,21 @@
-use crate::object::{Interpreted, JSON, JSValue};
 use crate::ast::Identifier;
+use crate::object::{
+    Interpreted,
+    JSValue,
+    JSON,
+};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum ParseError<V> {
-    InvalidJSON{ err: String },
-    ShouldBeBool{ value: V },
-    ShouldBeString{ value: V },
-    ShouldBeArray{ value: V },
+    InvalidJSON { err: String },
+    ShouldBeBool { value: V },
+    ShouldBeString { value: V },
+    ShouldBeArray { value: V },
     //ShouldBeObject{ value: V },
-    ObjectWithout{ attr: &'static str, value: V},
-    UnexpectedValue{ want: &'static str, value: V},
-    UnknownType{ value: V },
+    ObjectWithout { attr: &'static str, value: V },
+    UnexpectedValue { want: &'static str, value: V },
+    UnknownType { value: V },
 }
 
 #[allow(dead_code)]

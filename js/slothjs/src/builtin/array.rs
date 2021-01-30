@@ -1,12 +1,12 @@
 use crate::error::Exception;
+use crate::heap::{
+    Heap,
+    JSRef,
+};
 use crate::object::{
     Content,
     Interpreted,
     JSObject,
-};
-use crate::heap::{
-    Heap,
-    JSRef,
 };
 
 fn array_object_constructor(
@@ -25,12 +25,16 @@ fn array_toString(
     _arguments: Vec<Interpreted>,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let array = heap.get(this_ref)
-        .as_array().expect("Array.prototype.toString on something that is not Array")
-        .storage.clone();
-    let reprs = array.iter().map(|val|
-        val.stringify(heap)
-    ).collect::<Result<Vec<_>, Exception>>()?;
+    let array = heap
+        .get(this_ref)
+        .as_array()
+        .expect("Array.prototype.toString on something that is not Array") // TODO: Exception
+        .storage
+        .clone();
+    let reprs = array
+        .iter()
+        .map(|val| val.stringify(heap))
+        .collect::<Result<Vec<_>, Exception>>()?;
 
     let s = reprs.join(",");
     Ok(Interpreted::from(s))
@@ -50,7 +54,8 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     array_object.set_system("prototype", Content::from(Heap::ARRAY_PROTO))?;
 
     let array_ref = heap.alloc(array_object);
-    heap.get_mut(Heap::ARRAY_PROTO).set_system("constructor", Content::from(array_ref))?;
+    heap.get_mut(Heap::ARRAY_PROTO)
+        .set_system("constructor", Content::from(array_ref))?;
 
     Ok(array_ref)
 }

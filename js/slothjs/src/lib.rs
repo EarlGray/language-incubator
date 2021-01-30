@@ -1,11 +1,12 @@
 pub mod ast;
-pub mod object;
-pub mod heap;
-pub mod error;
-pub mod interpret;
-mod parse;
 mod builtin;
+pub mod error;
+pub mod heap;
+pub mod interpret;
+pub mod object;
+mod parse;
 #[cfg(test)]
+#[rustfmt::skip]
 mod test;
 
 
