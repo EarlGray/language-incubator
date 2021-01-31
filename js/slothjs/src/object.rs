@@ -874,7 +874,7 @@ impl Interpreted {
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
         let value = match self {
             Interpreted::Value(value) => value.clone(),
-            Interpreted::Member { of, name } => match heap.get(*of).get_value(name) {
+            Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(value) => value.clone(),
                 None => JSValue::Undefined,
             },
@@ -885,7 +885,7 @@ impl Interpreted {
     pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
         match self {
             Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
-            Interpreted::Member { of, name } => match heap.get(*of).get_value(name) {
+            Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(JSValue::Ref(r)) => Ok(*r),
                 _ => Err(Exception::TypeErrorGetProperty(
                     self.clone(),

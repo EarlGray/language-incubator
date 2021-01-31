@@ -554,15 +554,13 @@ impl Interpretable for NewExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let NewExpression(callee_expr, argument_exprs) = self;
 
-        let arguments = argument_exprs
-            .iter()
+        let arguments = (argument_exprs.iter())
             .map(|expr| expr.interpret(heap))
             .collect::<Result<Vec<Interpreted>, Exception>>()?;
 
         let callee = callee_expr.interpret(heap)?;
         let funcref = callee.to_ref(heap)?;
-        let prototype_ref = heap
-            .get_mut(funcref)
+        let prototype_ref = (heap.get_mut(funcref))
             .get_value("prototype")
             .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".to_string()))?
             .to_ref()?;

@@ -55,8 +55,8 @@
 * TODO user exceptions
 ** DONE [2021-01-27 Wed] =throw=
 ** DONE [2021-01-28 Thu] =try=, =catch=, =finally=
+** DONE [2021-01-31 Sun] =Error= objects
 ** TODO stacktraces with source locations
-** TODO =Error= objects
 * TODO =Symbol= primitive
 * TODO builtin =Object=
 ** TODO static methods
@@ -144,7 +144,7 @@
 ** DONE [2021-01-09 Sat] prototype chain
 ** DONE [2021-01-17 Sun] ThisExpression
 ** DONE [2021-01-18 Mon] NewExpression
-** TODO properties lookup on the chain
+** DONE [2021-01-31 Sun] properties lookup on the chain
 ** TODO properties, =get=, =set=
 
 * MAYBE optimizations
