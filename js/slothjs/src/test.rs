@@ -975,6 +975,16 @@ fn test_builtin_boolean() {
 }
 
 #[test]
+fn test_builtin_error() {
+    assert_eval!("void new Error()", null);
+    assert_eval!("var e = Error('testing'); e.message", "testing");
+    assert_eval!("var e = new Error('testing'); e.message", "testing");
+
+    // Error.prototype.toString()
+    assert_eval!("new Error('just testing').toString()", "Error: just testing");
+}
+
+#[test]
 fn test_objects() {
     assert_eval!( "var a = [1]; a[0] = 2; a[0]",    2.0);
     assert_eval!( "var a = {v: 1}; a.v = 2; a.v",   2.0);

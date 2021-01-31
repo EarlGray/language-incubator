@@ -145,6 +145,12 @@ pub struct Literal(pub JSON);
 #[derive(Clone, Debug, PartialEq)]
 pub struct Identifier(pub String);
 
+impl From<&str> for Identifier {
+    fn from(s: &str) -> Identifier {
+        Identifier(s.to_string())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct BinaryExpression(pub Box<Expr>, pub BinOp, pub Box<Expr>);
 

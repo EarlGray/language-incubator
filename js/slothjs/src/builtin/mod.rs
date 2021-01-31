@@ -1,6 +1,7 @@
 mod array;
 mod boolean;
 mod console;
+mod error;
 mod function;
 mod global;
 mod object;
@@ -27,6 +28,8 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let the_boolean = boolean::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
         .set_hidden("Boolean", Content::from(the_boolean))?;
+
+    error::init(heap)?;
 
     console::init(heap)?;
 

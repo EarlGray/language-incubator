@@ -24,20 +24,40 @@ pub struct JSRef(usize);
 
 impl JSRef {
     pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> Result<bool, Exception> {
-        let protoref = heap
-            .get(constructor)
-            .get_value("prototype")
-            .ok_or(Exception::TypeErrorNotCallable(Interpreted::from(
-                constructor,
-            )))?
-            .to_ref()?;
+        let protoval = heap.get(constructor).get_value("prototype");
+        let protoval = protoval.ok_or_else(|| {
+            let what = Interpreted::from(constructor);
+            Exception::TypeErrorNotCallable(what)
+        })?;
+        let protoref = protoval.to_ref()?;
 
-        let found = heap
-            .get(*self)
+        let found = (heap.get(*self))
             .protochain(heap)
             .find(|pref| *pref == protoref)
             .is_some();
         Ok(found)
+    }
+
+    /// Check if the object behind the reference `self` has a prototype of `constructor`.
+    /// ```
+    /// # use slothjs::{JSObject, Heap};
+    /// # let mut heap = Heap::new();
+    /// let array_ref = heap.alloc(JSObject::from_array(vec![]));
+    /// array_ref.expect_instance("Array", &heap).unwrap();
+    /// ```
+    pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> Result<(), Exception> {
+        let ctrval = heap.scope().get_value(constructor);
+        let ctrval = ctrval.ok_or(Exception::ReferenceNotFound(Identifier::from(constructor)))?;
+
+        let ctrref = ctrval.to_ref()?;
+        match self.isinstance(ctrref, heap)? {
+            true => Ok(()),
+            false => {
+                let what = Interpreted::from(*self);
+                let of = constructor.to_string();
+                Err(Exception::TypeErrorInstanceRequired(what, of))
+            }
+        }
     }
 }
 
@@ -92,7 +112,7 @@ impl Heap {
         JSRef(ind)
     }
 
-    /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true` calls.
+    /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true)` calls.
     pub(crate) fn smells_fresh(&self, objref: JSRef) -> bool {
         match objref {
             Heap::NULL => false,
@@ -188,6 +208,28 @@ impl Heap {
         } else {
             None
         }
+    }
+
+    /// Lookup a property chain starting from the current scope, e.g.
+    /// ```
+    /// # use slothjs::{Heap, Interpreted};
+    /// # let mut heap = Heap::new();
+    /// assert_eq!(
+    ///     heap.lookup_path(&["Array", "prototype"]).unwrap(),
+    ///     Interpreted::from(Heap::ARRAY_PROTO)
+    /// );
+    /// ```
+    pub fn lookup_path(&self, mut names: &[&str]) -> Result<Interpreted, Exception> {
+        let mut scoperef = self.local_scope().unwrap_or(Heap::GLOBAL);
+        while let Some((name, rest)) = names.split_first() {
+            names = rest;
+            let nameval = self.get(scoperef).get_value(name).ok_or_else(|| {
+                let what = Interpreted::from(scoperef);
+                Exception::TypeErrorGetProperty(what, name.to_string())
+            })?;
+            scoperef = nameval.to_ref()?;
+        }
+        Ok(Interpreted::from(scoperef))
     }
 
     fn push_scope(

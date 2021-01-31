@@ -12,6 +12,7 @@ mod test;
 
 pub type Program = ast::Program;
 
+pub type Interpreted = object::Interpreted;
 pub type JSON = object::JSON;
 pub type JSObject = object::JSObject;
 pub type JSValue = object::JSValue;

@@ -461,6 +461,19 @@ impl JSObject {
             })
     }
 
+    /// Check own and all inherited properties for `name` and returns the first found value.
+    pub fn lookup_value<'a>(&'a self, name: &str, heap: &'a Heap) -> Option<&'a JSValue> {
+        if let Some(value) = self.get_value(name) {
+            return Some(value);
+        }
+        for protoref in self.protochain(heap) {
+            if let Some(value) = heap.get(protoref).get_value(name) {
+                return Some(value);
+            }
+        }
+        None
+    }
+
     fn set_maybe_nonwritable(
         &mut self,
         name: &str,
