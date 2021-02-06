@@ -47,7 +47,7 @@ fn error_proto_toString(
     let name = (heap.get(this_ref))
         .lookup_value("name", heap)
         .map(|v| v.clone())
-        .unwrap_or(JSValue::from("TODO"))
+        .unwrap_or(JSValue::from(""))
         .stringify(heap)?;
 
     let message = (heap.get(this_ref))
@@ -56,17 +56,11 @@ fn error_proto_toString(
         .unwrap_or(JSValue::from(""))
         .stringify(heap)?;
 
-    let mut result = String::new();
-    if name.len() > 0 {
-        result.push_str(&name);
-    }
-    if name.len() > 0 && message.len() > 0 {
-        result.push_str(": ");
-    }
-    if message.len() > 0 {
-        result.push_str(&message);
-    }
-    Ok(Interpreted::from(result))
+    Ok(Interpreted::from(match () {
+        _ if message.is_empty() => name,
+        _ if name.is_empty() => message,
+        _ => name + ": " + &message,
+    }))
 }
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {

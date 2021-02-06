@@ -426,6 +426,50 @@ fn test_conditionals() {
 }
 
 #[test]
+fn test_switch() {
+    /*
+    // does it work?
+    assert_eval!("switch (true) {}", null);
+
+    // it uses the right case
+    assert_eval!("var a; switch (1) { case 1: a = true; break; default: a = false }; a", true);
+
+    // it uses default
+    assert_eval!("var a; switch (-1) { case 1: a = false; break; default: a = true }; a", true);
+
+    // the strict comparison is used
+    assert_eval!("var a; switch (1) { case '1': a = false; break; default: a = true }; a", true);
+
+    // fallthrough without break
+    assert_eval!("var a = ''; switch (1) { case 1: a += '1'; default: a += 'd' }; a", "1d");
+
+    // default before case
+    assert_eval!("var a; switch (-1) { default: a = true; break; case 1: a = false; }; a", true);
+
+    // case understands expressions
+    assert_eval!(r#"
+        var a, one = 1;
+        switch (1) { default: a = false; break; case one: a = true; };
+        a
+    "#, true);
+
+    // break & switch & for
+    assert_eval!(r#"
+        var trace = ''; function t(point) { trace += point; };
+        for (var i = 0; i < 4; ++i) {
+          switch (i) {
+            case 0:
+            case 1: t('a'); break;
+            default: t('d');
+            case 2: t('b');
+          }
+        }
+        trace
+    "#, "aabdb");
+    */
+}
+
+#[test]
 fn test_loops() {
     // for (<init>; <test>; <update)
     assert_eval!(r#"
@@ -553,55 +597,51 @@ fn test_exceptions() {
         };
     "#, Exception::UserThrown);
     assert_eval!(r#"
-        let a = false, b = true;
-        try {
-            throw '';
-            b = false;
-        } catch (e) {
-            a = true;
-        }
-        a && b
-    "#, true);
+        var trace = ''; function t(point) { trace += point; }
+        try { throw ''; t('b'); }
+        catch (e) { t('e'); }
+        trace
+    "#, "e");
     assert_eval!(r#"
-        var c = 0;
+        var trace = ''; function t(point) { trace += point; }
         try {
             for (var i = 0; i < 5; ++i) {
                 throw i;
-                c += i;
+                t('b');
             }
         } catch(e) {
-            c = true;
+            t('e')
         }
-        c
-    "#, true);
+        trace
+    "#, "e");
     assert_eval!(r#"
-        var c = 0;
+        var trace = ''; function t(point) { trace += point; }
         for (var i = 0; i < 5; ++i) {
             try {
-                if (i == 1) continue;
-                if (i == 2) throw '?';
-                if (i == 4) break;
-                c += i;
+                if (i == 1) { t('1'); continue; }
+                if (i == 2) { t('2'); throw '?'; }
+                if (i == 4) { t('4'); break; }
+                t('b');
             } catch(e) {
-                c += 100;
+                t('e');
             }
         }
-        c
-    "#, 103.0);
+        trace
+    "#, "b12eb4");
     assert_eval!(r#"
-        var c = 0;
-        for (var i = 0; i < 5; ++i) {
+        var trace = ''; function t(point) { trace += point; }
+        for (var i = 0; i < 6; ++i) {
             try {
-                if (i == 1) continue;
-                if (i == 2) throw '?';
-                if (i == 4) break;
-                c += i;
+                if (i == 1) { t('1'); continue; }
+                if (i == 2) { t('2'); throw '?'; }
+                if (i == 4) { t('4'); break; }
+                t('b');
             }
-            catch(e) {}
-            finally { c += 100; }
+            catch(e) { t('e'); }
+            finally { t('f'); }
         }
-        c
-    "#, 503.0);
+        trace
+    "#, "bf1f2efbf4f");
     /* TODO: let-variables and block scope
     assert_eval!(r#"
         function throws() { throw true; }
