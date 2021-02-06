@@ -359,6 +359,7 @@ impl Interpretable for Expr {
             Expr::Conditional(expr) => expr.interpret(heap),
             Expr::Unary(expr) => expr.interpret(heap),
             Expr::Update(expr) => expr.interpret(heap),
+            Expr::Sequence(expr) => expr.interpret(heap),
             Expr::Function(expr) => expr.interpret(heap),
             Expr::New(expr) => expr.interpret(heap),
             Expr::This => heap.interpret_this(),
@@ -475,6 +476,18 @@ impl Interpretable for UpdateExpression {
 
         let resnum = if *prefix { newnum } else { oldnum };
         Ok(Interpreted::from(resnum))
+    }
+}
+
+impl Interpretable for SequenceExpression {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let SequenceExpression(exprs) = self;
+
+        let mut value = JSValue::Undefined;
+        for expr in exprs.iter() {
+            value = expr.interpret(heap)?.to_value(heap)?;
+        }
+        Ok(Interpreted::from(value))
     }
 }
 

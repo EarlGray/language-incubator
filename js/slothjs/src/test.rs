@@ -395,12 +395,10 @@ fn test_scope() {
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 }
 
-/*
 #[test]
 fn test_sequence() {
-    assert_eq!( eval("let a = 0; a=a+2, a=a+2"), JSValue::from(6) );
+    assert_eval!("let a = 0; a += 2, a += 2", 4.0);
 }
-*/
 
 #[test]
 fn test_blocks() {

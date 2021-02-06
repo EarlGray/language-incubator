@@ -538,6 +538,10 @@ impl TryFrom<&JSON> for Expr {
                 let expr = ObjectExpression::try_from(jexpr)?;
                 Expr::Object(expr)
             }
+            "SequenceExpression" => {
+                let expr = SequenceExpression::try_from(jexpr)?;
+                Expr::Sequence(expr)
+            }
             "ThisExpression" => Expr::This,
             "UnaryExpression" => {
                 let expr = UnaryExpression::try_from(jexpr)?;
@@ -615,6 +619,19 @@ impl TryFrom<&JSON> for UpdateExpression {
             }
         };
         Ok(UpdateExpression(op, prefix, Box::new(argument)))
+    }
+}
+
+impl TryFrom<&JSON> for SequenceExpression {
+    type Error = ParseError<JSON>;
+
+    fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
+        let jexprs = json_get_array(jexpr, "expressions")?;
+
+        let exprs = (jexprs.iter())
+            .map(|jexpr| Expr::try_from(jexpr))
+            .collect::<Result<Vec<Expr>, ParseError<JSON>>>()?;
+        Ok(SequenceExpression(Box::new(exprs)))
     }
 }
 

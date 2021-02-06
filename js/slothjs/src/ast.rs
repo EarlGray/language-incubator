@@ -147,6 +147,7 @@ pub enum Expr {
     Conditional(ConditionalExpression),
     Unary(UnaryExpression),
     Update(UpdateExpression),
+    Sequence(SequenceExpression),
     Function(FunctionExpression),
     This,
     New(NewExpression),
@@ -187,6 +188,9 @@ pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expr>)>);
 
 #[derive(Clone, Debug)]
 pub struct MemberExpression(pub Box<Expr>, pub Box<Expr>, pub bool);
+
+#[derive(Clone, Debug)]
+pub struct SequenceExpression(pub Box<Vec<Expr>>);
 
 #[derive(Clone, Debug)]
 pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
