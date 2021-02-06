@@ -1,4 +1,5 @@
-use crate::ast::*;
+use crate::ast::*; // yes, EVERYTHING
+
 use crate::error::Exception;
 use crate::heap::Heap;
 use crate::object;
@@ -8,7 +9,7 @@ use crate::object::{
     Interpreted,
     JSObject,
     JSValue,
-}; // yes, EVERYTHING
+};
 
 // ==============================================
 
@@ -38,6 +39,7 @@ impl Interpretable for Statement {
             Statement::Block(stmt) => stmt.interpret(heap),
             Statement::If(stmt) => stmt.interpret(heap),
             Statement::For(stmt) => stmt.interpret(heap),
+            Statement::ForIn(stmt) => stmt.interpret(heap),
             Statement::Break(stmt) => stmt.interpret(heap),
             Statement::Continue(stmt) => stmt.interpret(heap),
             Statement::Label(stmt) => stmt.interpret(heap),
@@ -120,6 +122,77 @@ impl Interpretable for ForStatement {
     }
 }
 
+impl ForInStatement {}
+
+impl Interpretable for ForInStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        use std::collections::HashSet;
+
+        let iteratee = self.right.interpret(heap)?;
+        let iteratee = iteratee.to_value(heap)?.objectify(heap);
+
+        let assignexpr = match &self.left {
+            ForInTarget::Expr(expr) => expr.clone(),
+            ForInTarget::Var(vardecl) => {
+                if vardecl.declarations.len() != 1 {
+                    return Err(Exception::SyntaxErrorForInMultipleVar());
+                }
+                let name = &vardecl.declarations[0].name.0;
+                heap.declare_var(Some(vardecl.kind), &name)?;
+                Expr::Identifier(Identifier::from(name.as_str()))
+            }
+        };
+
+        let mut visited = HashSet::new();
+        let mut objref = iteratee;
+        while objref != Heap::NULL {
+            let object = heap.get(objref);
+            let mut keys = (object.properties.keys())
+                .map(|s| s.clone())
+                .collect::<HashSet<String>>();
+            if let Some(array) = object.as_array() {
+                let indices = 0..array.storage.len();
+                keys.extend(indices.map(|i| i.to_string()));
+            }
+            // TODO: strings iteration
+
+            for propname in keys.drain() {
+                if visited.contains(&propname) {
+                    continue;
+                }
+                visited.insert(propname.clone());
+
+                let object = heap.get(objref);
+                match object.properties.get(&propname) {
+                    Some(p) if p.access.enumerable() => (),
+                    None if object.as_array().is_some() && propname.parse::<usize>().is_ok() => (),
+                    Some(_) => continue, // not enumerable, skip
+                    None => continue,    // the property has disappeared!
+                };
+
+                let assignee = assignexpr.interpret(heap)?;
+                assignee
+                    .put_value(JSValue::from(propname.as_str()), heap)
+                    .or_else(crate::error::ignore_set_readonly)?;
+
+                match self.body.interpret(heap) {
+                    Ok(_) => (),
+                    Err(Exception::JumpContinue(None)) => continue,
+                    Err(Exception::JumpBreak(None)) => {
+                        return Ok(Interpreted::VOID);
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+
+            objref = heap.get(objref).proto;
+        }
+        Ok(Interpreted::VOID)
+    }
+}
+
 impl Interpretable for BreakStatement {
     fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
         let BreakStatement(maybe_label) = self;
@@ -141,6 +214,7 @@ impl LabelStatement {
             // must be a loop to continue
             let loop_stmt = match &**body {
                 Statement::For(stmt) => stmt,
+                Statement::ForIn(_) => todo!(),
                 _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone())),
             };
 
@@ -239,9 +313,7 @@ impl Interpretable for TryStatement {
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
-            let optinit = decl
-                .init
-                .as_ref()
+            let optinit = (decl.init.as_ref())
                 .map(|initexpr| initexpr.interpret(heap))
                 .transpose()?;
             let name = &decl.name.0;
@@ -389,22 +461,18 @@ impl Interpretable for UpdateExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let UpdateExpression(op, prefix, argexpr) = self;
         let assignee = argexpr.interpret(heap)?;
+
         let oldvalue = assignee.to_value(heap)?;
         let oldnum = oldvalue.numberify(heap).unwrap_or(f64::NAN);
-
         let newnum = match op {
             UpdOp::Increment => oldnum + 1.0,
             UpdOp::Decrement => oldnum - 1.0,
         };
 
-        match assignee {
-            Interpreted::Member { of, name } => {
-                heap.get_mut(of)
-                    .update(&name, JSValue::from(newnum))
-                    .or_else(crate::error::ignore_set_readonly)?;
-            }
-            _ => return Err(Exception::TypeErrorCannotAssign(assignee)),
-        }
+        assignee
+            .put_value(JSValue::from(newnum), heap)
+            .or_else(crate::error::ignore_set_readonly)?;
+
         let resnum = if *prefix { newnum } else { oldnum };
         Ok(Interpreted::from(resnum))
     }
@@ -498,32 +566,22 @@ impl Interpretable for AssignmentExpression {
                     op
                 )),
             };
-            match assignee {
-                Interpreted::Member { of, name } => {
-                    heap.get_mut(of)
-                        .update(&name, newvalue.clone())
-                        .or_else(crate::error::ignore_set_readonly)?;
-                    Ok(Interpreted::Value(newvalue))
-                }
-                _ => Err(Exception::TypeErrorCannotAssign(assignee.clone())),
-            }
+            assignee
+                .put_value(newvalue.clone(), heap)
+                .or_else(crate::error::ignore_set_readonly)?;
+            Ok(Interpreted::Value(newvalue))
         } else {
             if let Expr::Identifier(name) = leftexpr.as_ref() {
                 // `a = 1` should create a variable;
                 // `a.one = 1` without `a` should fail.
                 heap.declare_var(None, &name.0)?;
             }
+            let value = value.to_value(heap)?;
             let assignee = leftexpr.interpret(heap)?;
-            match assignee {
-                Interpreted::Member { of, name } => {
-                    let value = value.to_value(heap)?;
-                    heap.get_mut(of)
-                        .update(&name, value.clone())
-                        .or_else(crate::error::ignore_set_readonly)?;
-                    Ok(Interpreted::Value(value))
-                }
-                _ => Err(Exception::TypeErrorCannotAssign(assignee)),
-            }
+            assignee
+                .put_value(value.clone(), heap)
+                .or_else(crate::error::ignore_set_readonly)?;
+            Ok(Interpreted::Value(value))
         }
     }
 }

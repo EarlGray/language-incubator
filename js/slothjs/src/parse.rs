@@ -127,6 +127,10 @@ impl TryFrom<&JSON> for Statement {
                 let stmt = ForStatement::try_from(json)?;
                 Ok(Statement::For(Box::new(stmt)))
             }
+            "ForInStatement" => {
+                let stmt = ForInStatement::try_from(json)?;
+                Ok(Statement::ForIn(stmt))
+            }
             "FunctionDeclaration" => {
                 let decl = FunctionDeclaration::try_from(json)?;
                 Ok(Statement::FunctionDeclaration(decl))
@@ -228,6 +232,38 @@ impl TryFrom<&JSON> for ForStatement {
             test,
             update,
             body,
+        })
+    }
+}
+
+impl TryFrom<&JSON> for ForInStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(json: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(json, "type", "ForInStatement")?;
+
+        let jleft = json_get(json, "left")?;
+        let left = if let Ok(vardecl) = VariableDeclaration::try_from(jleft) {
+            ForInTarget::Var(vardecl)
+        } else if let Ok(expr) = Expr::try_from(jleft) {
+            ForInTarget::Expr(expr)
+        } else {
+            return Err(ParseError::UnexpectedValue {
+                want: "VariableDeclaration | Pattern",
+                value: jleft.clone(),
+            });
+        };
+
+        let jright = json_get(json, "right")?;
+        let right = Expr::try_from(jright)?;
+
+        let jbody = json_get(json, "body")?;
+        let body = Statement::try_from(jbody)?;
+
+        Ok(ForInStatement {
+            left,
+            right,
+            body: Box::new(body),
         })
     }
 }

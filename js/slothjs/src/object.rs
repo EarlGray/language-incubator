@@ -55,13 +55,6 @@ impl JSValue {
         }
     }
 
-    pub fn is_string(&self) -> bool {
-        match self {
-            JSValue::String(_) => true,
-            _ => false,
-        }
-    }
-
     /// to_string() makes a human-readable string representation of the value:
     /// ```
     /// # use serde_json::json;
@@ -587,9 +580,7 @@ impl JSObject {
     /// Create a `JSON` from this `JSObject`.
     pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
         if let Some(array) = self.as_array() {
-            let jvals = array
-                .storage
-                .iter()
+            let jvals = (array.storage.iter())
                 .map(|v| v.to_json(heap))
                 .collect::<Result<Vec<_>, Exception>>()?;
             return Ok(JSON::Array(jvals));
@@ -893,6 +884,13 @@ impl Interpreted {
                 )),
             },
             _ => Err(Exception::ReferenceNotAnObject(self.clone())),
+        }
+    }
+
+    pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> Result<(), Exception> {
+        match self {
+            Interpreted::Member { of, name } => heap.get_mut(*of).update(&name, value),
+            _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
         }
     }
 

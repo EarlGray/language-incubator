@@ -4,6 +4,7 @@
 * DONE [2020-12-22 Tue] ForStatement
 * DONE [2021-01-23 Sat] WhileStatement
 * DONE [2021-01-23 Sat] DoWhileStatement
+* DONE [2021-02-05 Fri] ForInExpression
 * DONE [2021-01-24 Sun] BreakStatement, ContinueStatement
 ** DONE [2021-01-23 Sat] BreakStatement
 ** DONE [2021-01-23 Sat] ContinueStatement
@@ -24,6 +25,7 @@
 * DONE [2021-01-04 Mon] UnaryExpression
 ** DONE [2021-01-03 Sun] everything, except...
 ** DONE [2021-01-04 Mon] =delete=
+* DONE [2021-02-06 Sat] SequenceExpression
 * TODO BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
@@ -51,7 +53,6 @@
 ** TODO ~&=~
 ** TODO ~|=~
 * TODO SwitchStatement
-* TODO ForInExpression
 * TODO user exceptions
 ** DONE [2021-01-27 Wed] =throw=
 ** DONE [2021-01-28 Thu] =try=, =catch=, =finally=

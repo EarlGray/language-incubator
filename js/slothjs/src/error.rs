@@ -22,6 +22,7 @@ pub enum ParseError<V> {
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxError(ParseError<JSON>),
+    SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(Identifier),

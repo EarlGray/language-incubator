@@ -8,6 +8,5 @@ default-run = "sljs"
 [dependencies]
 atty = "0.2"        # TODO: make this binary-only somehow
 bitflags = "1.2.1"
-#either = "1.6.1"
 serde = "1.0"
 serde_json = "1.0"

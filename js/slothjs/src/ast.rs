@@ -13,6 +13,7 @@ pub enum Statement {
     Expr(ExpressionStatement),
     If(Box<IfStatement>),
     For(Box<ForStatement>),
+    ForIn(ForInStatement),
     Return(ReturnStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
@@ -81,11 +82,23 @@ pub struct IfStatement {
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct ForStatement {
-    // Empty | VariableDeclaration | ExpressionStatement
-    pub init: Statement,
+    pub init: Statement, // Empty | VariableDeclaration | ExpressionStatement
     pub test: Option<Expr>,
     pub update: Option<Expr>,
     pub body: Statement,
+}
+
+#[derive(Clone, Debug)]
+pub struct ForInStatement {
+    pub left: ForInTarget,
+    pub right: Expr,
+    pub body: Box<Statement>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ForInTarget {
+    Var(VariableDeclaration),
+    Expr(Expr),
 }
 
 // ==============================================

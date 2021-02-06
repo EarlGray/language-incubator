@@ -382,6 +382,8 @@ fn test_scope() {
     assert_exception!( "a = a + 1", Exception::ReferenceNotFound );
     assert_exception!( "a += 1", Exception::ReferenceNotFound );
 
+    assert_eval!("var a=1, b=a+1; b", 2.0);
+
     assert_eval!( "var a = false; { var a = true; } a",     true );
     assert_eval!( "var a = false; { a = true } a",          true );
     //assert_eval!( "var a = true; { let a = false; } a",     true );
@@ -501,35 +503,41 @@ fn test_loops() {
         Exception::SyntaxErrorContinueLabelNotALoop
     );
 
-    /*
     // ForInStatement
+    assert_eval!("for (var p in null) throw false", null);
+    assert_eval!("for (var p in undefined) throw false", null);
     assert_eval!(r#"
         let obj = {one:1, two: 2, three: 3};
-        let sum = 0;
-        for (let prop in obj) sum += obj[prop];
-        sum
+        let sum = 0; for (let prop in obj) sum += obj[prop]; sum
     "#, 6.0);
     assert_eval!(r#"
         let obj = {two: 2, three: 3};
         Object.defineProperty(obj, 'one', {value: 1}); // non-enumerable
-        for (let prop in obj) sum += obj[prop];
-        sum
+        let sum = 0; for (let prop in obj) sum += obj[prop]; sum
     "#, 5.0);
     assert_eval!(r#"
         function Class() {};
         Class.prototype.one = 1;
-        var obj = Class();
+        var obj = new Class();
         obj.two = 2;
-        for (let prop in obj) sum += obj[prop];
-        sum
+        var sum = 0; for (let prop in obj) sum += obj[prop]; sum
     "#, 3.0);
     assert_eval!(r#"
-        var a = ['a', 'b', 'c'];
-        var s = '';
-        for (var k in a) s += a[k];
-        s
-    "#, "abc");
-     */
+        // non-enumerables do not participate in the loop,
+        // but do shadow later prototypes properties, even enumerable.
+        function Class() {};
+        Class.prototype.one = 1;
+        var obj = new Class();
+        obj.two = 2;
+        Object.defineProperty(obj, 'one', {value: 3});
+        var sum = 0; for (let prop in obj) sum += obj[prop]; sum
+    "#, 2.0);
+    assert_eval!(r#"
+        var s = 0; for (var i in [1, 2, 3]) s += i; s
+    "#, 3.0);
+    // TODO: ForInStatement string iteration
+    // TODO: continue, break
+    // TODO: labeled continue, break
 }
 
 #[test]

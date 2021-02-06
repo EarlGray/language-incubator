@@ -183,8 +183,7 @@ impl Heap {
             }
 
             // captured scopes lookup
-            let mut scope_ref = local
-                .properties
+            let mut scope_ref = (local.properties)
                 .get(Self::CAPTURED_SCOPE)
                 .and_then(|prop| prop.to_ref())
                 .unwrap_or(Heap::NULL);
@@ -194,8 +193,7 @@ impl Heap {
                     return Some(Interpreted::member(scope_ref, name));
                 }
 
-                scope_ref = scope
-                    .properties
+                scope_ref = (scope.properties)
                     .get(Self::CAPTURED_SCOPE)
                     .and_then(|prop| prop.to_ref())
                     .unwrap_or(Heap::NULL);
