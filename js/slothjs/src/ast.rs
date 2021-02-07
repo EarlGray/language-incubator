@@ -233,6 +233,8 @@ pub enum BinOp {
     Plus,
     Minus,
     Star,
+    Slash,
+    Percent,
     EqEq,
     NotEq,
     EqEqEq,
@@ -242,18 +244,13 @@ pub enum BinOp {
     LtEq,
     GtEq,
     InstanceOf,
-    /*
-    In,
-    Slash,
-    Percent,
-    StarStar,
     Pipe,
     Hat,
     Ampersand,
     LtLt,
     GtGt,
-    GtGtGt
-     */
+    GtGtGt,
+    //In,
 }
 
 #[derive(Clone, Debug, PartialEq)]

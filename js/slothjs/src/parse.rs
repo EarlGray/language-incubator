@@ -685,6 +685,8 @@ impl TryFrom<&JSON> for BinaryExpression {
             "+" => BinOp::Plus,
             "-" => BinOp::Minus,
             "*" => BinOp::Star,
+            "/" => BinOp::Slash,
+            "%" => BinOp::Percent,
             "==" => BinOp::EqEq,
             "===" => BinOp::EqEqEq,
             "!=" => BinOp::NotEq,
@@ -694,9 +696,15 @@ impl TryFrom<&JSON> for BinaryExpression {
             "<=" => BinOp::LtEq,
             ">=" => BinOp::GtEq,
             "instanceof" => BinOp::InstanceOf,
+            "|" => BinOp::Pipe,
+            "^" => BinOp::Hat,
+            "&" => BinOp::Ampersand,
+            "<<" => BinOp::LtLt,
+            ">>" => BinOp::GtGt,
+            ">>>" => BinOp::GtGtGt,
             _ => {
                 return Err(ParseError::UnexpectedValue {
-                    want: "+|-|*|==|===|!=|<|>|<=|>=|instanceof",
+                    want: "one of: + - * / % == === != < > <= >= instanceof | ^ & << >> >>>",
                     value: jexpr.get("operator").unwrap().clone(),
                 })
             }

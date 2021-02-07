@@ -467,6 +467,32 @@ impl Interpretable for BinaryExpression {
             BinOp::Plus => JSValue::plus(&lval, &rval, heap)?,
             BinOp::Minus => JSValue::minus(&lval, &rval, heap)?,
             BinOp::Star => JSValue::numerically(&lval, &rval, heap, |a, b| a * b),
+            BinOp::Slash => JSValue::numerically(&lval, &rval, heap, |a, b| a / b),
+            BinOp::Percent => JSValue::numerically(&lval, &rval, heap, |a, b| a % b),
+            BinOp::Pipe => {
+                let bitor = |a, b| (a as i32 | b as i32) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitor)
+            }
+            BinOp::Hat => {
+                let bitxor = |a, b| (a as i32 ^ b as i32) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitxor)
+            }
+            BinOp::Ampersand => {
+                let bitand = |a, b| (a as i32 & b as i32) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitand)
+            }
+            BinOp::LtLt => {
+                let bitshl = |a, b| ((a as i32) << ((b as u32) & 0x1f) as i32) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitshl)
+            }
+            BinOp::GtGt => {
+                let bitshr = |a, b| ((a as i32) >> ((b as u32) & 0x1f) as i32) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitshr)
+            }
+            BinOp::GtGtGt => {
+                let bitshru = |a, b| ((a as u32) >> (b as u32) & 0x1f) as f64;
+                JSValue::numerically(&lval, &rval, heap, bitshru)
+            }
             BinOp::InstanceOf => {
                 let constructor = rval.to_ref()?;
                 let found = match lval.to_ref() {

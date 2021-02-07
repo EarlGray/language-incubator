@@ -155,7 +155,7 @@ fn test_binary_addition() {
 }
 
 #[test]
-fn test_binary_subtraction() {
+fn test_binary_numeric_operations() {
     assert_eval!( "5 - 3",  2.0 );
     assert_eval!( "3.5 - 5",  (-1.5) );
     assert_eval!( "5 - 'hello'",  (f64::NAN) );
@@ -165,6 +165,26 @@ fn test_binary_subtraction() {
     assert_eval!( "'lol' * 3",  (f64::NAN) );
     assert_eval!( "'2' * '3'",  6.0 );
     assert_eval!( "3 * null",   0.0 );
+
+    assert_eval!("12 / 3", 4.0);
+    assert_eval!("14.5 % 3", 2.5);
+}
+
+#[test]
+fn test_binary_bit_operations() {
+    assert_eval!("6 | 9", 15.0);
+    assert_eval!("0xA0 | 8", (0xA8 as f64));
+
+    assert_eval!("5 ^ 3", 6.0);
+    assert_eval!("0xA3 ^ 0xAC", (0x0F as f64));
+
+    assert_eval!("6 & 9", 0.0);
+    assert_eval!("7 & 5", 5.0);
+
+    assert_eval!("0xA << 4", (0xA0 as f64));
+    assert_eval!("0xA5 >> 4", (0xA as f64));
+
+    assert_eval!("0xA5 >>> 4", (0xA as f64));
 }
 
 #[test]
@@ -302,16 +322,6 @@ fn test_binary_in() {
 
     assert_eq!( eval("2 ** 8"), JSValue::from(256.0));
 
-    assert_eq!( eval("6 | 9"), JSValue::from(15));
-    assert_eq!( eval("0xA0 | 8"), JSValue::from(0xA8));
-    assert_eq!( eval("5 ^ 3"), JSValue::from(6) );
-    assert_eq!( eval("0xA3 ^ 0xAC"), JSValue::from(0x0F) );
-    assert_eq!( eval("6 & 9"), JSValue::from(0));
-
-    assert_eq!( eval("0xA << 4"), JSValue::from(0xA0));
-    assert_eq!( eval("0xA5 >> 4"), JSValue::from(0xA));
-
-    assert_eq!( eval("0xA5 >>> 4"), JSValue::from(0xA));
 }
 */
 
