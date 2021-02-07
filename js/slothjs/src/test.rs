@@ -361,17 +361,16 @@ fn test_assignment() {
     assert_eval!( "var a = 1; a += 1",      2.0 );
     assert_eval!( "var a = 3; a *= a; a",   9.0 );
     assert_eval!( "var a = 1; a -= 1; a",   0.0 );
-    /*
-    assert_eq!( eval("var a = 3; a /= a; a"),            JSValue::from(1));
-    assert_eq!( eval("var a = 13; a %= 8; a"),            JSValue::from(5));
-    assert_eq!( eval("var a = 1; a <<= 4; a"),            JSValue::from(16));
-    assert_eq!( eval("var a = 32; a >>= 4; a"),            JSValue::from(2));
-    assert_eq!( eval("var a = 32; a >>>= 4; a"),            JSValue::from(2));
-    assert_eq!( eval("var a = 6; a &= 9; a"),            JSValue::from(0));
-    assert_eq!( eval("var a = 6; a ^= 9; a"),            JSValue::from(15));
-    assert_eq!( eval("var a = 3; a |= 6; a"),            JSValue::from(7));
-    assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
-    */
+    assert_eval!("var a = 3; a /= a; a",    1.0);
+    assert_eval!("var a = 13; a %= 8; a",   5.0);
+    assert_eval!("var a = 1; a <<= 4; a",   16.0);
+    assert_eval!("var a = 32; a >>= 4; a",  2.0);
+    assert_eval!("var a = 32; a >>>= 4; a", 2.0);
+    assert_eval!("var a = 6; a &= 9; a",    0.0);
+    assert_eval!("var a = 6; a ^= 9; a",    15.0);
+    assert_eval!("var a = 3; a |= 6; a",    7.0);
+    //assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
+
     // Assignment of read-only variables:
     assert_eval!("undefined = 5; typeof undefined", "undefined");
     assert_eval!("undefined += 1; typeof undefined", "undefined");

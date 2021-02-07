@@ -450,48 +450,50 @@ impl Interpretable for LogicalExpression {
     }
 }
 
-impl Interpretable for BinaryExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let BinaryExpression(lexpr, op, rexpr) = self;
-        let lval = lexpr.interpret(heap)?.to_value(heap)?;
-        let rval = rexpr.interpret(heap)?.to_value(heap)?;
-        let result = match op {
-            BinOp::EqEq => JSValue::from(JSValue::loose_eq(&lval, &rval, heap)),
-            BinOp::NotEq => JSValue::from(!JSValue::loose_eq(&lval, &rval, heap)),
-            BinOp::EqEqEq => JSValue::from(JSValue::strict_eq(&lval, &rval, heap)),
-            BinOp::NotEqEq => JSValue::from(!JSValue::strict_eq(&lval, &rval, heap)),
-            BinOp::Less => JSValue::compare(&lval, &rval, heap, |a, b| a < b, |a, b| a < b),
-            BinOp::Greater => JSValue::compare(&lval, &rval, heap, |a, b| a > b, |a, b| a > b),
-            BinOp::LtEq => JSValue::compare(&lval, &rval, heap, |a, b| a <= b, |a, b| a <= b),
-            BinOp::GtEq => JSValue::compare(&lval, &rval, heap, |a, b| a >= b, |a, b| a >= b),
-            BinOp::Plus => JSValue::plus(&lval, &rval, heap)?,
-            BinOp::Minus => JSValue::minus(&lval, &rval, heap)?,
-            BinOp::Star => JSValue::numerically(&lval, &rval, heap, |a, b| a * b),
-            BinOp::Slash => JSValue::numerically(&lval, &rval, heap, |a, b| a / b),
-            BinOp::Percent => JSValue::numerically(&lval, &rval, heap, |a, b| a % b),
+impl BinOp {
+    fn compute(
+        &self,
+        lval: &JSValue,
+        rval: &JSValue,
+        heap: &mut Heap,
+    ) -> Result<JSValue, Exception> {
+        Ok(match self {
+            BinOp::EqEq => JSValue::from(JSValue::loose_eq(lval, rval, heap)),
+            BinOp::NotEq => JSValue::from(!JSValue::loose_eq(lval, rval, heap)),
+            BinOp::EqEqEq => JSValue::from(JSValue::strict_eq(lval, rval, heap)),
+            BinOp::NotEqEq => JSValue::from(!JSValue::strict_eq(lval, rval, heap)),
+            BinOp::Less => JSValue::compare(lval, &rval, heap, |a, b| a < b, |a, b| a < b),
+            BinOp::Greater => JSValue::compare(lval, rval, heap, |a, b| a > b, |a, b| a > b),
+            BinOp::LtEq => JSValue::compare(lval, rval, heap, |a, b| a <= b, |a, b| a <= b),
+            BinOp::GtEq => JSValue::compare(lval, rval, heap, |a, b| a >= b, |a, b| a >= b),
+            BinOp::Plus => JSValue::plus(lval, rval, heap)?,
+            BinOp::Minus => JSValue::minus(lval, rval, heap)?,
+            BinOp::Star => JSValue::numerically(lval, rval, heap, |a, b| a * b),
+            BinOp::Slash => JSValue::numerically(lval, rval, heap, |a, b| a / b),
+            BinOp::Percent => JSValue::numerically(lval, rval, heap, |a, b| a % b),
             BinOp::Pipe => {
                 let bitor = |a, b| (a as i32 | b as i32) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitor)
+                JSValue::numerically(lval, rval, heap, bitor)
             }
             BinOp::Hat => {
                 let bitxor = |a, b| (a as i32 ^ b as i32) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitxor)
+                JSValue::numerically(lval, rval, heap, bitxor)
             }
             BinOp::Ampersand => {
                 let bitand = |a, b| (a as i32 & b as i32) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitand)
+                JSValue::numerically(lval, rval, heap, bitand)
             }
             BinOp::LtLt => {
                 let bitshl = |a, b| ((a as i32) << ((b as u32) & 0x1f) as i32) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitshl)
+                JSValue::numerically(lval, rval, heap, bitshl)
             }
             BinOp::GtGt => {
                 let bitshr = |a, b| ((a as i32) >> ((b as u32) & 0x1f) as i32) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitshr)
+                JSValue::numerically(lval, rval, heap, bitshr)
             }
             BinOp::GtGtGt => {
                 let bitshru = |a, b| ((a as u32) >> (b as u32) & 0x1f) as f64;
-                JSValue::numerically(&lval, &rval, heap, bitshru)
+                JSValue::numerically(lval, rval, heap, bitshru)
             }
             BinOp::In => {
                 let prop = lval.stringify(heap)?;
@@ -508,7 +510,16 @@ impl Interpretable for BinaryExpression {
                 };
                 JSValue::from(found)
             }
-        };
+        })
+    }
+}
+
+impl Interpretable for BinaryExpression {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let BinaryExpression(lexpr, op, rexpr) = self;
+        let lval = lexpr.interpret(heap)?.to_value(heap)?;
+        let rval = rexpr.interpret(heap)?.to_value(heap)?;
+        let result = op.compute(&lval, &rval, heap)?;
         Ok(Interpreted::Value(result))
     }
 }
@@ -647,15 +658,7 @@ impl Interpretable for AssignmentExpression {
             let assignee = leftexpr.interpret(heap)?;
             let oldvalue = assignee.to_value(heap)?;
             let value = value.to_value(heap)?;
-            let newvalue = match op {
-                BinOp::Plus => JSValue::plus(&oldvalue, &value, heap)?,
-                BinOp::Minus => JSValue::minus(&oldvalue, &value, heap)?,
-                BinOp::Star => JSValue::numerically(&oldvalue, &value, heap, |a, b| a * b),
-                _ => panic!(format!(
-                    "Binary operation {:?} cannot be used in assignment",
-                    op
-                )),
-            };
+            let newvalue = op.compute(&oldvalue, &value, heap)?;
             assignee
                 .put_value(newvalue.clone(), heap)
                 .or_else(crate::error::ignore_set_readonly)?;

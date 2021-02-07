@@ -27,7 +27,7 @@
 ** DONE [2021-01-04 Mon] =delete=
 * DONE [2021-02-06 Sat] SequenceExpression
 * DONE [2021-02-06 Sat] SwitchStatement
-* TODO BinaryExpression
+* DONE [2021-02-07 Sun] BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
 ** DONE [2021-01-13 Wed] ~+~ between all types
@@ -36,23 +36,23 @@
 ** DONE [2021-01-26 Tue] ~<=~
 ** DONE [2021-01-26 Tue] ~>~
 ** DONE [2021-01-30 Sat] =instanceof=
-** TODO =in=
-** TODO =/=
-** TODO =%=
-** TODO =**=
-** TODO =|=
-** TODO =^=
-** TODO =<<=
-** TODO =>>=
-** TODO =>>>=
-* TODO AssignmentExpression
+** DONE [2021-02-07 Sun] =in=
+** DONE [2021-02-07 Sun] =/=
+** DONE [2021-02-07 Sun] =%=
+** DONE [2021-02-07 Sun] =**=
+** DONE [2021-02-07 Sun] =|=
+** DONE [2021-02-07 Sun] =^=
+** DONE [2021-02-07 Sun] =<<=
+** DONE [2021-02-07 Sun] =>>=
+** DONE [2021-02-07 Sun] =>>>=
+* DONE [2021-02-07 Sun] AssignmentExpression
 ** DONE [2020-12-21 Mon] ~=~
 ** DONE [2021-01-02 Sat] ~+=~
 ** DONE [2021-01-15 Fri] ~-=~
 ** DONE [2021-01-14 Thu] ~*=~
-** TODO ~/=~
-** TODO ~&=~
-** TODO ~|=~
+** DONE [2021-02-07 Sun] ~/=~
+** DONE [2021-02-07 Sun] ~&=~
+** DONE [2021-02-07 Sun] ~|=~
 * TODO user exceptions
 ** DONE [2021-01-27 Wed] =throw=
 ** DONE [2021-01-28 Thu] =try=, =catch=, =finally=
