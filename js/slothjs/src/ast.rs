@@ -243,14 +243,14 @@ pub enum BinOp {
     Greater,
     LtEq,
     GtEq,
-    InstanceOf,
     Pipe,
     Hat,
     Ampersand,
     LtLt,
     GtGt,
     GtGtGt,
-    //In,
+    In,
+    InstanceOf,
 }
 
 #[derive(Clone, Debug, PartialEq)]

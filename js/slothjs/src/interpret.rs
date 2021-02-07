@@ -493,6 +493,13 @@ impl Interpretable for BinaryExpression {
                 let bitshru = |a, b| ((a as u32) >> (b as u32) & 0x1f) as f64;
                 JSValue::numerically(&lval, &rval, heap, bitshru)
             }
+            BinOp::In => {
+                let prop = lval.stringify(heap)?;
+                let objref = rval.to_ref()?;
+                let object = heap.get(objref);
+                let found = object.lookup_value(&prop, heap).is_some();
+                JSValue::from(found)
+            }
             BinOp::InstanceOf => {
                 let constructor = rval.to_ref()?;
                 let found = match lval.to_ref() {

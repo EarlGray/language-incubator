@@ -291,39 +291,31 @@ fn test_binary_instanceof() {
         let obj = new Class();
         (obj instanceof Class) && !({} instanceof Class)
     "#, true);
-    /*
     assert_eval!(r#"
         let Class = function() {};
         let Subclass = function() {};
-        Subclass.prototype = Object.create(Class)
+        Subclass.prototype = new Class();
         let obj = new Class();
         (obj instanceof Class) && !(obj instanceof Subclass)
     "#, true);
     assert_eval!(r#"
         let Class = function() {};
         let Subclass = function() {};
-        Subclass.prototype = Object.create(Class)
+        Subclass.prototype = new Class();
         let obj = new Subclass();
         (obj instanceof Class) && (obj instanceof Subclass)
     "#, true);
-    */
 }
 
-/*
 #[test]
 fn test_binary_in() {
-    assert!( evalbool("1 in [1, 2, 3]") );
-    assert!( !evalbool("0 in [1, 2, 3]") );
+    assert_eval!("'one' in {one: 1}", true);
+    assert_eval!("'toString' in {}", true); // prototypes are searched too
 
-
-    assert_eq!( eval("6 / 3"), JSValue::from(2) );
-
-    assert_eq!( eval("143 % 12"), JSValue::from(11) );
-
-    assert_eq!( eval("2 ** 8"), JSValue::from(256.0));
-
+    assert_eval!("0 in [1, 2]", true);
+    assert_eval!("1 in [1, 2]", true);
+    assert_eval!("2 in [1, 2]", false);
 }
-*/
 
 #[test]
 fn test_binary_logical() {
@@ -370,7 +362,6 @@ fn test_assignment() {
     assert_eval!( "var a = 3; a *= a; a",   9.0 );
     assert_eval!( "var a = 1; a -= 1; a",   0.0 );
     /*
-    assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
     assert_eq!( eval("var a = 3; a /= a; a"),            JSValue::from(1));
     assert_eq!( eval("var a = 13; a %= 8; a"),            JSValue::from(5));
     assert_eq!( eval("var a = 1; a <<= 4; a"),            JSValue::from(16));
@@ -379,6 +370,7 @@ fn test_assignment() {
     assert_eq!( eval("var a = 6; a &= 9; a"),            JSValue::from(0));
     assert_eq!( eval("var a = 6; a ^= 9; a"),            JSValue::from(15));
     assert_eq!( eval("var a = 3; a |= 6; a"),            JSValue::from(7));
+    assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
     */
     // Assignment of read-only variables:
     assert_eval!("undefined = 5; typeof undefined", "undefined");

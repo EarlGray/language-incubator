@@ -695,13 +695,13 @@ impl TryFrom<&JSON> for BinaryExpression {
             ">" => BinOp::Greater,
             "<=" => BinOp::LtEq,
             ">=" => BinOp::GtEq,
-            "instanceof" => BinOp::InstanceOf,
             "|" => BinOp::Pipe,
             "^" => BinOp::Hat,
             "&" => BinOp::Ampersand,
             "<<" => BinOp::LtLt,
             ">>" => BinOp::GtGt,
             ">>>" => BinOp::GtGtGt,
+            "instanceof" => BinOp::InstanceOf,
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "one of: + - * / % == === != < > <= >= instanceof | ^ & << >> >>>",
