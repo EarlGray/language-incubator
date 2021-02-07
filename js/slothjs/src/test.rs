@@ -427,7 +427,6 @@ fn test_conditionals() {
 
 #[test]
 fn test_switch() {
-    /*
     // does it work?
     assert_eval!("switch (true) {}", null);
 
@@ -439,6 +438,7 @@ fn test_switch() {
 
     // the strict comparison is used
     assert_eval!("var a; switch (1) { case '1': a = false; break; default: a = true }; a", true);
+    assert_eval!("var a; switch (NaN) { case NaN: a = false; break; default: a = true }; a", true);
 
     // fallthrough without break
     assert_eval!("var a = ''; switch (1) { case 1: a += '1'; default: a += 'd' }; a", "1d");
@@ -466,7 +466,6 @@ fn test_switch() {
         }
         trace
     "#, "aabdb");
-    */
 }
 
 #[test]

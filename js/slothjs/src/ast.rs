@@ -12,6 +12,7 @@ pub enum Statement {
     Block(BlockStatement),
     Expr(ExpressionStatement),
     If(Box<IfStatement>),
+    Switch(SwitchStatement),
     For(Box<ForStatement>),
     ForIn(ForInStatement),
     Return(ReturnStatement),
@@ -77,6 +78,19 @@ pub struct IfStatement {
     pub test: Expr,
     pub consequent: Statement,
     pub alternate: Option<Statement>,
+}
+
+// ==============================================
+#[derive(Clone, Debug)]
+pub struct SwitchStatement {
+    pub discriminant: Expr,
+    pub cases: Vec<SwitchCase>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SwitchCase {
+    pub test: Option<Expr>,
+    pub consequent: Vec<Statement>,
 }
 
 // ==============================================

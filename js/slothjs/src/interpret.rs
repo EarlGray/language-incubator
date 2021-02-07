@@ -38,6 +38,7 @@ impl Interpretable for Statement {
             Statement::Expr(stmt) => stmt.interpret(heap),
             Statement::Block(stmt) => stmt.interpret(heap),
             Statement::If(stmt) => stmt.interpret(heap),
+            Statement::Switch(stmt) => stmt.interpret(heap),
             Statement::For(stmt) => stmt.interpret(heap),
             Statement::ForIn(stmt) => stmt.interpret(heap),
             Statement::Break(stmt) => stmt.interpret(heap),
@@ -74,6 +75,49 @@ impl Interpretable for IfStatement {
         } else {
             Ok(Interpreted::VOID)
         }
+    }
+}
+
+impl Interpretable for SwitchStatement {
+    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let matchee = self.discriminant.interpret(heap)?;
+        let switchval = matchee.to_value(heap)?;
+
+        let mut default: Option<usize> = None; // the index of the default case, if any
+        let mut found_case: Option<usize> = None;
+
+        // search
+        for (i, case) in self.cases.iter().enumerate() {
+            let caseval = match &case.test {
+                None => {
+                    default = Some(i);
+                    continue;
+                }
+                Some(test) => test.interpret(heap)?.to_value(heap)?,
+            };
+
+            if JSValue::strict_eq(&switchval, &caseval, heap) {
+                found_case = Some(i);
+                break;
+            }
+        }
+
+        let end = self.cases.len();
+        let restart_index = found_case.or(default).unwrap_or(end);
+
+        // execute
+        for i in restart_index..end {
+            for stmt in self.cases[i].consequent.iter() {
+                match stmt.interpret(heap) {
+                    Ok(_) => (),
+                    Err(Exception::JumpBreak(None)) => {
+                        return Ok(Interpreted::VOID);
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+        Ok(Interpreted::VOID)
     }
 }
 

@@ -26,6 +26,7 @@
 ** DONE [2021-01-03 Sun] everything, except...
 ** DONE [2021-01-04 Mon] =delete=
 * DONE [2021-02-06 Sat] SequenceExpression
+* DONE [2021-02-06 Sat] SwitchStatement
 * TODO BinaryExpression
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
@@ -52,7 +53,6 @@
 ** TODO ~/=~
 ** TODO ~&=~
 ** TODO ~|=~
-* TODO SwitchStatement
 * TODO user exceptions
 ** DONE [2021-01-27 Wed] =throw=
 ** DONE [2021-01-28 Thu] =try=, =catch=, =finally=
@@ -98,7 +98,7 @@
 ** TODO =parseInt=
 ** TODO =eval=
 ** TODO =isNaN=
-* TODO builtin =assert= object
+* MAYBE builtin =assert= object
 * TODO builtin =console=
 * TODO builtin primitive wrappers
 ** DONE [2021-01-20 Wed] =Boolean=

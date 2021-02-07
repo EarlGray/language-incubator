@@ -147,6 +147,10 @@ impl TryFrom<&JSON> for Statement {
                 let stmt = ReturnStatement::try_from(json)?;
                 Ok(Statement::Return(stmt))
             }
+            "SwitchStatement" => {
+                let stmt = SwitchStatement::try_from(json)?;
+                Ok(Statement::Switch(stmt))
+            }
             "ThrowStatement" => {
                 let stmt = ThrowStatement::try_from(json)?;
                 Ok(Statement::Throw(stmt))
@@ -200,6 +204,37 @@ impl TryFrom<&JSON> for IfStatement {
             test,
             consequent,
             alternate,
+        })
+    }
+}
+
+impl TryFrom<&JSON> for SwitchStatement {
+    type Error = ParseError<JSON>;
+
+    fn try_from(json: &JSON) -> Result<Self, Self::Error> {
+        json_expect_str(json, "type", "SwitchStatement")?;
+
+        let jdiscriminant = json_get(json, "discriminant")?;
+        let discriminant = Expr::try_from(jdiscriminant)?;
+
+        let jcases = json_get_array(json, "cases")?;
+        let cases = (jcases.iter())
+            .map(|jcase| {
+                let jtest = json_get(jcase, "test")?;
+                let test = json_map_object(jtest, |jtest| Expr::try_from(jtest))?;
+
+                let jconsequent = json_get_array(jcase, "consequent")?;
+                let consequent = (jconsequent.iter())
+                    .map(|jstmt| Statement::try_from(jstmt))
+                    .collect::<Result<Vec<Statement>, Self::Error>>()?;
+
+                Ok(SwitchCase { test, consequent })
+            })
+            .collect::<Result<Vec<SwitchCase>, Self::Error>>()?;
+
+        Ok(SwitchStatement {
+            discriminant,
+            cases,
         })
     }
 }
