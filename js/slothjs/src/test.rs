@@ -479,6 +479,11 @@ fn test_loops() {
         }
         a
     "#, 5.0);
+    assert_eval!(r#"
+        var a = 0, i = 0;
+        for (i += 0; i < 5; i++) ++a;
+        a
+    "#, 5.0);
 
     assert_eval!(r#"
         let a = true;

@@ -249,7 +249,16 @@ impl TryFrom<&JSON> for ForStatement {
         while_ok.or(for_ok).or(dowhile_ok)?;
 
         let init = match json.get("init") {
-            Some(jinit) if !jinit.is_null() => Statement::try_from(jinit)?,
+            Some(jinit) => json_map_object(jinit, |jinit| {
+                if let Ok(var) = VariableDeclaration::try_from(jinit) {
+                    Ok(Statement::VariableDeclaration(var))
+                } else if let Ok(expr) = Expr::try_from(jinit) {
+                    Ok(Statement::Expr(ExpressionStatement { expression: expr }))
+                } else {
+                    panic!("jinit is not Expression | VariableDeclaration")
+                }
+            })?
+            .unwrap_or(Statement::Empty),
             _ => Statement::Empty,
         };
         let test = match json.get("test") {
