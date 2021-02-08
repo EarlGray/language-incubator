@@ -421,8 +421,13 @@ impl Interpretable for Literal {
 impl Interpretable for Identifier {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let name = &self.0;
-        heap.lookup_var(name)
-            .ok_or(Exception::ReferenceNotFound(self.clone()))
+        if let Some(place) = heap.lookup_var(name) {
+            Ok(place)
+        } else {
+            // Reference to a place that does not exist yet:
+            let scoperef = heap.local_scope().unwrap_or(Heap::GLOBAL);
+            Ok(Interpreted::member(scoperef, name))
+        }
     }
 }
 
@@ -528,19 +533,24 @@ impl Interpretable for UnaryExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let UnaryExpression(op, argexpr) = self;
         let arg = argexpr.interpret(heap)?;
-        let argvalue = arg.to_value(heap)?;
+        let argvalue = || arg.to_value(heap);
+        let argnum = || argvalue().map(|val| val.numberify(heap).unwrap_or(f64::NAN));
         let value = match op {
-            UnOp::Delete => JSValue::from(arg.delete(heap).is_ok()),
-            UnOp::Exclamation => JSValue::Bool(!argvalue.boolify(heap)),
-            UnOp::Minus => JSValue::Number(-argvalue.numberify(heap).unwrap_or(f64::NAN)),
-            UnOp::Plus => JSValue::Number(argvalue.numberify(heap).unwrap_or(f64::NAN)),
-            UnOp::Typeof => JSValue::from(argvalue.type_of(heap)),
+            UnOp::Exclamation => JSValue::Bool(!argvalue()?.boolify(heap)),
+            UnOp::Minus => JSValue::Number(-argnum()?),
+            UnOp::Plus => JSValue::Number(argnum()?),
             UnOp::Tilde => {
-                let num = argvalue.numberify(heap).unwrap_or(f64::NAN);
+                let num = argnum()?;
                 let num = if f64::is_nan(num) { 0.0 } else { num };
                 JSValue::from(-(1.0 + num))
             }
             UnOp::Void => JSValue::Undefined,
+            UnOp::Typeof => JSValue::from(
+                argvalue()
+                    .map(|val| val.type_of(heap))
+                    .unwrap_or("undefined"),
+            ),
+            UnOp::Delete => JSValue::from(arg.delete(heap).is_ok()),
         };
         Ok(Interpreted::Value(value))
     }

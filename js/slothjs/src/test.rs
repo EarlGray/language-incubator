@@ -692,6 +692,7 @@ fn test_unary_operations() {
     assert!( evalbool("!undefined") );
 
     assert_eval!("typeof undefined",   "undefined");
+    assert_eval!("typeof nosuch",      "undefined");
     assert_eval!("typeof 1",           "number");
     assert_eval!("typeof true",        "boolean");
     assert_eval!("typeof ''",          "string");
@@ -723,7 +724,7 @@ fn test_unary_operations() {
     assert_eval!( "var a = 1; delete a",  false); // vars are not configurable
     assert_eval!( "a = 1; delete a",      true ); // but these are.
     assert_eval!( "delete 0",             true ); // don't ask.
-    //assert_eval!( "delete x", true );
+    assert_eval!( "delete nosuch", true );
     //assert_eval!( "let a = ['one', 'two']; delete a[2]", true );
     //assert_eval!("let a = ['one', 'two']; delete a[1]", true);
     //assert_eval!("let a = ['one', 'two']; delete a[0]; a[0] === undefined", true);

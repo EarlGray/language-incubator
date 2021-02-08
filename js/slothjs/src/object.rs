@@ -538,9 +538,7 @@ impl JSObject {
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
     pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        let access = self
-            .properties
-            .get(name)
+        let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
         self.set(name, Content::from(value), access)
@@ -548,9 +546,7 @@ impl JSObject {
 
     /// Just like `.update()`, but updates even non-writable properties.
     pub fn update_even_nonwritable(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
-        let access = self
-            .properties
-            .get(name)
+        let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
         self.set_even_nonwritable(name, Content::from(value), access)
@@ -863,14 +859,19 @@ impl Interpreted {
     }
 
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
-        let value = match self {
-            Interpreted::Value(value) => value.clone(),
-            Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
-                Some(value) => value.clone(),
-                None => JSValue::Undefined,
-            },
-        };
-        Ok(value)
+        match self {
+            Interpreted::Value(value) => Ok(value.clone()),
+            Interpreted::Member { of, name } => {
+                if let Some(value) = heap.get(*of).lookup_value(name, heap) {
+                    Ok(value.clone())
+                } else if heap.is_scope(*of) {
+                    let ident = ast::Identifier(name.clone());
+                    Err(Exception::ReferenceNotFound(ident))
+                } else {
+                    Ok(JSValue::Undefined)
+                }
+            }
+        }
     }
 
     pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
@@ -878,6 +879,10 @@ impl Interpreted {
             Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(JSValue::Ref(r)) => Ok(*r),
+                None if heap.is_scope(*of) => {
+                    let ident = ast::Identifier(name.clone());
+                    Err(Exception::ReferenceNotFound(ident))
+                }
                 _ => Err(Exception::TypeErrorGetProperty(
                     self.clone(),
                     name.to_string(),

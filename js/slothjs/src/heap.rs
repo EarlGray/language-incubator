@@ -127,6 +127,10 @@ impl Heap {
         }
     }
 
+    pub(crate) fn is_scope(&self, objref: JSRef) -> bool {
+        objref == Self::GLOBAL || self.get(objref).get_value(Heap::SAVED_SCOPE).is_some()
+    }
+
     /// Find out what `this` currently is.
     pub fn interpret_this(&mut self) -> Result<Interpreted, Exception> {
         let this_ref = self
