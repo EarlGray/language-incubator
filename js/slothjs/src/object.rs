@@ -750,6 +750,20 @@ bitflags! {
 }
 
 impl Access {
+    pub fn new(configurable: bool, enumerable: bool, writable: bool) -> Access {
+        let mut access = Access::empty();
+        if configurable {
+            access |= Access::CONF;
+        }
+        if enumerable {
+            access |= Access::ENUM;
+        }
+        if writable {
+            access |= Access::WRITE;
+        }
+        access
+    }
+
     pub fn enumerable(&self) -> bool {
         self.contains(Access::ENUM)
     }
@@ -773,6 +787,12 @@ pub enum Content {
 }
 
 impl Content {
+    pub fn from_func(func: NativeFunction, heap: &mut Heap) -> Content {
+        let func_obj = JSObject::from_func(func);
+        let funcref = heap.alloc(func_obj);
+        Content::Value(JSValue::Ref(funcref))
+    }
+
     /// This might call getters of the property.
     pub fn to_value(&self) -> Result<JSValue, Exception> {
         match self {

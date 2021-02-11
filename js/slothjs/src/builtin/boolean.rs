@@ -65,11 +65,8 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     /* Boolean.prototype */
     let mut boolean_proto = JSObject::new();
 
-    let valueof_ref = heap.alloc(JSObject::from_func(boolean_proto_valueOf));
-    boolean_proto.set_hidden("valueOf", Content::from(valueof_ref))?;
-
-    let tostr_ref = heap.alloc(JSObject::from_func(boolean_proto_toString));
-    boolean_proto.set_hidden("toString", Content::from(tostr_ref))?;
+    boolean_proto.set_hidden("valueOf", Content::from_func(boolean_proto_valueOf, heap))?;
+    boolean_proto.set_hidden("toString", Content::from_func(boolean_proto_toString, heap))?;
 
     *heap.get_mut(Heap::BOOLEAN_PROTO) = boolean_proto;
 

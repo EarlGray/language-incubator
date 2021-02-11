@@ -25,14 +25,14 @@ fn array_toString(
     _arguments: Vec<Interpreted>,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let array = heap
-        .get(this_ref)
-        .as_array()
-        .expect("Array.prototype.toString on something that is not Array") // TODO: Exception
-        .storage
-        .clone();
-    let reprs = array
-        .iter()
+    let array_object = heap.get(this_ref);
+    let array = (array_object.as_array()).ok_or(Exception::TypeErrorInstanceRequired(
+        Interpreted::from(this_ref),
+        "Array".to_string(),
+    ))?;
+    let array = array.storage.clone();
+
+    let reprs = (array.iter())
         .map(|val| val.stringify(heap))
         .collect::<Result<Vec<_>, Exception>>()?;
 
@@ -43,8 +43,7 @@ fn array_toString(
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut array_proto = JSObject::new();
 
-    let tostr_ref = heap.alloc(JSObject::from_func(array_toString));
-    array_proto.set_hidden("toString", Content::from(tostr_ref))?;
+    array_proto.set_hidden("toString", Content::from_func(array_toString, heap))?;
 
     *heap.get_mut(Heap::ARRAY_PROTO) = array_proto;
 

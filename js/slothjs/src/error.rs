@@ -34,6 +34,7 @@ pub enum Exception {
     TypeErrorNotArraylike(Interpreted),
     TypeErrorInstanceRequired(Interpreted, String),
     TypeErrorInvalidDescriptor(Interpreted),
+    TypeErrorInvalidPrototype(Interpreted),
 
     // nonlocal transfers of control, "abrupt completions"
     JumpReturn(Interpreted),

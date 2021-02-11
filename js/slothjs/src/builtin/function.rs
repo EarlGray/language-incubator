@@ -66,11 +66,8 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut function_proto = JSObject::new();
     function_proto.proto = Heap::OBJECT_PROTO;
 
-    let func_call_ref = heap.alloc(JSObject::from_func(function_proto_call));
-    function_proto.set_hidden("call", Content::from(func_call_ref))?;
-
-    let func_apply_ref = heap.alloc(JSObject::from_func(function_proto_apply));
-    function_proto.set_hidden("apply", Content::from(func_apply_ref))?;
+    function_proto.set_hidden("call", Content::from_func(function_proto_call, heap))?;
+    function_proto.set_hidden("apply", Content::from_func(function_proto_apply, heap))?;
 
     *heap.get_mut(Heap::FUNCTION_PROTO) = function_proto;
 

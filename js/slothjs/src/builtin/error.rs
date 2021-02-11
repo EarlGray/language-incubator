@@ -67,9 +67,7 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let mut error_proto = JSObject::new();
     error_proto.set_hidden("name", Content::from("Error"))?;
     error_proto.set_hidden("message", Content::from(""))?;
-
-    let tostr_ref = heap.alloc(JSObject::from_func(error_proto_toString));
-    error_proto.set_hidden("toString", Content::from(tostr_ref))?;
+    error_proto.set_hidden("toString", Content::from_func(error_proto_toString, heap))?;
 
     let error_proto_ref = heap.alloc(error_proto);
 

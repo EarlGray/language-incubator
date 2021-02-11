@@ -844,16 +844,33 @@ fn test_builtin_object() {
     assert_eval!( "Object(null)",     {} );
     assert_eval!( "Object(undefined)", {} );
     assert_eval!( "var a = {one: 1}; Object(a) == a", true );
+    assert_eval!( "Object(false) instanceof Boolean", true );
     //assert_eval!( "Object(1) instanceof Number", true );
-    //assert_eval!( "Object(false) instanceof Boolean", true );
 
     assert_eval!( "new Object(null)",     {} );
     assert_eval!( "new Object(undefined)", {} );
     assert_eval!( "new Object({one: 1})", {"one": 1.0} );
+    assert_eval!("new Object(true) instanceof Boolean", true);
     //assert_eval!( "new Object(1) instanceof Number", true );
-    //assert_eval!( "new Object(true) instanceof Boolean", true );
+
+    // Object.defineProperties
+    assert_eval!(r#"
+        var obj = {};
+        Object.defineProperties(obj, {one: {value: 1}, two: {value: 2}});
+        obj.one + obj.two
+    "#, 3.0);
+    //assert_exception!(
+    //  "Object.defineProperties({}, 'a')",
+    //  Exception::TypeErrorInstanceRequired
+    //);
+    //assert_exception!(
+    //  "Object.defineProperties({}, ['a'])",
+    //  Exception::TypeErrorInvalidDescriptor
+    //);
 
     // Object.defineProperty
+    //assert_exception!("Object.defineProperty(1)", Exception::TypeErrorInstanceRequired);
+    //assert_exception!("Object.defineProperty(null)", Exception::TypeErrorInstanceRequired);
     assert_eval!(r#"
         var obj = {};
         Object.defineProperty(obj, 'prop', {value: 42});
@@ -941,6 +958,12 @@ fn test_builtin_object() {
     "#, 1.0);
      */
     // Object.create()
+    assert_eval!("var p = {prop: true}; var o = Object.create(p); o.prop", true);
+    assert_eval!("var p = {prop: false}; var o = Object.create(p); p.prop = true; o.prop", true);
+    assert_eval!("'toString' in Object.create(null)", false);
+    assert_exception!("Object.create(true)", Exception::TypeErrorInvalidPrototype);
+    assert_eval!("var o = Object.create(null, {one: {value: 1}}); o.one", 1.0);
+
     // Object.entries()
     // Object.keys()
     // Object.values()

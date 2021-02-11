@@ -58,18 +58,17 @@ fn parse_int(
  */
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
-    let parse_int_ref = heap.alloc(JSObject::from_func(parse_int));
-
-    let global = heap.get_mut(Heap::GLOBAL);
+    let mut global = JSObject::new();
 
     global.set_system("NaN", Content::from(f64::NAN))?;
     global.set_system("undefined", Content::from(JSValue::Undefined))?;
 
-    global.set_hidden("parseInt", Content::from(parse_int_ref))?;
-
-    // The `global` self-reference:
     global.set_hidden("global", Content::from(Heap::GLOBAL))?;
     global.set_system(Heap::SCOPE_THIS, Content::from(Heap::GLOBAL))?;
+
+    global.set_hidden("parseInt", Content::from_func(parse_int, heap))?;
+
+    *heap.get_mut(Heap::GLOBAL) = global;
 
     Ok(())
 }

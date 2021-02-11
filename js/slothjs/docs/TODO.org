@@ -64,12 +64,30 @@
 *** DONE [2021-01-05 Tue] .getOwnPropertyDescriptor
 *** DONE [2021-01-08 Fri] .is()
 *** DONE [2021-01-18 Mon] Object() constructor
-*** TODO 
+*** DONE [2021-02-10 Wed] .create()
+*** DONE [2021-02-10 Wed] .defineProperties()
+*** TODO .getPrototypeOf()
+*** TODO .setPrototypeOf()
+*** TODO .assign()
+*** TODO .keys()
+*** TODO .values()
+*** TODO .entries()
+*** TODO .fromEntries()
+*** TODO .getOwnPropertyDescriptors()
+*** TODO .getOwnPropertyNames()
+*** TODO .freeze()
+*** TODO .isFrozen()
+*** TODO .preventExtensions()
+*** TODO .isExtensible()
+*** TODO .seal()
+*** TODO .isSealed()
 ** TODO Object.prototype
 *** DONE [2021-01-05 Tue] create it!
 *** DONE [2021-01-08 Fri] .constructor
 *** DONE [2021-01-18 Mon] .valueOf()
-*** TODO ...everything else
+*** TODO .hasOwnProperty()
+*** TODO .isPrototypeOf()
+*** TODO .propertyIsEnumerable()
 * TODO builtin =Function=
 ** DONE [2021-01-06 Wed] =src/builtin/function.rs=
 ** TODO static methods
