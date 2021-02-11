@@ -192,10 +192,10 @@ pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
 pub struct UpdateExpression(pub UpdOp, pub bool, pub Box<Expr>);
 
 #[derive(Clone, Debug)]
-pub struct CallExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
+pub struct CallExpression(pub Box<Expr>, pub Vec<Expr>);
 
 #[derive(Clone, Debug)]
-pub struct ArrayExpression(pub Vec<Box<Expr>>);
+pub struct ArrayExpression(pub Vec<Expr>);
 
 #[derive(Clone, Debug)]
 pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expr>)>);
@@ -226,7 +226,7 @@ pub struct FunctionExpression {
 pub type Pattern = Identifier;
 
 #[derive(Clone, Debug)]
-pub struct NewExpression(pub Box<Expr>, pub Vec<Box<Expr>>);
+pub struct NewExpression(pub Box<Expr>, pub Vec<Expr>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {

@@ -387,13 +387,17 @@ fn test_scope() {
 
     assert_eval!( "var a = false; { var a = true; } a",     true );
     assert_eval!( "var a = false; { a = true } a",          true );
-    //assert_eval!( "var a = true; { let a = false; } a",     true );
     //assert_eval!( "var a = false; (function() { a = true; })(); a", true );
     assert_eval!( "var a = true; (function(a) { a = false })('nope'); a", true );
 
+    // block scope
+    //assert_eval!( "var a = true; { let a = false; } a",     true );
     //assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
 
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
+
+    // variable hoisting
+    //assert_eval!("(function() { return a; var a = 12; })()", null);
 }
 
 #[test]

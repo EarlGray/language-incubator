@@ -46,15 +46,12 @@ fn function_proto_apply(
         // TODO: convert from everything array-like.
         Some(object) => {
             let objref = object.to_ref(heap)?;
-            if let Some(array) = heap.get(objref).as_array() {
-                array
-                    .storage
-                    .iter()
-                    .map(|val| Interpreted::Value(val.clone()))
-                    .collect()
-            } else {
-                return Err(Exception::TypeErrorNotArraylike(object.clone()));
-            }
+            let array = (heap.get(objref))
+                .as_array()
+                .ok_or(Exception::TypeErrorNotArraylike(object.clone()))?;
+            (array.storage.iter())
+                .map(|val| Interpreted::Value(val.clone()))
+                .collect()
         }
         None => Vec::new(),
     };

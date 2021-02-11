@@ -16,8 +16,12 @@
 * DONE [2020-12-31 Thu] make it a library
 * DONE [2021-01-01 Fri] a repl executable
 * TODO move tests to =tests/=
-* TODO =let= variables, block scope
-* TODO =const= values
+* TODO proper variable/declaration scopes
+** TODO variable hoisting
+** BUG assignment to an outer variable
+** TODO free-variables analysis for closures
+** TODO =let= variables, block scope
+** TODO =const= values
 * DONE [2021-01-23 Sat] UpdateExpression
 * DONE [2021-01-19 Tue] LogicalExpression...
 ** DONE [2021-01-19 Tue] &&
@@ -117,7 +121,8 @@
 ** TODO =eval=
 ** TODO =isNaN=
 * MAYBE builtin =assert= object
-* TODO builtin =console=
+* MAYBE =console= in sljs
+  This is I/O and should not live in the interpreter core.
 * TODO builtin primitive wrappers
 ** DONE [2021-01-20 Wed] =Boolean=
 *** DONE [2021-01-20 Wed] scaffolding in =src/builtin/boolean.rs=
@@ -192,4 +197,4 @@
 * TODO =eval=
 
 
-#+TODO: TODO MAYBE | DONE
+#+TODO: BUG TODO MAYBE | DONE

@@ -87,7 +87,7 @@ impl TryFrom<&JSON> for Program {
         let jbody = json_get_array(json, "body")?;
 
         let mut body = vec![];
-        for jstmt in jbody.iter() {
+        for jstmt in jbody.into_iter() {
             let stmt = Statement::try_from(jstmt)?;
             body.push(stmt);
         }
@@ -176,7 +176,7 @@ impl TryFrom<&JSON> for BlockStatement {
     fn try_from(json: &JSON) -> Result<Self, Self::Error> {
         let jbody = json_get_array(json, "body")?;
         let mut body = vec![];
-        for jstmt in jbody.iter() {
+        for jstmt in jbody.into_iter() {
             let stmt = Statement::try_from(jstmt)?;
             body.push(stmt);
         }
@@ -196,9 +196,7 @@ impl TryFrom<&JSON> for IfStatement {
         let jthen = json_get(value, "consequent")?;
         let consequent = Statement::try_from(jthen)?;
 
-        let alternate = value
-            .get("alternate")
-            .and_then(|jelse| Statement::try_from(jelse).ok());
+        let alternate = (value.get("alternate")).and_then(|jelse| Statement::try_from(jelse).ok());
 
         Ok(IfStatement {
             test,
@@ -218,13 +216,13 @@ impl TryFrom<&JSON> for SwitchStatement {
         let discriminant = Expr::try_from(jdiscriminant)?;
 
         let jcases = json_get_array(json, "cases")?;
-        let cases = (jcases.iter())
+        let cases = (jcases.into_iter())
             .map(|jcase| {
                 let jtest = json_get(jcase, "test")?;
                 let test = json_map_object(jtest, |jtest| Expr::try_from(jtest))?;
 
                 let jconsequent = json_get_array(jcase, "consequent")?;
-                let consequent = (jconsequent.iter())
+                let consequent = (jconsequent.into_iter())
                     .map(|jstmt| Statement::try_from(jstmt))
                     .collect::<Result<Vec<Statement>, Self::Error>>()?;
 
@@ -436,7 +434,7 @@ impl TryFrom<&JSON> for VariableDeclaration {
         let jdeclarations = json_get_array(value, "declarations")?;
 
         let mut declarations = vec![];
-        for decl in jdeclarations.iter() {
+        for decl in jdeclarations.into_iter() {
             json_expect_str(decl, "type", "VariableDeclarator")?;
 
             let jid = json_get(decl, "id")?;
@@ -493,10 +491,9 @@ impl TryFrom<&JSON> for Expr {
         let expr = match jexpr_ty {
             "ArrayExpression" => {
                 let jelements = json_get_array(jexpr, "elements")?;
-                let elements = jelements
-                    .iter()
-                    .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
-                    .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
+                let elements = (jelements.into_iter())
+                    .map(|j| Expr::try_from(j))
+                    .collect::<Result<Vec<Expr>, ParseError<JSON>>>();
                 let expr = ArrayExpression(elements?);
                 Expr::Array(expr)
             }
@@ -513,10 +510,9 @@ impl TryFrom<&JSON> for Expr {
                 let callee = Expr::try_from(jcallee)?;
 
                 let jarguments = json_get_array(jexpr, "arguments")?;
-                let arguments = jarguments
-                    .iter()
-                    .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
-                    .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>();
+                let arguments = (jarguments.into_iter())
+                    .map(|j| Expr::try_from(j))
+                    .collect::<Result<Vec<Expr>, ParseError<JSON>>>();
 
                 Expr::Call(CallExpression(Box::new(callee), arguments?))
             }
@@ -570,10 +566,9 @@ impl TryFrom<&JSON> for Expr {
                 let callee = Expr::try_from(jcallee)?;
 
                 let jarguments = json_get_array(jexpr, "arguments")?;
-                let arguments = jarguments
-                    .iter()
-                    .map(|j| Expr::try_from(j).map(|e| Box::new(e)))
-                    .collect::<Result<Vec<Box<Expr>>, ParseError<JSON>>>()?;
+                let arguments = (jarguments.into_iter())
+                    .map(|j| Expr::try_from(j))
+                    .collect::<Result<Vec<Expr>, ParseError<JSON>>>()?;
 
                 let expr = NewExpression(Box::new(callee), arguments);
                 Expr::New(expr)
@@ -672,7 +667,7 @@ impl TryFrom<&JSON> for SequenceExpression {
     fn try_from(jexpr: &JSON) -> Result<Self, Self::Error> {
         let jexprs = json_get_array(jexpr, "expressions")?;
 
-        let exprs = (jexprs.iter())
+        let exprs = (jexprs.into_iter())
             .map(|jexpr| Expr::try_from(jexpr))
             .collect::<Result<Vec<Expr>, ParseError<JSON>>>()?;
         Ok(SequenceExpression(Box::new(exprs)))
@@ -796,7 +791,7 @@ impl TryFrom<&JSON> for ObjectExpression {
         let jproperties = json_get_array(jexpr, "properties")?;
 
         let mut properties = vec![];
-        for jprop in jproperties.iter() {
+        for jprop in jproperties.into_iter() {
             json_expect_str(jprop, "type", "Property")?;
 
             let jkey = json_get(jprop, "key")?;
@@ -837,8 +832,7 @@ impl TryFrom<&JSON> for FunctionExpression {
             .ok();
 
         let jparams = json_get_array(jexpr, "params")?;
-        let params = jparams
-            .into_iter()
+        let params = (jparams.into_iter())
             .map(|jparam| Identifier::try_from(jparam))
             .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
 

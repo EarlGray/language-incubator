@@ -245,15 +245,14 @@ impl Heap {
         let mut scope_object = JSObject::new();
 
         // `arguments`
-        let argv = values
-            .iter()
+        let argv = (values.iter())
             .map(|v| v.to_value(self))
             .collect::<Result<Vec<JSValue>, Exception>>()?;
         let arguments_ref = self.alloc(JSObject::from_array(argv));
         scope_object.set_nonconf("arguments", Content::from(arguments_ref))?;
 
         // set each argument
-        for (i, param) in params.iter().enumerate() {
+        for (i, param) in params.into_iter().enumerate() {
             let name = &param.0;
             let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
             scope_object.set_nonconf(name, Content::Value(value))?;

@@ -214,8 +214,8 @@ impl Interpretable for ForInStatement {
                     None => continue,    // the property has disappeared!
                 };
 
-                let assignee = assignexpr.interpret(heap)?;
-                assignee
+                assignexpr
+                    .interpret(heap)?
                     .put_value(JSValue::from(propname.as_str()), heap)
                     .or_else(crate::error::ignore_set_readonly)?;
 
@@ -646,8 +646,7 @@ impl Interpretable for ObjectExpression {
 impl Interpretable for ArrayExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let ArrayExpression(exprs) = self;
-        let storage = exprs
-            .iter()
+        let storage = (exprs.iter())
             .map(|expr| expr.interpret(heap)?.to_value(heap))
             .collect::<Result<Vec<JSValue>, Exception>>()?;
 
