@@ -421,8 +421,8 @@ impl TryFrom<&JSON> for VariableDeclaration {
         json_expect_str(value, "type", "VariableDeclaration")?;
 
         let kind = match json_get_str(value, "kind")? {
-            "const" => DeclarationKind::Const,
-            "let" => DeclarationKind::Let,
+            "const" => todo!(), // DeclarationKind::Const,
+            "let" => todo!(), // DeclarationKind::Let,
             "var" => DeclarationKind::Var,
             _ => {
                 return Err(ParseError::UnexpectedValue {

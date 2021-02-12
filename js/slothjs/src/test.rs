@@ -128,7 +128,7 @@ fn test_literals() {
     assert_eval!("var a = {one:1, two:2}; a", {"one": 1.0, "two": 2.0});
 
     assert_eq!(
-        eval("let x = 'one'; let o = {[x]: 1}; o.one"),
+        eval("var x = 'one'; var o = {[x]: 1}; o.one"),
         JSON::from(1.0)
     );
 
@@ -287,22 +287,22 @@ fn test_binary_instanceof() {
     assert_eval!("Object(false) instanceof Boolean", true);
     assert_eval!("Object(false) instanceof Array", false);
     assert_eval!(r#"
-        let Class = function() {};
-        let obj = new Class();
+        var Class = function() {};
+        var obj = new Class();
         (obj instanceof Class) && !({} instanceof Class)
     "#, true);
     assert_eval!(r#"
-        let Class = function() {};
-        let Subclass = function() {};
+        var Class = function() {};
+        var Subclass = function() {};
         Subclass.prototype = new Class();
-        let obj = new Class();
+        var obj = new Class();
         (obj instanceof Class) && !(obj instanceof Subclass)
     "#, true);
     assert_eval!(r#"
-        let Class = function() {};
-        let Subclass = function() {};
+        var Class = function() {};
+        var Subclass = function() {};
         Subclass.prototype = new Class();
-        let obj = new Subclass();
+        var obj = new Subclass();
         (obj instanceof Class) && (obj instanceof Subclass)
     "#, true);
 }
@@ -337,19 +337,19 @@ fn test_binary_logical() {
 #[test]
 fn test_member_expression() {
     assert_eq!( eval("['zero', 'one', 'two'][2]"),      JSON::from("two"));
-    assert_eq!( eval("let o = {one: 1}; o.one"),        JSON::from(1.0));
+    assert_eq!( eval("var o = {one: 1}; o.one"),        JSON::from(1.0));
     assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
-    assert_eq!( eval("let o = {'o e': 1}; o['o e']"),   JSON::from(1.0));
+    assert_eq!( eval("var o = {'o e': 1}; o['o e']"),   JSON::from(1.0));
     assert_eq!(
-        eval("let x = 'one'; let o = {[x]: 1}; o"),
+        eval("var x = 'one'; var o = {[x]: 1}; o"),
         json!({"one": 1.0})
     );
     assert_eq!(
-        eval("let a = {}; a.sub = {}; a.sub.one = 1; a"),
+        eval("var a = {}; a.sub = {}; a.sub.one = 1; a"),
         json!({"sub": {"one": 1.0}})
     );
     assert_exception!(
-        "let a = {}; a.sub.one = 1", Exception::ReferenceNotAnObject
+        "var a = {}; a.sub.one = 1", Exception::ReferenceNotAnObject
     );
 }
 
@@ -394,6 +394,7 @@ fn test_scope() {
     //assert_eval!( "var a = true; { let a = false; } a",     true );
     //assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
 
+    // const variables
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 
     // variable hoisting
@@ -402,7 +403,7 @@ fn test_scope() {
 
 #[test]
 fn test_sequence() {
-    assert_eval!("let a = 0; a += 2, a += 2", 4.0);
+    assert_eval!("var a = 0; a += 2, a += 2", 4.0);
 }
 
 #[test]
@@ -490,21 +491,21 @@ fn test_loops() {
     "#, 5.0);
 
     assert_eval!(r#"
-        let a = true;
+        var a = true;
         for (; false; ) a = false;
         a
     "#, true);
 
     // while
     assert_eval!(r#"
-        let a = false;
+        var a = false;
         while (!a) { a = true }
         a
     "#, true);
 
     // do while
     assert_eval!(r#"
-        let a = false;
+        var a = false;
         do { a = true } while (0);
         a
     "#, true);
@@ -515,7 +516,7 @@ fn test_loops() {
 
     // continue
     assert!( evalbool(r#"
-        let a = false;
+        var a = false;
         while (!a) {
             a = true;
             continue;
@@ -528,7 +529,7 @@ fn test_loops() {
     // labeled break
     assert_eval!("c = 0; label: { ++c; break label; ++c; }; c", 1.0);
     assert_eval!(r#"
-        let a = false;
+        var a = false;
         label: do {
             a = true;
             for (;;) { break label; }
@@ -558,20 +559,20 @@ fn test_loops() {
     assert_eval!("for (var p in null) throw false", null);
     assert_eval!("for (var p in undefined) throw false", null);
     assert_eval!(r#"
-        let obj = {one:1, two: 2, three: 3};
-        let sum = 0; for (let prop in obj) sum += obj[prop]; sum
+        var obj = {one:1, two: 2, three: 3};
+        var sum = 0; for (var prop in obj) sum += obj[prop]; sum
     "#, 6.0);
     assert_eval!(r#"
-        let obj = {two: 2, three: 3};
+        var obj = {two: 2, three: 3};
         Object.defineProperty(obj, 'one', {value: 1}); // non-enumerable
-        let sum = 0; for (let prop in obj) sum += obj[prop]; sum
+        var sum = 0; for (var prop in obj) sum += obj[prop]; sum
     "#, 5.0);
     assert_eval!(r#"
         function Class() {};
         Class.prototype.one = 1;
         var obj = new Class();
         obj.two = 2;
-        var sum = 0; for (let prop in obj) sum += obj[prop]; sum
+        var sum = 0; for (var prop in obj) sum += obj[prop]; sum
     "#, 3.0);
     assert_eval!(r#"
         // non-enumerables do not participate in the loop,
@@ -581,7 +582,7 @@ fn test_loops() {
         var obj = new Class();
         obj.two = 2;
         Object.defineProperty(obj, 'one', {value: 3});
-        var sum = 0; for (let prop in obj) sum += obj[prop]; sum
+        var sum = 0; for (var prop in obj) sum += obj[prop]; sum
     "#, 2.0);
     assert_eval!(r#"
         var s = 0; for (var i in [1, 2, 3]) s += i; s
@@ -674,12 +675,12 @@ fn test_unary_operations() {
     assert_eq!( eval("+'1'"),               JSON::from(1.0) );
     assert_eq!( eval("+false"),             JSON::from(0.0) );
     assert_eq!( eval("+null"),              JSON::from(0.0) );
-    assert!( evalbool("let v = +{}; v != v") );         // NaN
-    assert!( evalbool("let v = +[1, 2]; v != v") );
-    assert!( evalbool("let v = +'false'; v != v") );
-    assert_eval!( "let a = []; +a",          0.0 );
-    assert_eval!( "let a = [1]; +a",         1.0 );
-    assert_eval!( "let a = +[1, 2]; a != a",  true);
+    assert!( evalbool("var v = +{}; v != v") );         // NaN
+    assert!( evalbool("var v = +[1, 2]; v != v") );
+    assert!( evalbool("var v = +'false'; v != v") );
+    assert_eval!( "var a = []; +a",          0.0 );
+    assert_eval!( "var a = [1]; +a",         1.0 );
+    assert_eval!( "var a = +[1, 2]; a != a",  true);
 
     assert_eq!( eval("-'1'"),               JSON::from(-1.0) );
 
@@ -719,19 +720,19 @@ fn test_unary_operations() {
     assert_eq!( eval("typeof void 'nope'"), JSON::from("undefined") );
     assert_eq!( eval("typeof void {}"),     JSON::from("undefined") );
 
-    assert_eq!( eval("let a = {one: 1}; delete a.one; a"),   json!({}) );
-    assert!( evalbool("let a = {one: 1}; delete a.one") );
-    assert!( evalbool("let a = {one: 1}; delete a['one']") );
-    assert_eq!( eval("let a = {one: 1}; delete a.two; a"),   json!({"one": 1.0}) );
-    assert!( evalbool("let a = {one: 1}; delete a.two") );
+    assert_eq!( eval("var a = {one: 1}; delete a.one; a"),   json!({}) );
+    assert!( evalbool("var a = {one: 1}; delete a.one") );
+    assert!( evalbool("var a = {one: 1}; delete a['one']") );
+    assert_eq!( eval("var a = {one: 1}; delete a.two; a"),   json!({"one": 1.0}) );
+    assert!( evalbool("var a = {one: 1}; delete a.two") );
     assert_eval!( "delete undefined",     false ); // global.undefined is not configurable
     assert_eval!( "var a = 1; delete a",  false); // vars are not configurable
     assert_eval!( "a = 1; delete a",      true ); // but these are.
     assert_eval!( "delete 0",             true ); // don't ask.
     assert_eval!( "delete nosuch", true );
-    //assert_eval!( "let a = ['one', 'two']; delete a[2]", true );
-    //assert_eval!("let a = ['one', 'two']; delete a[1]", true);
-    //assert_eval!("let a = ['one', 'two']; delete a[0]; a[0] === undefined", true);
+    //assert_eval!( "var a = ['one', 'two']; delete a[2]", true );
+    //assert_eval!("var a = ['one', 'two']; delete a[1]", true);
+    //assert_eval!("var a = ['one', 'two']; delete a[0]; a[0] === undefined", true);
 }
 
 #[test]
@@ -761,7 +762,7 @@ fn test_functions() {
 
     // FunctionExpression
     assert_eval!( r#"
-        let twice = function(x) { return x + x; };
+        var twice = function(x) { return x + x; };
         twice(12)
     "#, 24.0);
 
@@ -770,20 +771,20 @@ fn test_functions() {
 
     // return returns immediately
     assert_eval!(r#"
-        let func = function() { return true; return false; };
+        var func = function() { return true; return false; };
         func()
     "#, true);
 
     // the arguments are always fresh
     assert_eval!(r#"
-        let twice = function(x) { return x + x; };
+        var twice = function(x) { return x + x; };
         twice(12)
         twice('a')
     "#, "aa");
 
     // function scope
     assert_eval!(r#"
-        let x = 'outer';
+        var x = 'outer';
         function twice(x) { return x + x; };
         twice('inner')
         x
@@ -803,14 +804,14 @@ fn test_functions() {
     // immediate/anonymous function call
     assert_eval!( "(function(x) { return x + x; })(12)",   24.0);
     assert_eval!(r#"
-        let a = [function() { return 8; }, function() { return 12; }];
+        var a = [function() { return 8; }, function() { return 12; }];
         a[0]()
     "#, 8.0);
 
     // closures
     assert_eval!(r#"
-        let adder = function(y) { return function(x) { return x + y; } };
-        let add3 = adder(3);
+        var adder = function(y) { return function(x) { return x + y; } };
+        var add3 = adder(3);
         add3(4)
     "#, 7.0);
 
@@ -956,8 +957,8 @@ fn test_builtin_object() {
     /*
     // Object.assign
     assert_eval!(r#"
-        const obj = {one: 1};
-        const copy = Object.assign({}, obj);
+        var obj = {one: 1};
+        var copy = Object.assign({}, obj);
         obj.one
     "#, 1.0);
      */
@@ -1087,27 +1088,27 @@ fn test_objects() {
     // NewExpression
     assert_eval!("new Object()",    {});
     assert_eval!(r#"
-        let HasOne = function() { this.one = 1; }
-        let obj = new HasOne()
+        var HasOne = function() { this.one = 1; }
+        var obj = new HasOne()
         obj.one
     "#, 1.0);
     assert_eval!(r#"
-        let HasOne = function() { this.one = 1; }
-        let obj1 = new HasOne()
-        let obj2 = new HasOne()
+        var HasOne = function() { this.one = 1; }
+        var obj1 = new HasOne()
+        var obj2 = new HasOne()
         obj2.one = 2;
         obj1.one + obj2.one
     "#, 3.0);
     assert_eval!(r#"
-        let Class = function() { return {one: 1}; }
-        let obj = new Class()
+        var Class = function() { return {one: 1}; }
+        var obj = new Class()
         obj.one
     "#, 1.0);
     /* // TODO: property lookup on the prototype chain
     assert_eval!(r#"
-        let HasOne = function() { this.one = 1; }
-        let obj1 = new HasOne()
-        let obj2 = new HasOne()
+        var HasOne = function() { this.one = 1; }
+        var obj1 = new HasOne()
+        var obj2 = new HasOne()
         HasOne.prototype.two = 2
         obj1.two + obj2.two
     "#, 4.0);
@@ -1119,20 +1120,20 @@ fn test_this() {
     assert_eval!("var f = function() { return this; }; f() == global", true );
 
     assert_eval!(r#"
-        const test = { prop: 42, func: function() { return this.prop; } };
+        var test = { prop: 42, func: function() { return this.prop; } };
         test.func()
     "#, 42.0 );
 
     // call
     assert_eval!(r#"
-        const add = function(c, d) { return this.a + this.b + c + d }
+        function add(c, d) { return this.a + this.b + c + d }
         var o = {a: 1, b: 3}
         add.call(o, 5, 7)
     "#, 16.0);
 
     // apply
     assert_eval!(r#"
-        const f = function(c, d) { return this.a + this.b + c + d }
+        function f(c, d) { return this.a + this.b + c + d }
         var o = {a: 1, b: 3}
         f.apply(o, [5, 7])
     "#, 16.0);
@@ -1173,8 +1174,8 @@ fn test_this() {
     "#, 1.0);
     */
     assert_eval!(r#"
-        let Class = function() { this.prop = true; }
-        let obj = new Class();
+        var Class = function() { this.prop = true; }
+        var obj = new Class();
         obj.prop
     "#, true);
 }
@@ -1184,16 +1185,16 @@ fn test_arrays() {
     assert_eval!( "[]",   [] );
     assert_eval!( "[1, 'a', undefined]",   [1.0, "a", null] );
 
-    assert_eval!( "let a = ['zero', 'one']; a[1]",  "one" );
-    assert_eval!( "let a = ['zero', 'one']; a[2]",  null );
+    assert_eval!( "var a = ['zero', 'one']; a[1]",  "one" );
+    assert_eval!( "var a = ['zero', 'one']; a[2]",  null );
 
-    //assert_eval!( "let a = ['zero', 'one']; a.length", 2 );
-    //assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
+    //assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
+    //assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
 
-    assert_eval!( "let a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
-    assert_eval!( "let a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
+    assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
+    assert_eval!( "var a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
 
-    //assert_eval!( "let a = ['zero']; a.push('one'); a[1]",  "one" );
+    //assert_eval!( "var a = ['zero']; a.push('one'); a[1]",  "one" );
 }
 
 /// ```sh
