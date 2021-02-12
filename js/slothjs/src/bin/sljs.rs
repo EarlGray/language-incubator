@@ -14,7 +14,6 @@
 //! to execute the Esprima parser. It uses $TMPDIR/sljs/ to unpack
 //! its auxiliary files.
 
-use std::convert::TryFrom;
 use std::env;
 use std::fmt::Debug;
 use std::fs;
@@ -134,7 +133,7 @@ enum EvalError {
 fn evaluate_input(esparse_path: &Path, input: &str, heap: &mut Heap) -> Result<JSValue, EvalError> {
     let (stdout, _stderr) = run_esprima(esparse_path, input).map_err(|e| EvalError::Syntax(e))?;
     let json = serde_json::from_str(&stdout).map_err(|e| EvalError::JSON(e))?;
-    let ast = Program::try_from(&json).map_err(|e| EvalError::Parser(e))?;
+    let ast = Program::parse_from(&json).map_err(|e| EvalError::Parser(e))?;
 
     let result = ast.interpret(heap).map_err(|e| EvalError::Exception(e))?;
 

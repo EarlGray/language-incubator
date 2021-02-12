@@ -1,16 +1,18 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::convert::TryFrom;
 
 use serde_json::json;
 
-use crate::ast::Program;
-use crate::heap;
-use crate::heap::Heap;
-use crate::object;
-use crate::object::{JSON, JSValue, Interpreted};
-use crate::error::{Exception, ParseError};
+use crate::{
+    Heap,
+    Interpreted,
+    JSON,
+    JSValue,
+    Program,
+};
 use crate::interpret::Interpretable;
+use crate::object;
+use crate::error::{Exception, ParseError};
 
 const ESPARSE: &str = "./node_modules/.bin/esparse";
 
@@ -39,7 +41,7 @@ fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exceptio
             let err = ParseError::InvalidJSON{ err: err.to_string() };
             Exception::SyntaxError(err)
         })?;
-    let program = Program::try_from(&json)
+    let program = Program::parse_from(&json)
         .map_err(|e| Exception::SyntaxError(e))?;
     program.interpret(heap)
 }
@@ -388,7 +390,11 @@ fn test_scope() {
     assert_eval!( "var a = false; { var a = true; } a",     true );
     assert_eval!( "var a = false; { a = true } a",          true );
     //assert_eval!( "var a = false; (function() { a = true; })(); a", true );
+    assert_eval!( "var a = true; (function(a) { a = false; })(); a", true );
     assert_eval!( "var a = true; (function(a) { a = false })('nope'); a", true );
+
+    assert_eval!("var a; Object.getOwnPropertyDescriptor(this, 'a').configurable", false);
+    assert_eval!("a = 1; Object.getOwnPropertyDescriptor(this, 'a').configurable", true);
 
     // block scope
     //assert_eval!( "var a = true; { let a = false; } a",     true );
@@ -399,6 +405,21 @@ fn test_scope() {
 
     // variable hoisting
     //assert_eval!("(function() { return a; var a = 12; })()", null);
+    /*
+    assert_eval!(r#"
+        a = 1;  // Even a Program hoists its variables
+        var a = 2;
+        Object.getOwnPropertyDescriptor(this, 'a').configurable
+    "#, false);
+    */
+
+    // closures
+    assert_eval!(r#"
+        var adder = function(y) { return function(x) { return x + y + zero; } };
+        var add3 = adder(3);
+        var zero = 1;
+        add3(4)
+    "#, 8.0);
 }
 
 #[test]
@@ -1203,6 +1224,7 @@ fn test_arrays() {
 #[test]
 fn test_sizes() {
     use std::mem::size_of;
+    use crate::heap;
     use object::{Access, Content, Interpreted, ObjectValue, Property};
 
     println!("============================");

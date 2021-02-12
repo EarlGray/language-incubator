@@ -13,7 +13,6 @@
 //! 4
 //! ```
 
-use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::io;
 
@@ -39,7 +38,7 @@ fn main() {
     for json in deserializer.into_iter::<JSON>() {
         let json = json.unwrap_or_else(|e| die("JSON error", e, 1));
 
-        let ast = Program::try_from(&json).unwrap_or_else(|e| die("Parse error", e, 2));
+        let ast = Program::parse_from(&json).unwrap_or_else(|e| die("Parse error", e, 2));
 
         let mut heap = Heap::new();
         let result = ast

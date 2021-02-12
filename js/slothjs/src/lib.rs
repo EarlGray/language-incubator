@@ -9,7 +9,6 @@ mod parse;
 #[rustfmt::skip]
 mod test;
 
-
 pub type Program = ast::Program;
 
 pub type Interpreted = object::Interpreted;
