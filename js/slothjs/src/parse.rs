@@ -1,14 +1,29 @@
+use std::collections::HashSet;
+
 use crate::ast::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
 use crate::object::JSON;
 
-pub struct ParserContext {}
+#[derive(Debug)]
+pub struct ParserContext {
+    pub used_variables: HashSet<Identifier>,
+    pub declared_variables: HashSet<Identifier>,
+}
+
+impl ParserContext {
+    pub fn new() -> ParserContext {
+        ParserContext {
+            used_variables: HashSet::new(),
+            declared_variables: HashSet::new(),
+        }
+    }
+}
 
 trait ParseFrom<T> {
     type Error;
 
-    fn parse_from(source: &T, _ctx: &mut ParserContext) -> Result<Self, Self::Error>
+    fn parse_from(source: &T, ctx: &mut ParserContext) -> Result<Self, Self::Error>
     where
         Self: Sized;
 }
@@ -90,27 +105,14 @@ impl Program {
     pub fn parse_from(json: &JSON) -> Result<Program, ParseError<JSON>> {
         json_expect_str(json, "type", "Program")?;
 
-        let mut ctx = ParserContext {};
+        let mut ctx = ParserContext::new();
         let jbody = json_get_array(json, "body")?;
         let body = (jbody.into_iter())
             .map(|jstmt| Statement::parse_from(jstmt, &mut ctx))
             .collect::<Result<Vec<Statement>, ParseError<JSON>>>()?;
-        Ok(Program { body })
-    }
-}
 
-impl ParseFrom<JSON> for Program {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(json, "type", "Program")?;
-
-        let jbody = json_get_array(json, "body")?;
-        let body = jbody
-            .into_iter()
-            .map(|jstmt| Statement::parse_from(jstmt, ctx))
-            .collect::<Result<Vec<Statement>, Self::Error>>()?;
-        Ok(Program { body })
+        let variables = ctx.declared_variables;
+        Ok(Program { body, variables })
     }
 }
 
@@ -448,7 +450,7 @@ impl ParseFrom<JSON> for VariableDeclaration {
             "var" => DeclarationKind::Var,
             _ => {
                 return Err(ParseError::UnexpectedValue {
-                    want: "const|let|var",
+                    want: "var | let | const",
                     value: value.get("kind").unwrap().clone(),
                 })
             }
@@ -471,6 +473,7 @@ impl ParseFrom<JSON> for VariableDeclaration {
                 }
             };
 
+            ctx.declared_variables.insert(name.clone());
             declarations.push(VariableDeclarator { name, init });
         }
         Ok(VariableDeclaration { kind, declarations })
@@ -488,6 +491,7 @@ impl ParseFrom<JSON> for FunctionDeclaration {
             attr: "id",
             value: value.clone(),
         })?;
+        ctx.declared_variables.insert(id.clone());
         Ok(FunctionDeclaration { id, function })
     }
 }
@@ -625,9 +629,11 @@ impl ParseFrom<JSON> for Expr {
 impl ParseFrom<JSON> for Identifier {
     type Error = ParseError<JSON>;
 
-    fn parse_from(jexpr: &JSON, _ctx: &mut ParserContext) -> Result<Self, Self::Error> {
+    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
         let name = json_get_str(jexpr, "name")?;
-        Ok(Identifier(name.to_string()))
+        let identifier = Identifier::from(name);
+        ctx.used_variables.insert(identifier.clone());
+        Ok(identifier)
     }
 }
 
@@ -853,18 +859,36 @@ impl ParseFrom<JSON> for FunctionExpression {
             .and_then(|jid| Identifier::parse_from(jid, ctx))
             .ok();
 
+        let mut inner_ctx = ParserContext::new();
         let jparams = json_get_array(jexpr, "params")?;
         let params = (jparams.into_iter())
-            .map(|jparam| Identifier::parse_from(jparam, ctx))
+            .map(|jparam| Identifier::parse_from(jparam, &mut inner_ctx))
             .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
 
         let jbody = json_get(jexpr, "body")?;
-        let body = BlockStatement::parse_from(jbody, ctx)?;
+
+        let body = BlockStatement::parse_from(jbody, &mut inner_ctx)?;
+        let body = Box::new(body);
+
+        let ParserContext {
+            used_variables: mut free_variables,
+            declared_variables: variables,
+        } = inner_ctx;
+
+        free_variables.remove(&Identifier::from("arguments"));
+        for var in params.iter().chain(variables.iter()) {
+            free_variables.remove(var);
+        }
+
+        ctx.used_variables
+            .extend(free_variables.clone().into_iter());
 
         Ok(FunctionExpression {
             id,
             params,
-            body: Box::new(body),
+            variables,
+            free_variables,
+            body,
             is_generator: json_get_bool(jexpr, "generator").unwrap_or(false),
             is_expression: json_get_bool(jexpr, "expression").unwrap_or(false),
             is_async: json_get_bool(jexpr, "async").unwrap_or(false),

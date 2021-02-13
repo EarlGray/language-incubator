@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{
+    HashMap,
+    HashSet,
+};
 use std::convert::TryFrom;
 use std::fmt;
 use std::str::FromStr;
@@ -115,6 +118,7 @@ impl JSValue {
     /// `value.numberify().unwrap_or(f64::NAN)` corresponds to `+value` in JavaScript.
     pub fn numberify(&self, heap: &Heap) -> Option<JSNumber> {
         match self {
+            JSValue::Undefined => None, // Some(f64::NAN),
             JSValue::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
             JSValue::Number(n) => Some(*n),
             JSValue::String(s) => s.parse::<JSNumber>().ok(),
@@ -131,7 +135,6 @@ impl JSValue {
                     object.to_primitive(heap).and_then(|v| v.numberify(heap))
                 }
             }
-            _ => None,
         }
     }
 
@@ -845,9 +848,10 @@ pub type NativeFunction = fn(
 #[derive(Clone, Debug)]
 pub struct Closure {
     pub id: Option<ast::Identifier>,
-    pub params: Vec<ast::Identifier>,
+    pub params: Vec<ast::Identifier>, // cannot be a set, needs order
+    pub variables: HashSet<ast::Identifier>,
     pub body: Box<ast::BlockStatement>,
-    pub captured_scope: JSRef,
+    pub captured_scope: JSRef, // TODO: capture free variables only
 }
 
 /// The underlying storage of an Array object.

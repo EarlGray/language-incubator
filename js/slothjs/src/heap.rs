@@ -1,9 +1,7 @@
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
-use crate::ast::{
-    DeclarationKind,
-    Identifier,
-};
+use crate::ast::Identifier;
 use crate::builtin;
 use crate::error::Exception;
 use crate::interpret::Interpretable;
@@ -158,22 +156,13 @@ impl Heap {
         self.get_mut(scope_ref)
     }
 
-    /// Variable declaration in the current scope.
-    // NOTE: This should not try to assign an initial value.
-    pub fn declare_var(
-        &mut self,
-        kind: Option<DeclarationKind>,
-        name: &str,
-    ) -> Result<(), Exception> {
-        // TODO: let and const should be block-scoped
-        if !self.scope().properties.contains_key(name) {
-            let content = Content::Value(JSValue::Undefined);
-            let access = if kind.is_none() {
-                Access::all()
-            } else {
-                Access::NONCONF
-            };
-            self.scope_mut().set(name, content, access)?;
+    pub fn declare_variables(&mut self, variables: &HashSet<Identifier>) -> Result<(), Exception> {
+        for var in variables.iter() {
+            let name = var.as_str();
+            if !self.scope().properties.contains_key(name) {
+                let content = Content::Value(JSValue::Undefined);
+                self.scope_mut().set(name, content, Access::NONCONF)?;
+            }
         }
         Ok(())
     }
@@ -236,7 +225,7 @@ impl Heap {
 
     fn push_scope(
         &mut self,
-        params: Vec<Identifier>,
+        params: &[Identifier],
         values: Vec<Interpreted>,
         this_ref: JSRef,
     ) -> Result<JSRef, Exception> {
@@ -252,7 +241,7 @@ impl Heap {
         scope_object.set_nonconf("arguments", Content::from(arguments_ref))?;
 
         // set each argument
-        for (i, param) in params.into_iter().enumerate() {
+        for (i, param) in params.iter().enumerate() {
             let name = &param.0;
             let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
             scope_object.set_nonconf(name, Content::Value(value))?;
@@ -316,11 +305,14 @@ impl Heap {
             ObjectValue::Closure(closure) => {
                 let Closure {
                     params,
+                    variables,
                     body,
                     captured_scope,
                     ..
                 } = &*closure;
-                let scope = self.push_scope(params.clone(), arguments, this_ref)?;
+                let scope = self.push_scope(&params, arguments, this_ref)?;
+                self.declare_variables(variables)?;
+                // TODO: use free variables only
                 if *captured_scope != Heap::NULL {
                     self.get_mut(scope)
                         .set_system(Self::CAPTURED_SCOPE, Content::from(*captured_scope))?;

@@ -22,6 +22,7 @@ pub trait Interpretable {
 impl Interpretable for Program {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let mut result = Interpreted::VOID;
+        heap.declare_variables(&self.variables)?;
         for stmt in self.body.iter() {
             result = stmt.interpret(heap)?;
         }
@@ -181,9 +182,8 @@ impl Interpretable for ForInStatement {
                 if vardecl.declarations.len() != 1 {
                     return Err(Exception::SyntaxErrorForInMultipleVar());
                 }
-                let name = &vardecl.declarations[0].name.0;
-                heap.declare_var(Some(vardecl.kind), &name)?;
-                Expr::Identifier(Identifier::from(name.as_str()))
+                let name = vardecl.declarations[0].name.as_str();
+                Expr::Identifier(Identifier::from(name))
             }
         };
 
@@ -361,7 +361,6 @@ impl Interpretable for VariableDeclaration {
                 .map(|initexpr| initexpr.interpret(heap))
                 .transpose()?;
             let name = &decl.name.0;
-            heap.declare_var(Some(self.kind), name)?;
             if let Some(init) = optinit {
                 let value = init.to_value(heap)?;
                 heap.scope_mut()
@@ -377,12 +376,9 @@ impl Interpretable for FunctionDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let function_ref = self.function.interpret(heap)?;
 
-        let name = &self.id.0;
-        heap.declare_var(Some(DeclarationKind::Var), name)?;
-
         let value = function_ref.to_value(heap)?;
         heap.scope_mut()
-            .update(name, value)
+            .update(self.id.as_str(), value)
             .or_else(crate::error::ignore_set_readonly)?;
         Ok(Interpreted::VOID)
     }
@@ -424,9 +420,7 @@ impl Interpretable for Identifier {
         if let Some(place) = heap.lookup_var(name) {
             Ok(place)
         } else {
-            // Reference to a place that does not exist yet:
-            let scoperef = heap.local_scope().unwrap_or(Heap::GLOBAL);
-            Ok(Interpreted::member(scoperef, name))
+            Ok(Interpreted::member(Heap::GLOBAL, name))
         }
     }
 }
@@ -660,31 +654,27 @@ impl Interpretable for AssignmentExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let AssignmentExpression(leftexpr, AssignOp(modop), valexpr) = self;
 
-        // this must happen before a possible declare_var()
         let value = valexpr.interpret(heap)?;
 
-        if let Some(op) = modop {
-            let assignee = leftexpr.interpret(heap)?;
-            let oldvalue = assignee.to_value(heap)?;
-            let value = value.to_value(heap)?;
-            let newvalue = op.compute(&oldvalue, &value, heap)?;
-            assignee
-                .put_value(newvalue.clone(), heap)
-                .or_else(crate::error::ignore_set_readonly)?;
-            Ok(Interpreted::Value(newvalue))
-        } else {
-            if let Expr::Identifier(name) = leftexpr.as_ref() {
-                // `a = 1` should create a variable;
-                // `a.one = 1` without `a` should fail.
-                heap.declare_var(None, &name.0)?;
+        // This can be:
+        // - Interpreted::Member{ existing object, attribute }
+        // - Interpreted::Member{ scope, existing variable }
+        // - Interpreted::Member{ global, non-existing variable }
+        // - Interpreted::Value
+        let assignee = leftexpr.interpret(heap)?;
+
+        let newvalue = match modop {
+            None => value.to_value(heap)?,
+            Some(op) => {
+                let oldvalue = assignee.to_value(heap)?;
+                let value = value.to_value(heap)?;
+                op.compute(&oldvalue, &value, heap)?
             }
-            let value = value.to_value(heap)?;
-            let assignee = leftexpr.interpret(heap)?;
-            assignee
-                .put_value(value.clone(), heap)
-                .or_else(crate::error::ignore_set_readonly)?;
-            Ok(Interpreted::Value(value))
-        }
+        };
+        assignee
+            .put_value(newvalue.clone(), heap)
+            .or_else(crate::error::ignore_set_readonly)?;
+        Ok(Interpreted::Value(newvalue))
     }
 }
 
@@ -746,6 +736,7 @@ impl Interpretable for FunctionExpression {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
+            variables: self.variables.clone(),
             captured_scope: heap.local_scope().unwrap_or(Heap::NULL),
         };
 

@@ -140,20 +140,23 @@ fn test_literals() {
 
 #[test]
 fn test_binary_addition() {
-    // O_o
-    assert_eq!( eval("2 + 2"),          JSON::from(4.0) );
-    assert_eq!( eval("'1' + '2'"),      JSON::from("12") );
-    assert_eq!( eval("[1] + [2,3]"),    JSON::from("12,3") );
-    assert_eq!( eval("[1,2] + null"),   JSON::from("1,2null") );
-    assert_eq!( eval("null + null"),    JSON::from(0.0) );
-    assert_eq!( eval("true + null"),    JSON::from(1.0) );
-    assert_eval!( "'' + [1, 2]",    "1,2" );
-    assert_eval!( "'' + null",   "null" );
-    assert_eval!( "'' + true",   "true" );
-    assert_eval!( "'' + {}",     "[object Object]" );
+    assert_eval!("2 + 2",          4.0);
+    assert_eval!("'1' + '2'",      "12");
+    assert_eval!("[1] + [2,3]",    "12,3");
+    assert_eval!("[1,2] + null",   "1,2null");
+    assert_eval!("null + null",    0.0);
+    assert_eval!("true + null",    1.0);
+    assert_eval!( "'' + [1, 2]",   "1,2");
+    assert_eval!( "'' + null",     "null");
+    assert_eval!( "'' + true",     "true");
+    assert_eval!( "'' + {}",       "[object Object]");
     assert_eval!( "({} + {})",     "[object Object][object Object]" );
-    assert_eval!( "({} + [])",     "[object Object]" ); // expression
-    assert_eval!( "{} +[]",         0.0 );              // two statements
+    assert_eval!( "({} + [])",     "[object Object]"); // expression
+    assert_eval!( "{} +[]",         0.0 );             // two statements
+    //assert_eval!("undefined + undefined",  (f64::NAN));
+    //assert_eval!("5 + undefined",  (f64::NAN));
+    assert_eval!("undefined + 5",  "undefined5");
+    assert_eval!("1 + {}",         "1[object Object]");
 }
 
 #[test]
@@ -389,9 +392,10 @@ fn test_scope() {
 
     assert_eval!( "var a = false; { var a = true; } a",     true );
     assert_eval!( "var a = false; { a = true } a",          true );
-    //assert_eval!( "var a = false; (function() { a = true; })(); a", true );
+    assert_eval!( "var a = false; (function() { a = true; })(); a", true );
     assert_eval!( "var a = true; (function(a) { a = false; })(); a", true );
     assert_eval!( "var a = true; (function(a) { a = false })('nope'); a", true );
+    assert_eval!("(function() { a = true; })(); a", true);
 
     assert_eval!("var a; Object.getOwnPropertyDescriptor(this, 'a').configurable", false);
     assert_eval!("a = 1; Object.getOwnPropertyDescriptor(this, 'a').configurable", true);
@@ -404,22 +408,41 @@ fn test_scope() {
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 
     // variable hoisting
-    //assert_eval!("(function() { return a; var a = 12; })()", null);
-    /*
+    assert_eval!("(function() { return a; var a = 12; })()", null);
     assert_eval!(r#"
         a = 1;  // Even a Program hoists its variables
         var a = 2;
         Object.getOwnPropertyDescriptor(this, 'a').configurable
     "#, false);
-    */
 
     // closures
     assert_eval!(r#"
-        var adder = function(y) { return function(x) { return x + y + zero; } };
+        var adder = function(y) { return function(x) { return x + y + z; } };
         var add3 = adder(3);
-        var zero = 1;
+        var z = 1;
         add3(4)
     "#, 8.0);
+    assert_eval!(r#"
+        function adder(y) { return function(x) { return x + y + z; } };
+        var z = 1;
+        adder(3)(4)
+    "#, 8.0);
+    assert_eval!(r#"
+        var z = 2;
+        function adder(y) { var z = 0; return function(x) { return x + y + z; } };
+        adder(3)(4)
+    "#, 7.0);
+    assert_eval!(r#"
+        var obj = {z: 0};
+        var adder = function(y) { return function(x) { return x + y + obj.z; } };
+        var add3 = adder(3);
+        obj.z += 1;
+        add3(4)
+    "#, 8.0);
+    assert_exception!(r#"
+        function adder(y) { return function(x) { return x + y + obj.z; } };
+        adder(3)(4)
+    "#, Exception::ReferenceNotFound);
 }
 
 #[test]
@@ -681,13 +704,13 @@ fn test_exceptions() {
         catch(e) { a = e };
         a
     "#, true);
+    */
     // catch-variable is block scope:
     assert_eval!(r#"
         var e = true;
         try { throw false; } catch(e) {};
         e
     "#, true);
-    */
 }
 
 #[test]
@@ -1038,7 +1061,7 @@ fn test_builtin_function() {
 
 #[test]
 fn test_builtin_boolean() {
-    //assert_eval!("true instanceof Boolean", false);
+    assert_eval!("true instanceof Boolean", false);
 
     assert_eval!("var b = new Boolean(false); b.valueOf()",     false);
     assert_eval!("var b = new Boolean(); b.valueOf()",          false);
@@ -1125,7 +1148,6 @@ fn test_objects() {
         var obj = new Class()
         obj.one
     "#, 1.0);
-    /* // TODO: property lookup on the prototype chain
     assert_eval!(r#"
         var HasOne = function() { this.one = 1; }
         var obj1 = new HasOne()
@@ -1133,7 +1155,6 @@ fn test_objects() {
         HasOne.prototype.two = 2
         obj1.two + obj2.two
     "#, 4.0);
-    */
 }
 
 #[test]
@@ -1159,7 +1180,6 @@ fn test_this() {
         f.apply(o, [5, 7])
     "#, 16.0);
 
-    /*
     assert_eval!(r#"
         var o = {f: function() { return this.a + this.b; }}
         var p = Object.create(o)
@@ -1168,6 +1188,7 @@ fn test_this() {
         p.f()
     "#, 5.0 );
 
+    /*
     // bind
     assert_eval!(r#"
         var f = function(c, d) { return this.a + this.b + c + d }
@@ -1209,11 +1230,11 @@ fn test_arrays() {
     assert_eval!( "var a = ['zero', 'one']; a[1]",  "one" );
     assert_eval!( "var a = ['zero', 'one']; a[2]",  null );
 
-    //assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
-    //assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
-
     assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
     assert_eval!( "var a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
+
+    //assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
+    //assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
 
     //assert_eval!( "var a = ['zero']; a.push('one'); a[1]",  "one" );
 }

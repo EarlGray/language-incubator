@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+
 use crate::object::JSON;
 
 // ==============================================
 pub struct Program {
-    pub body: Vec<Statement>, // TODO: Either<Statement, Directive>
+    pub body: Vec<Statement>,           // TODO: Either<Statement, Directive>
+    pub variables: HashSet<Identifier>, // The set of scope variables
 }
 
 // ==============================================
@@ -170,8 +173,14 @@ pub enum Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Literal(pub JSON);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Identifier(pub String);
+
+impl Identifier {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<&str> for Identifier {
     fn from(s: &str) -> Identifier {
@@ -215,7 +224,9 @@ pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
     pub id: Option<Identifier>,
-    pub params: Vec<Pattern>,
+    pub params: Vec<Pattern>, // cannot be a HashSet, needs order
+    pub variables: HashSet<Identifier>, // the set of local variables
+    pub free_variables: HashSet<Identifier>,
     pub body: Box<BlockStatement>,
     pub is_generator: bool,
     pub is_expression: bool,
