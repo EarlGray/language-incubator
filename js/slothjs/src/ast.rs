@@ -224,7 +224,7 @@ pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
     pub id: Option<Identifier>,
-    pub params: Vec<Pattern>, // cannot be a HashSet, needs order
+    pub params: Vec<Pattern>,           // cannot be a HashSet, needs order
     pub variables: HashSet<Identifier>, // the set of local variables
     pub free_variables: HashSet<Identifier>,
     pub body: Box<BlockStatement>,

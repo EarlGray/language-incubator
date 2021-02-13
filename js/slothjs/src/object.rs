@@ -450,11 +450,9 @@ impl JSObject {
                 }
             }
         }
-        self.properties
-            .get(name)
-            .and_then(|prop| match &prop.content {
-                Content::Value(value) => Some(value),
-            })
+        (self.properties.get(name)).and_then(|prop| match &prop.content {
+            Content::Value(value) => Some(value),
+        })
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.

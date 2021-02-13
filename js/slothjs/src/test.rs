@@ -1029,6 +1029,12 @@ fn test_builtin_object() {
     // Object.seal()
 
     // Object.prototype.hasOwnProperty()
+    assert_eval!("Object.hasOwnProperty('create')", true);
+    assert_eval!("Object.hasOwnProperty('toString')", false); // it's on the prototype, not own one
+    assert_eval!("[1].hasOwnProperty(0)", true);
+    assert_eval!("[1].hasOwnProperty(1)", false);
+    assert_eval!("this.hasOwnProperty()", true); // yes, global has a property called `undefined`
+
     // Object.prototype.isPrototypeOf()
     // Object.prototype.propertyIsEnumerable()
 

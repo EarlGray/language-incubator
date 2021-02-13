@@ -11,6 +11,35 @@ use crate::{
     JSRef,
 };
 
+fn object_constructor(
+    _this_ref: JSRef,
+    _method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap,
+) -> Result<Interpreted, Exception> {
+    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let value = argument.to_value(heap)?;
+    let object_ref = match value.objectify(heap) {
+        Heap::NULL => heap.alloc(JSObject::new()),
+        href => href,
+    };
+    Ok(Interpreted::from(object_ref))
+}
+
+#[allow(non_snake_case)]
+fn object_proto_hasOwnProperty(
+    this_ref: JSRef,
+    _method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap,
+) -> Result<Interpreted, Exception> {
+    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let propname = argument.to_value(heap)?.stringify(heap)?;
+    let this_object = heap.get(this_ref);
+    let found = this_object.get_value(&propname).is_some(); // TODO: avoid calling getters, if any
+    Ok(Interpreted::from(found))
+}
+
 #[allow(non_snake_case)]
 fn object_proto_toString(
     _this_ref: JSRef,
@@ -30,21 +59,6 @@ fn object_proto_dbg(
     dbg!(this_ref);
     dbg!(heap.get(this_ref));
     Ok(Interpreted::VOID)
-}
-
-fn object_constructor(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let value = argument.to_value(heap)?;
-    let object_ref = match value.objectify(heap) {
-        Heap::NULL => heap.alloc(JSObject::new()),
-        href => href,
-    };
-    Ok(Interpreted::from(object_ref))
 }
 
 #[allow(non_snake_case)]
@@ -252,18 +266,13 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut object_proto = JSObject::new();
     object_proto.proto = Heap::NULL;
 
-    object_proto.set_system(
-        "dbg",
-        Content::from(heap.alloc(JSObject::from_func(object_proto_dbg))),
-    )?;
+    object_proto.set_system("dbg", Content::from_func(object_proto_dbg, heap))?;
     object_proto.set_hidden(
-        "toString",
-        Content::from(heap.alloc(JSObject::from_func(object_proto_toString))),
+        "hasOwnProperty",
+        Content::from_func(object_proto_hasOwnProperty, heap),
     )?;
-    object_proto.set_hidden(
-        "valueOf",
-        Content::from(heap.alloc(JSObject::from_func(object_proto_valueOf))),
-    )?;
+    object_proto.set_hidden("toString", Content::from_func(object_proto_toString, heap))?;
+    object_proto.set_hidden("valueOf", Content::from_func(object_proto_valueOf, heap))?;
 
     *heap.get_mut(Heap::OBJECT_PROTO) = object_proto;
 
