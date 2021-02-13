@@ -17,9 +17,9 @@
 * DONE [2021-01-01 Fri] a repl executable
 * TODO move tests to =tests/=
 * TODO proper variable/declaration scopes
-** TODO variable hoisting
-** BUG assignment to an outer variable
-** TODO free-variables analysis for closures
+** DONE [2021-02-13 Sat] variable hoisting
+** DONE [2021-02-13 Sat] assignment to an outer variable
+** DONE [2021-02-13 Sat] free-variables analysis for closures
 ** TODO =let= variables, block scope
 ** TODO =const= values
 * DONE [2021-01-23 Sat] UpdateExpression
@@ -89,7 +89,7 @@
 *** DONE [2021-01-05 Tue] create it!
 *** DONE [2021-01-08 Fri] .constructor
 *** DONE [2021-01-18 Mon] .valueOf()
-*** TODO .hasOwnProperty()
+*** DONE [2021-02-13 Sat] .hasOwnProperty()
 *** TODO .isPrototypeOf()
 *** TODO .propertyIsEnumerable()
 * TODO builtin =Function=

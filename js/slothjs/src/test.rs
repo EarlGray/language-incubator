@@ -1020,7 +1020,25 @@ fn test_builtin_object() {
     // Object.getOwnPropertyDescriptors()
     // Object.getOwnPropertyNames()
     // Object.getPrototypeOf()
+
     // Object.setPrototypeOf()
+    assert_eval!(r#"
+        var obj = Object.create({a: false});
+        Object.setPrototypeOf(obj, {a: true});
+        obj.a
+    "#, true);
+    assert_eval!(r#"
+        var obj = Object.create({a: true});
+        Object.setPrototypeOf(obj, 'do nothing');
+        obj.a
+    "#, true);
+    assert_eval!(r#"
+        var obj = Object.create({a: true});
+        Object.setPrototypeOf(obj, null);
+        obj.a
+    "#, null);
+    //TODO: check if the object is extensible
+
     // Object.fromEntries()
     // Object.isExtensible()
     // Object.isFrozen()

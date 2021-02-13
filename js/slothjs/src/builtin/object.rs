@@ -261,6 +261,26 @@ fn object_object_defineProperties(
     Ok(Interpreted::from(objref))
 }
 
+#[allow(non_snake_case)]
+fn object_object_setPrototypeOf(
+    _this_ref: JSRef,
+    _method_name: String,
+    arguments: Vec<Interpreted>,
+    heap: &mut Heap,
+) -> Result<Interpreted, Exception> {
+    let obj_arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let objref = (obj_arg.to_ref(heap))
+        .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
+
+    let proto_arg = arguments.get(1).unwrap_or(&Interpreted::VOID);
+    if let Ok(protoref) = proto_arg.to_ref(heap) {
+        let object = heap.get_mut(objref);
+        object.proto = protoref;
+    }
+
+    Ok(Interpreted::from(objref))
+}
+
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     /* Object.prototype */
     let mut object_proto = JSObject::new();
@@ -294,6 +314,10 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     object_object.set_hidden(
         "getOwnPropertyDescriptor",
         Content::from_func(object_object_getOwnPropertyDescriptor, heap),
+    )?;
+    object_object.set_hidden(
+        "setPrototypeOf",
+        Content::from_func(object_object_setPrototypeOf, heap),
     )?;
 
     let the_object_ref = heap.alloc(object_object);
