@@ -34,22 +34,22 @@ impl Interpretable for Program {
 
 impl Interpretable for Statement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        match self {
-            Statement::Empty => Ok(Interpreted::VOID),
-            Statement::Expr(stmt) => stmt.interpret(heap),
-            Statement::Block(stmt) => stmt.interpret(heap),
-            Statement::If(stmt) => stmt.interpret(heap),
-            Statement::Switch(stmt) => stmt.interpret(heap),
-            Statement::For(stmt) => stmt.interpret(heap),
-            Statement::ForIn(stmt) => stmt.interpret(heap),
-            Statement::Break(stmt) => stmt.interpret(heap),
-            Statement::Continue(stmt) => stmt.interpret(heap),
-            Statement::Label(stmt) => stmt.interpret(heap),
-            Statement::Return(stmt) => stmt.interpret(heap),
-            Statement::Throw(stmt) => stmt.interpret(heap),
-            Statement::Try(stmt) => stmt.interpret(heap),
-            Statement::VariableDeclaration(stmt) => stmt.interpret(heap),
-            Statement::FunctionDeclaration(stmt) => stmt.interpret(heap),
+        match &self.stmt {
+            Stmt::Empty => Ok(Interpreted::VOID),
+            Stmt::Expr(stmt) => stmt.interpret(heap),
+            Stmt::Block(stmt) => stmt.interpret(heap),
+            Stmt::If(stmt) => stmt.interpret(heap),
+            Stmt::Switch(stmt) => stmt.interpret(heap),
+            Stmt::For(stmt) => stmt.interpret(heap),
+            Stmt::ForIn(stmt) => stmt.interpret(heap),
+            Stmt::Break(stmt) => stmt.interpret(heap),
+            Stmt::Continue(stmt) => stmt.interpret(heap),
+            Stmt::Label(stmt) => stmt.interpret(heap),
+            Stmt::Return(stmt) => stmt.interpret(heap),
+            Stmt::Throw(stmt) => stmt.interpret(heap),
+            Stmt::Try(stmt) => stmt.interpret(heap),
+            Stmt::Variable(stmt) => stmt.interpret(heap),
+            Stmt::Function(stmt) => stmt.interpret(heap),
         }
     }
 }
@@ -182,8 +182,9 @@ impl Interpretable for ForInStatement {
                 if vardecl.declarations.len() != 1 {
                     return Err(Exception::SyntaxErrorForInMultipleVar());
                 }
-                let name = vardecl.declarations[0].name.as_str();
-                Expr::Identifier(Identifier::from(name))
+                let ident = &vardecl.declarations[0].name;
+                let idexpr = Expr::Identifier(Identifier::from(ident.as_str()));
+                Expression { expr: idexpr, loc: None }
             }
         };
 
@@ -256,9 +257,9 @@ impl LabelStatement {
         let LabelStatement(label, body) = self;
         loop {
             // must be a loop to continue
-            let loop_stmt = match &**body {
-                Statement::For(stmt) => stmt,
-                Statement::ForIn(_) => todo!(),
+            let loop_stmt = match &body.stmt {
+                Stmt::For(stmt) => stmt,
+                Stmt::ForIn(_) => todo!(),
                 _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone())),
             };
 
@@ -384,9 +385,9 @@ impl Interpretable for FunctionDeclaration {
     }
 }
 
-impl Interpretable for Expr {
+impl Interpretable for Expression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        match self {
+        match &self.expr {
             Expr::Literal(expr) => expr.interpret(heap),
             Expr::Identifier(expr) => expr.interpret(heap),
             Expr::BinaryOp(expr) => expr.interpret(heap),
@@ -592,7 +593,7 @@ impl Interpretable for MemberExpression {
             let propval = propexpr.interpret(heap)?.to_value(heap)?;
             propval.stringify(heap)?
         } else {
-            match &**propexpr {
+            match &propexpr.expr {
                 Expr::Identifier(name) => name.0.clone(),
                 _ => panic!("Member(computed=false) property is not an identifier"),
             }

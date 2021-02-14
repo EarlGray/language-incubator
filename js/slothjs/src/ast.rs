@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
 use crate::object::JSON;
+use crate::source;
+
+// ==============================================
 
 // ==============================================
 pub struct Program {
@@ -10,7 +13,13 @@ pub struct Program {
 
 // ==============================================
 #[derive(Clone, Debug)]
-pub enum Statement {
+pub struct Statement {
+    pub stmt: Stmt,
+    pub loc: Option<Box<source::Location>>,
+}
+
+#[derive(Clone, Debug)]
+pub enum Stmt {
     Empty,
     Block(BlockStatement),
     Expr(ExpressionStatement),
@@ -26,27 +35,27 @@ pub enum Statement {
     Try(TryStatement),
 
     // TODO: move declarations out?
-    VariableDeclaration(VariableDeclaration),
-    FunctionDeclaration(FunctionDeclaration),
+    Variable(VariableDeclaration),
+    Function(FunctionDeclaration),
 }
 
 #[derive(Debug, Clone)]
 pub enum ObjectKey {
-    Computed(Expr),
+    Computed(Expression),
     Identifier(String),
 }
 
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct ExpressionStatement {
-    pub expression: Expr,
+    pub expression: Expression,
 }
 
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct VariableDeclarator {
     pub name: Pattern,
-    pub init: Option<Box<Expr>>,
+    pub init: Option<Box<Expression>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -78,7 +87,7 @@ pub struct BlockStatement {
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct IfStatement {
-    pub test: Expr,
+    pub test: Expression,
     pub consequent: Statement,
     pub alternate: Option<Statement>,
 }
@@ -86,13 +95,13 @@ pub struct IfStatement {
 // ==============================================
 #[derive(Clone, Debug)]
 pub struct SwitchStatement {
-    pub discriminant: Expr,
+    pub discriminant: Expression,
     pub cases: Vec<SwitchCase>,
 }
 
 #[derive(Clone, Debug)]
 pub struct SwitchCase {
-    pub test: Option<Expr>,
+    pub test: Option<Expression>,
     pub consequent: Vec<Statement>,
 }
 
@@ -100,22 +109,22 @@ pub struct SwitchCase {
 #[derive(Clone, Debug)]
 pub struct ForStatement {
     pub init: Statement, // Empty | VariableDeclaration | ExpressionStatement
-    pub test: Option<Expr>,
-    pub update: Option<Expr>,
+    pub test: Option<Expression>,
+    pub update: Option<Expression>,
     pub body: Statement,
 }
 
 #[derive(Clone, Debug)]
 pub struct ForInStatement {
     pub left: ForInTarget,
-    pub right: Expr,
+    pub right: Expression,
     pub body: Box<Statement>,
 }
 
 #[derive(Clone, Debug)]
 pub enum ForInTarget {
     Var(VariableDeclaration),
-    Expr(Expr),
+    Expr(Expression),
 }
 
 // ==============================================
@@ -130,11 +139,11 @@ pub struct LabelStatement(pub Identifier, pub Box<Statement>);
 
 // ==============================================
 #[derive(Clone, Debug)]
-pub struct ReturnStatement(pub Option<Expr>);
+pub struct ReturnStatement(pub Option<Expression>);
 
 // ==============================================
 #[derive(Clone, Debug)]
-pub struct ThrowStatement(pub Expr);
+pub struct ThrowStatement(pub Expression);
 
 #[derive(Clone, Debug)]
 pub struct TryStatement {
@@ -150,6 +159,12 @@ pub struct CatchClause {
 }
 
 // ==============================================
+#[derive(Debug, Clone)]
+pub struct Expression {
+    pub expr: Expr,
+    pub loc: Option<Box<source::Location>>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(Literal),
@@ -189,37 +204,37 @@ impl From<&str> for Identifier {
 }
 
 #[derive(Clone, Debug)]
-pub struct BinaryExpression(pub Box<Expr>, pub BinOp, pub Box<Expr>);
+pub struct BinaryExpression(pub Box<Expression>, pub BinOp, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct LogicalExpression(pub Box<Expr>, pub BoolOp, pub Box<Expr>);
+pub struct LogicalExpression(pub Box<Expression>, pub BoolOp, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct UnaryExpression(pub UnOp, pub Box<Expr>);
+pub struct UnaryExpression(pub UnOp, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct UpdateExpression(pub UpdOp, pub bool, pub Box<Expr>);
+pub struct UpdateExpression(pub UpdOp, pub bool, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct CallExpression(pub Box<Expr>, pub Vec<Expr>);
+pub struct CallExpression(pub Box<Expression>, pub Vec<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct ArrayExpression(pub Vec<Expr>);
+pub struct ArrayExpression(pub Vec<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expr>)>);
+pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expression>)>);
 
 #[derive(Clone, Debug)]
-pub struct MemberExpression(pub Box<Expr>, pub Box<Expr>, pub bool);
+pub struct MemberExpression(pub Box<Expression>, pub Box<Expression>, pub bool);
 
 #[derive(Clone, Debug)]
-pub struct SequenceExpression(pub Box<Vec<Expr>>);
+pub struct SequenceExpression(pub Box<Vec<Expression>>);
 
 #[derive(Clone, Debug)]
-pub struct AssignmentExpression(pub Box<Expr>, pub AssignOp, pub Box<Expr>);
+pub struct AssignmentExpression(pub Box<Expression>, pub AssignOp, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct ConditionalExpression(pub Box<Expr>, pub Box<Expr>, pub Box<Expr>);
+pub struct ConditionalExpression(pub Box<Expression>, pub Box<Expression>, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
@@ -237,7 +252,7 @@ pub struct FunctionExpression {
 pub type Pattern = Identifier;
 
 #[derive(Clone, Debug)]
-pub struct NewExpression(pub Box<Expr>, pub Vec<Expr>);
+pub struct NewExpression(pub Box<Expression>, pub Vec<Expression>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {

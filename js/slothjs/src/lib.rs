@@ -5,6 +5,7 @@ pub mod heap;
 pub mod interpret;
 pub mod object;
 mod parse;
+pub mod source;
 #[cfg(test)]
 #[rustfmt::skip]
 mod test;
