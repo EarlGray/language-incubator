@@ -15,6 +15,7 @@ use crate::heap::{
     Heap,
     JSRef,
 };
+use crate::interpret::Interpretable;
 
 pub type JSON = serde_json::Value;
 
@@ -817,7 +818,7 @@ pub struct VMCall(NativeFunction);
 
 impl VMCall {
     pub fn call(
-        &self,
+        self,
         this_ref: JSRef,
         method_name: String,
         arguments: Vec<Interpreted>,
@@ -848,8 +849,47 @@ pub struct Closure {
     pub id: Option<ast::Identifier>,
     pub params: Vec<ast::Identifier>, // cannot be a set, needs order
     pub variables: HashSet<ast::Identifier>,
-    pub body: Box<ast::BlockStatement>,
+    pub body: ast::BlockStatement,
     pub captured_scope: JSRef, // TODO: capture free variables only
+}
+
+impl Closure {
+    pub fn call(
+        self,
+        this_ref: JSRef,
+        _method_name: &str,
+        arguments: Vec<Interpreted>,
+        heap: &mut Heap,
+    ) -> Result<Interpreted, Exception> {
+        let result = heap.enter_new_scope(this_ref, self.captured_scope, |heap, scoperef| {
+            // `arguments`
+            let argv = (arguments.iter())
+                .map(|v| v.to_value(heap))
+                .collect::<Result<Vec<JSValue>, Exception>>()?;
+            let arguments_ref = heap.alloc(JSObject::from_array(argv));
+            heap.get_mut(scoperef)
+                .set_nonconf("arguments", Content::from(arguments_ref))?;
+
+            // set each argument
+            for (i, param) in self.params.iter().enumerate() {
+                let value = (arguments.get(i))
+                    .unwrap_or(&Interpreted::VOID)
+                    .to_value(heap)?;
+                heap.get_mut(scoperef)
+                    .set_nonconf(param.as_str(), Content::Value(value))?;
+            }
+            // TODO: save caller site into the new scope
+
+            heap.declare_variables(&self.variables)?;
+
+            self.body.interpret(heap)
+        });
+        match result {
+            Ok(_) => Ok(Interpreted::VOID), // BlockStatement result
+            Err(Exception::JumpReturn(returned)) => Ok(returned),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /// The underlying storage of an Array object.
@@ -918,6 +958,34 @@ impl Interpreted {
         match self {
             Interpreted::Member { of, name } => heap.get_mut(*of).update(&name, value),
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
+        }
+    }
+
+    /// Resolve self to: a callable JSRef, `this` JSRef and the method name.
+    pub fn resolve_call(&self, heap: &Heap) -> Result<(JSRef, JSRef, &str), Exception> {
+        match self {
+            Interpreted::Member { of: this_ref, name } => {
+                let of = match heap.lookup_protochain(*this_ref, name) {
+                    Some(Interpreted::Member { of, .. }) => of,
+                    Some(_) => unreachable!(),
+                    None => return Err(Exception::TypeErrorNotCallable(self.clone())),
+                };
+                let func_value =
+                    heap.get(of)
+                        .get_value(&name)
+                        .ok_or(Exception::TypeErrorNotCallable(Interpreted::member(
+                            of, &name,
+                        )))?;
+                let func_ref = func_value
+                    .to_ref()
+                    .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))?;
+                Ok((func_ref, *this_ref, name))
+            }
+            Interpreted::Value(JSValue::Ref(func_ref)) => {
+                let this_ref = Heap::GLOBAL; // TODO: figure out what is this
+                Ok((*func_ref, this_ref, "<anonymous>"))
+            }
+            _ => return Err(Exception::TypeErrorNotCallable(self.clone())),
         }
     }
 

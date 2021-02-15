@@ -4,10 +4,8 @@ use std::convert::TryFrom;
 use crate::ast::Identifier;
 use crate::builtin;
 use crate::error::Exception;
-use crate::interpret::Interpretable;
 use crate::object::{
     Access,
-    Closure,
     Content,
     Interpreted,
     JSObject,
@@ -91,17 +89,15 @@ impl Heap {
     }
 
     pub fn get(&self, objref: JSRef) -> &JSObject {
-        self.0.get(objref.0).unwrap_or_else(|| {
-            let msg = format!("{:?} is invalid", objref);
-            panic!(msg);
-        })
+        self.0
+            .get(objref.0)
+            .unwrap_or_else(|| panic!("{:?} is invalid", objref))
     }
 
     pub fn get_mut(&mut self, objref: JSRef) -> &mut JSObject {
-        self.0.get_mut(objref.0).unwrap_or_else(|| {
-            let msg = format!("{:?} is invalid", objref);
-            panic!(msg);
-        })
+        self.0
+            .get_mut(objref.0)
+            .unwrap_or_else(|| panic!("{:?} is invalid", objref))
     }
 
     pub fn alloc(&mut self, object: JSObject) -> JSRef {
@@ -223,29 +219,29 @@ impl Heap {
         Ok(Interpreted::from(scoperef))
     }
 
-    fn push_scope(
+    pub fn enter_new_scope<T, F>(
         &mut self,
-        params: &[Identifier],
-        values: Vec<Interpreted>,
         this_ref: JSRef,
-    ) -> Result<JSRef, Exception> {
+        captured_scope: JSRef,
+        mut action: F,
+    ) -> Result<T, Exception>
+    where
+        F: FnMut(&mut Heap, JSRef) -> Result<T, Exception>,
+    {
+        let scoperef = self.push_scope(this_ref)?;
+        if captured_scope != Heap::NULL {
+            self.get_mut(scoperef)
+                .set_system(Self::CAPTURED_SCOPE, Content::from(captured_scope))?;
+        }
+        let result = action(self, scoperef);
+        self.pop_scope()?;
+        result
+    }
+
+    fn push_scope(&mut self, this_ref: JSRef) -> Result<JSRef, Exception> {
         let old_scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
 
         let mut scope_object = JSObject::new();
-
-        // `arguments`
-        let argv = (values.iter())
-            .map(|v| v.to_value(self))
-            .collect::<Result<Vec<JSValue>, Exception>>()?;
-        let arguments_ref = self.alloc(JSObject::from_array(argv));
-        scope_object.set_nonconf("arguments", Content::from(arguments_ref))?;
-
-        // set each argument
-        for (i, param) in params.iter().enumerate() {
-            let name = &param.0;
-            let value = values.get(i).unwrap_or(&Interpreted::VOID).to_value(self)?;
-            scope_object.set_nonconf(name, Content::Value(value))?;
-        }
 
         scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref))?;
         scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref))?;
@@ -298,64 +294,21 @@ impl Heap {
         method_name: &str,
         arguments: Vec<Interpreted>,
     ) -> Result<Interpreted, Exception> {
-        match self.get(func_ref).value.clone() {
+        // Yes, we do need a clone() to workaround borrow checker:
+        match &self.get(func_ref).value {
             ObjectValue::VMCall(vmcall) => {
-                vmcall.call(this_ref, method_name.to_string(), arguments, self)
+                vmcall
+                    .clone()
+                    .call(this_ref, method_name.to_string(), arguments, self)
             }
             ObjectValue::Closure(closure) => {
-                let Closure {
-                    params,
-                    variables,
-                    body,
-                    captured_scope,
-                    ..
-                } = &*closure;
-                let scope = self.push_scope(&params, arguments, this_ref)?;
-                self.declare_variables(variables)?;
-                // TODO: use free variables only
-                if *captured_scope != Heap::NULL {
-                    self.get_mut(scope)
-                        .set_system(Self::CAPTURED_SCOPE, Content::from(*captured_scope))?;
-                }
-                let result = body.interpret(self);
-                self.pop_scope()?;
-                match result {
-                    Ok(_) => Ok(Interpreted::VOID), // BlockStatement result
-                    Err(Exception::JumpReturn(returned)) => Ok(returned),
-                    Err(e) => Err(e),
-                }
+                closure.clone().call(this_ref, method_name, arguments, self)
             }
             _ => {
                 let callee = Interpreted::member(this_ref, method_name);
                 return Err(Exception::TypeErrorNotCallable(callee));
             }
         }
-    }
-
-    /// Performs a method lookup on the prototype chain of `this_ref` for `method_name`,
-    /// then runs a found method via `Heap::execute`, binding `this_ref` to `this`.
-    pub fn execute_method(
-        &mut self,
-        this_ref: JSRef,
-        method_name: &str,
-        arguments: Vec<Interpreted>,
-    ) -> Result<Interpreted, Exception> {
-        let callee = Interpreted::member(this_ref, method_name);
-        let (of, name) = match self.lookup_protochain(this_ref, method_name) {
-            Some(Interpreted::Member { of, name }) => (of, name),
-            Some(_) => unreachable!(),
-            None => return Err(Exception::TypeErrorNotCallable(callee.clone())),
-        };
-        let funcobj_ref = match self.get(of).get_value(&name) {
-            Some(JSValue::Ref(func_ref)) => *func_ref,
-            _ => {
-                return Err(Exception::TypeErrorNotCallable(Interpreted::member(
-                    of, &name,
-                )))
-            }
-        };
-
-        self.execute(funcobj_ref, this_ref, method_name, arguments)
     }
 
     /// Deserializes JSON into objects on the heap

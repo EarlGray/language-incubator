@@ -685,21 +685,14 @@ impl Interpretable for CallExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let CallExpression(callee_expr, argument_exprs) = self;
 
-        let mut arguments = vec![];
-        for argexpr in argument_exprs.iter() {
-            let arg = argexpr.interpret(heap)?;
-            arguments.push(arg);
-        }
+        let arguments = (argument_exprs.iter())
+            .map(|argexpr| argexpr.interpret(heap))
+            .collect::<Result<Vec<Interpreted>, Exception>>()?;
 
         let callee = callee_expr.interpret(heap)?;
-        match &callee {
-            Interpreted::Member { of, name } => heap.execute_method(*of, &name, arguments),
-            Interpreted::Value(JSValue::Ref(funcref)) => {
-                let this_ref = Heap::GLOBAL; // TODO: figure out what is this
-                heap.execute(*funcref, this_ref, "<anonymous>", arguments)
-            }
-            _ => return Err(Exception::TypeErrorNotCallable(callee.clone())),
-        }
+        let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
+
+        heap.execute(func_ref, this_ref, name, arguments)
     }
 }
 
