@@ -26,11 +26,11 @@ pub enum Stmt {
     If(Box<IfStatement>),
     Switch(SwitchStatement),
     For(Box<ForStatement>),
-    ForIn(ForInStatement),
+    ForIn(Box<ForInStatement>),
     Return(ReturnStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
-    Label(LabelStatement),
+    Label(Box<LabelStatement>),
     Throw(ThrowStatement),
     Try(TryStatement),
 
@@ -118,7 +118,7 @@ pub struct ForStatement {
 pub struct ForInStatement {
     pub left: ForInTarget,
     pub right: Expression,
-    pub body: Box<Statement>,
+    pub body: Statement,
 }
 
 #[derive(Clone, Debug)]
@@ -135,7 +135,7 @@ pub struct BreakStatement(pub Option<Identifier>);
 pub struct ContinueStatement(pub Option<Identifier>);
 
 #[derive(Clone, Debug)]
-pub struct LabelStatement(pub Identifier, pub Box<Statement>);
+pub struct LabelStatement(pub Identifier, pub Statement);
 
 // ==============================================
 #[derive(Clone, Debug)]
@@ -169,20 +169,20 @@ pub struct Expression {
 pub enum Expr {
     Literal(Literal),
     Identifier(Identifier),
-    BinaryOp(BinaryExpression),
-    LogicalOp(LogicalExpression),
-    Call(CallExpression),
+    BinaryOp(Box<BinaryExpression>),
+    LogicalOp(Box<LogicalExpression>),
+    Call(Box<CallExpression>),
     Array(ArrayExpression),
     Object(ObjectExpression),
-    Member(MemberExpression),
-    Assign(AssignmentExpression),
-    Conditional(ConditionalExpression),
+    Member(Box<MemberExpression>),
+    Assign(Box<AssignmentExpression>),
+    Conditional(Box<ConditionalExpression>),
     Unary(UnaryExpression),
-    Update(UpdateExpression),
+    Update(Box<UpdateExpression>),
     Sequence(SequenceExpression),
     Function(FunctionExpression),
     This,
-    New(NewExpression),
+    New(Box<NewExpression>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -204,37 +204,41 @@ impl From<&str> for Identifier {
 }
 
 #[derive(Clone, Debug)]
-pub struct BinaryExpression(pub Box<Expression>, pub BinOp, pub Box<Expression>);
+pub struct BinaryExpression(pub Expression, pub BinOp, pub Expression);
 
 #[derive(Clone, Debug)]
-pub struct LogicalExpression(pub Box<Expression>, pub BoolOp, pub Box<Expression>);
+pub struct LogicalExpression(pub Expression, pub BoolOp, pub Expression);
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpression(pub UnOp, pub Box<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct UpdateExpression(pub UpdOp, pub bool, pub Box<Expression>);
+pub struct UpdateExpression(pub UpdOp, pub bool, pub Expression);
 
 #[derive(Clone, Debug)]
-pub struct CallExpression(pub Box<Expression>, pub Vec<Expression>);
+pub struct CallExpression(pub Expression, pub Vec<Expression>);
 
 #[derive(Clone, Debug)]
 pub struct ArrayExpression(pub Vec<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct ObjectExpression(pub Vec<(ObjectKey, Box<Expression>)>);
+pub struct ObjectExpression(pub Vec<(ObjectKey, Expression)>);
 
 #[derive(Clone, Debug)]
-pub struct MemberExpression(pub Box<Expression>, pub Box<Expression>, pub bool);
+pub struct MemberExpression(pub Expression, pub Expression, pub bool);
 
 #[derive(Clone, Debug)]
-pub struct SequenceExpression(pub Box<Vec<Expression>>);
+pub struct SequenceExpression(pub Vec<Expression>);
 
 #[derive(Clone, Debug)]
-pub struct AssignmentExpression(pub Box<Expression>, pub AssignOp, pub Box<Expression>);
+pub struct AssignmentExpression(pub Expression, pub AssignOp, pub Expression);
 
 #[derive(Clone, Debug)]
-pub struct ConditionalExpression(pub Box<Expression>, pub Box<Expression>, pub Box<Expression>);
+pub struct ConditionalExpression {
+    pub condexpr: Expression,
+    pub thenexpr: Expression,
+    pub elseexpr: Expression,
+}
 
 #[derive(Clone, Debug)]
 pub struct FunctionExpression {
@@ -242,7 +246,7 @@ pub struct FunctionExpression {
     pub params: Vec<Pattern>,           // cannot be a HashSet, needs order
     pub variables: HashSet<Identifier>, // the set of local variables
     pub free_variables: HashSet<Identifier>,
-    pub body: Box<BlockStatement>,
+    pub body: BlockStatement,
     pub is_generator: bool,
     pub is_expression: bool,
     pub is_async: bool,
@@ -252,7 +256,7 @@ pub struct FunctionExpression {
 pub type Pattern = Identifier;
 
 #[derive(Clone, Debug)]
-pub struct NewExpression(pub Box<Expression>, pub Vec<Expression>);
+pub struct NewExpression(pub Expression, pub Vec<Expression>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {

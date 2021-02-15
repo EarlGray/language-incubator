@@ -184,7 +184,10 @@ impl Interpretable for ForInStatement {
                 }
                 let ident = &vardecl.declarations[0].name;
                 let idexpr = Expr::Identifier(Identifier::from(ident.as_str()));
-                Expression { expr: idexpr, loc: None }
+                Expression {
+                    expr: idexpr,
+                    loc: None,
+                }
             }
         };
 
@@ -428,12 +431,11 @@ impl Interpretable for Identifier {
 
 impl Interpretable for ConditionalExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let ConditionalExpression(condexpr, thenexpr, elseexpr) = self;
-        let cond = condexpr.interpret(heap)?.to_value(heap)?;
+        let cond = self.condexpr.interpret(heap)?.to_value(heap)?;
         if cond.boolify(heap) {
-            thenexpr.interpret(heap)
+            self.thenexpr.interpret(heap)
         } else {
-            elseexpr.interpret(heap)
+            self.elseexpr.interpret(heap)
         }
     }
 }

@@ -140,13 +140,19 @@ impl ParseFrom<JSON> for Statement {
                 let stmt = ForStatement::parse_from(json, ctx)?;
                 Stmt::For(Box::new(stmt))
             }
-            "ForInStatement" => Stmt::ForIn(ForInStatement::parse_from(json, ctx)?),
+            "ForInStatement" => {
+                let stmt = ForInStatement::parse_from(json, ctx)?;
+                Stmt::ForIn(Box::new(stmt))
+            }
             "FunctionDeclaration" => Stmt::Function(FunctionDeclaration::parse_from(json, ctx)?),
             "IfStatement" => {
                 let stmt = IfStatement::parse_from(json, ctx)?;
                 Stmt::If(Box::new(stmt))
             }
-            "LabeledStatement" => Stmt::Label(LabelStatement::parse_from(json, ctx)?),
+            "LabeledStatement" => {
+                let stmt = LabelStatement::parse_from(json, ctx)?;
+                Stmt::Label(Box::new(stmt))
+            }
             "ReturnStatement" => Stmt::Return(ReturnStatement::parse_from(json, ctx)?),
             "SwitchStatement" => Stmt::Switch(SwitchStatement::parse_from(json, ctx)?),
             "ThrowStatement" => Stmt::Throw(ThrowStatement::parse_from(json, ctx)?),
@@ -243,16 +249,22 @@ impl ParseFrom<JSON> for ForStatement {
             Some(jinit) => json_map_object(jinit, |jinit| {
                 if let Ok(var) = VariableDeclaration::parse_from(jinit, ctx) {
                     let stmt = Stmt::Variable(var);
-                    Ok(Statement{ stmt, loc: None})
+                    Ok(Statement { stmt, loc: None })
                 } else if let Ok(expr) = Expression::parse_from(jinit, ctx) {
                     let stmt = Stmt::Expr(ExpressionStatement { expression: expr });
-                    Ok(Statement{ stmt, loc: None})
+                    Ok(Statement { stmt, loc: None })
                 } else {
                     panic!("jinit is not Expression | VariableDeclaration")
                 }
             })?
-            .unwrap_or(Statement{ stmt: Stmt::Empty, loc: None }),
-            _ => Statement{ stmt: Stmt::Empty, loc: None },
+            .unwrap_or(Statement {
+                stmt: Stmt::Empty,
+                loc: None,
+            }),
+            _ => Statement {
+                stmt: Stmt::Empty,
+                loc: None,
+            },
         };
         let test = match json.get("test") {
             Some(jtest) if !jtest.is_null() => Some(Expression::parse_from(jtest, ctx)?),
@@ -297,11 +309,7 @@ impl ParseFrom<JSON> for ForInStatement {
         let jbody = json_get(json, "body")?;
         let body = Statement::parse_from(jbody, ctx)?;
 
-        Ok(ForInStatement {
-            left,
-            right,
-            body: Box::new(body),
-        })
+        Ok(ForInStatement { left, right, body })
     }
 }
 
@@ -349,7 +357,7 @@ impl ParseFrom<JSON> for LabelStatement {
         let jbody = json_get(value, "body")?;
         let body = Statement::parse_from(jbody, ctx)?;
 
-        Ok(LabelStatement(label, Box::new(body)))
+        Ok(LabelStatement(label, body))
     }
 }
 
@@ -498,11 +506,11 @@ impl ParseFrom<JSON> for Expression {
             }
             "AssignmentExpression" => {
                 let expr = AssignmentExpression::parse_from(jexpr, ctx)?;
-                Expr::Assign(expr)
+                Expr::Assign(Box::new(expr))
             }
             "BinaryExpression" => {
                 let expr = BinaryExpression::parse_from(jexpr, ctx)?;
-                Expr::BinaryOp(expr)
+                Expr::BinaryOp(Box::new(expr))
             }
             "CallExpression" => {
                 let jcallee = json_get(jexpr, "callee")?;
@@ -511,9 +519,9 @@ impl ParseFrom<JSON> for Expression {
                 let jarguments = json_get_array(jexpr, "arguments")?;
                 let arguments = (jarguments.into_iter())
                     .map(|jarg| Expression::parse_from(jarg, ctx))
-                    .collect::<Result<Vec<Expression>, ParseError<JSON>>>();
+                    .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
 
-                Expr::Call(CallExpression(Box::new(callee), arguments?))
+                Expr::Call(Box::new(CallExpression(callee, arguments)))
             }
             "ConditionalExpression" => {
                 let jtest = json_get(jexpr, "test")?;
@@ -525,12 +533,12 @@ impl ParseFrom<JSON> for Expression {
                 let jelse = json_get(jexpr, "alternate")?;
                 let elseexpr = Expression::parse_from(jelse, ctx)?;
 
-                let expr = ConditionalExpression(
-                    Box::new(condexpr),
-                    Box::new(thenexpr),
-                    Box::new(elseexpr),
-                );
-                Expr::Conditional(expr)
+                let expr = ConditionalExpression {
+                    condexpr,
+                    thenexpr,
+                    elseexpr,
+                };
+                Expr::Conditional(Box::new(expr))
             }
             "FunctionExpression" => {
                 let expr = FunctionExpression::parse_from(jexpr, ctx)?;
@@ -547,7 +555,7 @@ impl ParseFrom<JSON> for Expression {
             }
             "LogicalExpression" => {
                 let expr = LogicalExpression::parse_from(jexpr, ctx)?;
-                Expr::LogicalOp(expr)
+                Expr::LogicalOp(Box::new(expr))
             }
             "MemberExpression" => {
                 let computed = json_get_bool(jexpr, "computed")?;
@@ -557,8 +565,8 @@ impl ParseFrom<JSON> for Expression {
 
                 let jproperty = json_get(jexpr, "property")?;
                 let property = Expression::parse_from(jproperty, ctx)?;
-                let expr = MemberExpression(Box::new(object), Box::new(property), computed);
-                Expr::Member(expr)
+                let expr = MemberExpression(object, property, computed);
+                Expr::Member(Box::new(expr))
             }
             "NewExpression" => {
                 let jcallee = json_get(jexpr, "callee")?;
@@ -569,8 +577,8 @@ impl ParseFrom<JSON> for Expression {
                     .map(|jarg| Expression::parse_from(jarg, ctx))
                     .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
 
-                let expr = NewExpression(Box::new(callee), arguments);
-                Expr::New(expr)
+                let expr = NewExpression(callee, arguments);
+                Expr::New(Box::new(expr))
             }
             "ObjectExpression" => {
                 let expr = ObjectExpression::parse_from(jexpr, ctx)?;
@@ -587,7 +595,7 @@ impl ParseFrom<JSON> for Expression {
             }
             "UpdateExpression" => {
                 let expr = UpdateExpression::parse_from(jexpr, ctx)?;
-                Expr::Update(expr)
+                Expr::Update(Box::new(expr))
             }
             _ => {
                 return Err(ParseError::UnknownType {
@@ -595,7 +603,7 @@ impl ParseFrom<JSON> for Expression {
                 })
             }
         };
-        Ok(Expression{ expr, loc: None })
+        Ok(Expression { expr, loc: None })
     }
 }
 
@@ -658,7 +666,7 @@ impl ParseFrom<JSON> for UpdateExpression {
                 })
             }
         };
-        Ok(UpdateExpression(op, prefix, Box::new(argument)))
+        Ok(UpdateExpression(op, prefix, argument))
     }
 }
 
@@ -671,7 +679,7 @@ impl ParseFrom<JSON> for SequenceExpression {
         let exprs = (jexprs.into_iter())
             .map(|jexpr| Expression::parse_from(jexpr, ctx))
             .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
-        Ok(SequenceExpression(Box::new(exprs)))
+        Ok(SequenceExpression(exprs))
     }
 }
 
@@ -715,7 +723,7 @@ impl ParseFrom<JSON> for BinaryExpression {
                 })
             }
         };
-        Ok(BinaryExpression(Box::new(left), op, Box::new(right)))
+        Ok(BinaryExpression(left, op, right))
     }
 }
 
@@ -740,7 +748,7 @@ impl ParseFrom<JSON> for LogicalExpression {
                 })
             }
         };
-        Ok(LogicalExpression(Box::new(left), op, Box::new(right)))
+        Ok(LogicalExpression(left, op, right))
     }
 }
 
@@ -775,11 +783,7 @@ impl ParseFrom<JSON> for AssignmentExpression {
                 })
             }
         };
-        Ok(AssignmentExpression(
-            Box::new(left),
-            AssignOp(modop),
-            Box::new(right),
-        ))
+        Ok(AssignmentExpression(left, AssignOp(modop), right))
     }
 }
 
@@ -818,7 +822,7 @@ impl ParseFrom<JSON> for ObjectExpression {
             let jvalue = json_get(jprop, "value")?;
             let value = Expression::parse_from(jvalue, ctx)?;
 
-            properties.push((key, Box::new(value)));
+            properties.push((key, value));
         }
         Ok(ObjectExpression(properties))
     }
@@ -839,9 +843,7 @@ impl ParseFrom<JSON> for FunctionExpression {
             .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
 
         let jbody = json_get(jexpr, "body")?;
-
         let body = BlockStatement::parse_from(jbody, &mut inner_ctx)?;
-        let body = Box::new(body);
 
         let ParserContext {
             used_variables: mut free_variables,
