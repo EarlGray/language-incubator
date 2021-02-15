@@ -66,10 +66,7 @@ fn evalbool(input: &str) -> bool {
     let mut heap = Heap::new();
     match interpret(input, &mut heap) {
         Ok(value) => value.boolify(&heap),
-        Err(e) => {
-            let msg = format!("{:?}", e);
-            panic!(msg)
-        }
+        Err(e) => panic!("{:?}", e),
     }
 }
 
@@ -87,7 +84,7 @@ macro_rules! assert_eval {
                 assert_eq!( result, expected )
             }
             Err(exc) => {
-                panic!(format!("\n     want value: {}\n  got exception: {:?}", expected, exc))
+                panic!("\n     want value: {}\n  got exception: {:?}", expected, exc)
             }
         }
     }
@@ -108,7 +105,7 @@ macro_rules! assert_exception {
         match interpret($js, &mut heap) {
             Err($exc(_)) => (),
             other => {
-                panic!(format!("\n   want {}\n   got: {:?}\n", stringify!($exc), other))
+                panic!("\n   want {}\n   got: {:?}\n", stringify!($exc), other)
             }
         }
     };
