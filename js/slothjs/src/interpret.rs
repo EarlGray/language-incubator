@@ -10,6 +10,7 @@ use crate::object::{
     JSObject,
     JSValue,
 };
+use crate::source;
 
 // ==============================================
 
@@ -34,6 +35,9 @@ impl Interpretable for Program {
 
 impl Interpretable for Statement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        if let Some(loc) = self.loc.as_ref() {
+            source::stash_location(loc, heap);
+        }
         match &self.stmt {
             Stmt::Empty => Ok(Interpreted::VOID),
             Stmt::Expr(stmt) => stmt.interpret(heap),
@@ -318,6 +322,9 @@ impl Interpretable for ThrowStatement {
         let ThrowStatement(exc_expr) = self;
         let exc_value = exc_expr.interpret(heap)?;
         let exc_value = exc_value.to_value(heap)?;
+        if let Err(e) = crate::source::print_callstack(heap) {
+            eprintln!("print_callstack failed: {:?}", e);
+        }
         Err(Exception::UserThrown(exc_value))
     }
 }
@@ -390,6 +397,9 @@ impl Interpretable for FunctionDeclaration {
 
 impl Interpretable for Expression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        if let Some(loc) = self.loc.as_ref() {
+            source::stash_location(loc, heap);
+        }
         match &self.expr {
             Expr::Literal(expr) => expr.interpret(heap),
             Expr::Identifier(expr) => expr.interpret(heap),

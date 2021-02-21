@@ -83,6 +83,7 @@ fn run_esprima(esparse_path: &Path, input: &str) -> io::Result<(String, String)>
     let tmpdir = esparse_path.parent().unwrap();
     let mut esparse = Command::new("node")
         .arg(&esparse_path)
+        .arg("--loc")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

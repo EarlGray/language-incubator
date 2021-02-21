@@ -42,8 +42,10 @@ impl JSRef {
     /// array_ref.expect_instance("Array", &heap).unwrap();
     /// ```
     pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> Result<(), Exception> {
-        let ctrval = heap.scope().get_value(constructor);
-        let ctrval = ctrval.ok_or(Exception::ReferenceNotFound(Identifier::from(constructor)))?;
+        let ctrval = heap
+            .scope()
+            .get_value(constructor)
+            .ok_or(Exception::ReferenceNotFound(Identifier::from(constructor)))?;
 
         let ctrref = ctrval.to_ref()?;
         match self.isinstance(ctrref, heap)? {
@@ -67,14 +69,23 @@ impl Heap {
     pub const NULL: JSRef = JSRef(0);
     pub const GLOBAL: JSRef = JSRef(1);
     pub const OBJECT_PROTO: JSRef = JSRef(2);
-    pub const FUNCTION_PROTO: JSRef = JSRef(3);
+
     pub const ARRAY_PROTO: JSRef = JSRef(4);
+    pub const FUNCTION_PROTO: JSRef = JSRef(3);
     pub const BOOLEAN_PROTO: JSRef = JSRef(5);
-    const USERSTART: usize = 6;
+    //pub const NUMBER_PROTO: JSRef = JSRef(6);
+    //pub const STRING_PROTO: JSRef = JSRef(7);
+
+    pub const ERROR_PROTO: JSRef = JSRef(8);
+    pub const SYNTAX_ERROR_PROTO: JSRef = JSRef(9);
+    pub const TYPE_ERROR_PROTO: JSRef = JSRef(10);
+    pub const REFERENCE_ERROR_PROTO: JSRef = JSRef(11);
+
+    const USERSTART: usize = 12;
 
     pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";
-    const SAVED_SCOPE: &'static str = "[[saved_scope]]";
+    pub(crate) const SAVED_SCOPE: &'static str = "[[saved_scope]]";
     const CAPTURED_SCOPE: &'static str = "[[captured_scope]]";
 
     pub fn new() -> Self {
@@ -142,7 +153,7 @@ impl Heap {
         }
     }
 
-    fn scope(&self) -> &JSObject {
+    pub(crate) fn scope(&self) -> &JSObject {
         let scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
         self.get(scope_ref)
     }
@@ -226,14 +237,14 @@ impl Heap {
         mut action: F,
     ) -> Result<T, Exception>
     where
-        F: FnMut(&mut Heap, JSRef) -> Result<T, Exception>,
+        F: FnMut(&mut Heap) -> Result<T, Exception>,
     {
-        let scoperef = self.push_scope(this_ref)?;
+        self.push_scope(this_ref)?;
         if captured_scope != Heap::NULL {
-            self.get_mut(scoperef)
+            self.scope_mut()
                 .set_system(Self::CAPTURED_SCOPE, Content::from(captured_scope))?;
         }
-        let result = action(self, scoperef);
+        let result = action(self);
         self.pop_scope()?;
         result
     }
@@ -255,8 +266,7 @@ impl Heap {
     fn pop_scope(&mut self) -> Result<(), Exception> {
         let this_scope_ref = self.local_scope().expect(".pop_scope without local scope"); // yes, panic, this interpreter is broken.
         let this_scope_object = self.get(this_scope_ref);
-        let saved_scope_ref = this_scope_object
-            .properties
+        let saved_scope_ref = (this_scope_object.properties)
             .get(Self::SAVED_SCOPE)
             .and_then(|prop| prop.to_ref())
             .expect("saved scope is not a reference"); // yes, panic, this interpreter is broken.
@@ -302,7 +312,9 @@ impl Heap {
                     .call(this_ref, method_name.to_string(), arguments, self)
             }
             ObjectValue::Closure(closure) => {
-                closure.clone().call(this_ref, method_name, arguments, self)
+                closure
+                    .clone()
+                    .call(this_ref, method_name.to_string(), arguments, self)
             }
             _ => {
                 let callee = Interpreted::member(this_ref, method_name);
@@ -310,6 +322,22 @@ impl Heap {
             }
         }
     }
+
+    /*
+    pub fn throw(&mut self, error_proto: JSRef, message: String) -> Result<(), Exception> {
+        // This cannot use the ? shortcut.
+        let constructor = self.get(error_proto)
+            .get_value("constructor").expect("Error.constructor")
+            .to_ref().expect("Error.constructori is a reference");
+
+        let error_ref = self.alloc(JSObject::new());
+        self.execute(constructor, error_ref, "", vec![Interpreted::from(message)])?;
+
+        // TODO: gather callstack
+
+        Err(Exception{ content: Jump::Catch(error_ref) })
+    }
+    */
 
     /// Deserializes JSON into objects on the heap
     pub fn object_from_json(&mut self, json: &JSON) -> JSValue {

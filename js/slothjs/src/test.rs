@@ -1287,4 +1287,8 @@ fn test_sizes() {
 
 // this is for one-off experiments, don't commit anything here:
 #[test] fn test_scratch() {
+    use crate::source;
+    let s = r#" { "something": false, "start": { "line" : 1, "column": 0 }, "end" : { "line": 1, "column": 9 }} "#;
+    let loc = serde_json::from_str::<source::Location>(&s).unwrap();
+    dbg!(loc);
 }

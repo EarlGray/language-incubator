@@ -5,7 +5,27 @@ use crate::object::{
     JSON,
 };
 
-#[allow(dead_code)]
+/*
+use crate::heap::JSRef;
+
+pub type Label = Identifier;
+
+#[derive(Debug, PartialEq)]
+pub struct Exception {
+    //pub callstack: Vec<(Identifier, Identifier, source::Location)>,
+    pub content: Jump,
+}
+
+
+#[derive(Debug, PartialEq)]
+pub enum Jump {
+    Break(Option<Label>),
+    Continue(Option<Label>),
+    Return(Interpreted),
+    Catch(JSRef),
+}
+*/
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError<V> {
     InvalidJSON { err: String },
@@ -18,7 +38,6 @@ pub enum ParseError<V> {
     UnknownType { value: V },
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxError(ParseError<JSON>),

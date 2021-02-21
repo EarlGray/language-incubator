@@ -16,6 +16,7 @@ use crate::heap::{
     JSRef,
 };
 use crate::interpret::Interpretable;
+use crate::source;
 
 pub type JSON = serde_json::Value;
 
@@ -469,6 +470,13 @@ impl JSObject {
         None
     }
 
+    pub fn protochain<'a>(&self, heap: &'a Heap) -> ProtoChainIter<'a> {
+        ProtoChainIter {
+            heap,
+            protoref: self.proto,
+        }
+    }
+
     fn set_maybe_nonwritable(
         &mut self,
         name: &str,
@@ -664,13 +672,6 @@ impl JSObject {
         }
         Ok(s)
     }
-
-    pub fn protochain<'a>(&self, heap: &'a Heap) -> ProtoChainIter<'a> {
-        ProtoChainIter {
-            heap,
-            protoref: self.proto,
-        }
-    }
 }
 
 pub struct ProtoChainIter<'a> {
@@ -837,6 +838,35 @@ impl fmt::Debug for VMCall {
     }
 }
 
+pub struct CallContext {
+    pub this_ref: JSRef,
+    pub func_ref: JSRef,
+    pub method_name: String,
+    pub arguments: Vec<Interpreted>,
+}
+
+impl CallContext {
+    pub fn call(self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        // Yes, we do need a clone() to workaround borrow checker:
+        match &heap.get(self.func_ref).value {
+            ObjectValue::VMCall(vmcall) => {
+                vmcall
+                    .clone()
+                    .call(self.this_ref, self.method_name, self.arguments, heap)
+            }
+            ObjectValue::Closure(closure) => {
+                closure
+                    .clone()
+                    .call(self.this_ref, self.method_name, self.arguments, heap)
+            }
+            _ => {
+                let callee = Interpreted::member(self.this_ref, &self.method_name);
+                return Err(Exception::TypeErrorNotCallable(callee));
+            }
+        }
+    }
+}
+
 pub type NativeFunction = fn(
     this_ref: JSRef,
     method_name: String,
@@ -857,17 +887,17 @@ impl Closure {
     pub fn call(
         self,
         this_ref: JSRef,
-        _method_name: &str,
+        _method_name: String,
         arguments: Vec<Interpreted>,
         heap: &mut Heap,
     ) -> Result<Interpreted, Exception> {
-        let result = heap.enter_new_scope(this_ref, self.captured_scope, |heap, scoperef| {
+        let result = heap.enter_new_scope(this_ref, self.captured_scope, |heap| {
             // `arguments`
             let argv = (arguments.iter())
                 .map(|v| v.to_value(heap))
                 .collect::<Result<Vec<JSValue>, Exception>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
-            heap.get_mut(scoperef)
+            heap.scope_mut()
                 .set_nonconf("arguments", Content::from(arguments_ref))?;
 
             // set each argument
@@ -875,10 +905,15 @@ impl Closure {
                 let value = (arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
-                heap.get_mut(scoperef)
+                heap.scope_mut()
                     .set_nonconf(param.as_str(), Content::Value(value))?;
             }
-            // TODO: save caller site into the new scope
+
+            let loc = source::node_location(heap);
+            dbg!(&loc);
+            if let Some(loc) = loc {
+                source::save_caller(&loc, heap)?;
+            }
 
             heap.declare_variables(&self.variables)?;
 

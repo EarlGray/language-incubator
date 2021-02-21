@@ -123,8 +123,10 @@ impl ParseFrom<JSON> for Statement {
     type Error = ParseError<JSON>;
 
     fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
+        let jloc = json_get(json, "loc").unwrap_or(&JSON::Null);
+        let loc = serde_json::from_value::<Box<source::Location>>(jloc.clone()).ok(); // TODO: clone() can be costly
+
         let typ = json_get_str(json, "type")?;
-        let loc = serde_json::from_value::<Box<source::Location>>(json.clone()).ok(); // TODO: clone() can be costly
         let stmt = match typ {
             "BlockStatement" => Stmt::Block(BlockStatement::parse_from(json, ctx)?),
             "BreakStatement" => Stmt::Break(BreakStatement::parse_from(json, ctx)?),
@@ -493,8 +495,10 @@ impl ParseFrom<JSON> for Expression {
     type Error = ParseError<JSON>;
 
     fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jexpr_ty = json_get_str(jexpr, "type")?;
+        let jloc = json_get(jexpr, "loc").unwrap_or(&JSON::Null);
+        let loc = serde_json::from_value::<Box<source::Location>>(jloc.clone()).ok();
 
+        let jexpr_ty = json_get_str(jexpr, "type")?;
         let expr = match jexpr_ty {
             "ArrayExpression" => {
                 let jelements = json_get_array(jexpr, "elements")?;
@@ -603,7 +607,7 @@ impl ParseFrom<JSON> for Expression {
                 })
             }
         };
-        Ok(Expression { expr, loc: None })
+        Ok(Expression { expr, loc })
     }
 }
 
