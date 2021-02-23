@@ -111,6 +111,7 @@ impl JSValue {
                         this_ref: *r,
                         method_name: "toString".to_string(),
                         arguments: vec![],
+                        loc: None,
                     };
                     let result = call.execute(funcref, heap)?;
                     Ok(result.to_value(heap)?.stringify(heap)?)
@@ -476,6 +477,13 @@ impl JSObject {
         None
     }
 
+    pub fn protochain<'a>(&self, heap: &'a Heap) -> ProtoChainIter<'a> {
+        ProtoChainIter {
+            heap,
+            protoref: self.proto,
+        }
+    }
+
     fn set_maybe_nonwritable(
         &mut self,
         name: &str,
@@ -670,13 +678,6 @@ impl JSObject {
             s.push('}');
         }
         Ok(s)
-    }
-
-    pub fn protochain<'a>(&self, heap: &'a Heap) -> ProtoChainIter<'a> {
-        ProtoChainIter {
-            heap,
-            protoref: self.proto,
-        }
     }
 }
 
