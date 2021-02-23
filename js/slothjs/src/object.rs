@@ -6,17 +6,17 @@ use bitflags::bitflags;
 use serde_json::json;
 
 use crate::ast;
+use crate::error::Exception;
 use crate::function::{
+    CallContext,
     Closure,
     NativeFunction,
     VMCall,
 };
-use crate::error::Exception;
 use crate::heap::{
     Heap,
     JSRef,
 };
-
 
 pub type JSON = serde_json::Value;
 
@@ -106,7 +106,12 @@ impl JSValue {
             JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
                 Some(to_string) => {
                     let funcref = to_string.to_ref(heap)?;
-                    let result = heap.execute(funcref, *r, "toString", vec![])?;
+                    let call = CallContext {
+                        this_ref: *r,
+                        method_name: "toString".to_string(),
+                        arguments: vec![],
+                    };
+                    let result = call.execute(funcref, heap)?;
                     Ok(result.to_value(heap)?.stringify(heap)?)
                 }
                 None => Ok("[object Object]".to_string()),
@@ -812,7 +817,6 @@ where
         Content::Value(JSValue::from(x))
     }
 }
-
 
 /// The underlying storage of an Array object.
 #[derive(Clone, Debug)]

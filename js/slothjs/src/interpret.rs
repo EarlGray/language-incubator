@@ -1,8 +1,11 @@
 use crate::ast::*; // yes, EVERYTHING
 
 use crate::error::Exception;
+use crate::function::{
+    CallContext,
+    Closure,
+};
 use crate::heap::Heap;
-use crate::function::Closure;
 use crate::object::{
     Access,
     Content,
@@ -692,7 +695,13 @@ impl Interpretable for CallExpression {
         let callee = callee_expr.interpret(heap)?;
         let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
 
-        heap.execute(func_ref, this_ref, name, arguments)
+        let method_name = name.to_string();
+        let call = CallContext {
+            this_ref,
+            method_name,
+            arguments,
+        };
+        call.execute(func_ref, heap)
     }
 }
 
@@ -718,7 +727,12 @@ impl Interpretable for NewExpression {
         let object_ref = heap.alloc(object);
 
         // call its constructor
-        let result = heap.execute(funcref, object_ref, "<constructor>", arguments)?;
+        let call = CallContext {
+            this_ref: object_ref,
+            method_name: "<constructor>".to_string(),
+            arguments,
+        };
+        let result = call.execute(funcref, heap)?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),
             _ => Ok(Interpreted::from(object_ref)),

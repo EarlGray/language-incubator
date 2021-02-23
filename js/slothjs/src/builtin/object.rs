@@ -4,6 +4,7 @@ use crate::object::{
     JSValue,
 };
 use crate::{
+    CallContext,
     Exception,
     Heap,
     Interpreted,
@@ -11,13 +12,8 @@ use crate::{
     JSRef,
 };
 
-fn object_constructor(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+fn object_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
     let object_ref = match value.objectify(heap) {
         Heap::NULL => heap.alloc(JSObject::new()),
@@ -28,61 +24,43 @@ fn object_constructor(
 
 #[allow(non_snake_case)]
 fn object_proto_hasOwnProperty(
-    this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
+    call: CallContext,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let propname = argument.to_value(heap)?.stringify(heap)?;
-    let this_object = heap.get(this_ref);
+    let this_object = heap.get(call.this_ref);
     let found = this_object.get_value(&propname).is_some(); // TODO: avoid calling getters, if any
     Ok(Interpreted::from(found))
 }
 
 #[allow(non_snake_case)]
-fn object_proto_toString(
-    _this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    _heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
+fn object_proto_toString(_call: CallContext, _heap: &mut Heap) -> Result<Interpreted, Exception> {
     Ok(Interpreted::from("[object Object]"))
 }
 
-fn object_proto_dbg(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    dbg!(this_ref);
-    dbg!(heap.get(this_ref));
+fn object_proto_dbg(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    dbg!(call.this_ref);
+    dbg!(heap.get(call.this_ref));
     Ok(Interpreted::VOID)
 }
 
 #[allow(non_snake_case)]
-fn object_proto_valueOf(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    _heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
+fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> Result<Interpreted, Exception> {
     // primitive wrappers are handled by their own `.valueOf()`
-    Ok(Interpreted::from(this_ref))
+    Ok(Interpreted::from(call.this_ref))
 }
 
-fn object_object_create(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let proto = (arguments.get(0))
+fn object_object_create(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let proto = (call.arguments.get(0))
         .ok_or_else(|| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
     let protoref =
         (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
-    let properties: Option<JSRef> = arguments.get(1).and_then(|props| props.to_ref(heap).ok());
+
+    let properties: Option<JSRef> = call
+        .arguments
+        .get(1)
+        .and_then(|props| props.to_ref(heap).ok());
 
     let mut object = JSObject::new();
     object.proto = protoref;
@@ -96,16 +74,11 @@ fn object_object_create(
     Ok(Interpreted::from(objref))
 }
 
-fn object_object_is(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
+fn object_object_is(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     use JSValue::*;
 
-    let left = arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let right = arguments.get(1).unwrap_or(&Interpreted::VOID);
+    let left = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let right = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
 
     let answer = match (left.to_value(heap), right.to_value(heap)) {
         (Ok(Undefined), Ok(Undefined)) => true,
@@ -128,16 +101,14 @@ fn object_object_is(
 
 #[allow(non_snake_case)]
 fn object_object_getOwnPropertyDescriptor(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
+    call: CallContext,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let inspected = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let inspected = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let inspected_ref =
         (inspected.to_ref(heap)).map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
 
-    let propname = (arguments.get(1).unwrap_or(&Interpreted::VOID))
+    let propname = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(&*heap)?
         .stringify(heap)?;
 
@@ -202,20 +173,18 @@ fn define_property(
 
 #[allow(non_snake_case)]
 fn object_object_defineProperty(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
+    call: CallContext,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let objarg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let objarg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let objref = (objarg.to_ref(heap))
         .map_err(|_| Exception::TypeErrorInstanceRequired(objarg.clone(), "Object".to_string()))?;
 
-    let prop = (arguments.get(1).unwrap_or(&Interpreted::VOID))
+    let prop = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(heap)?
         .stringify(heap)?;
 
-    let descref = (arguments.get(2).unwrap_or(&Interpreted::VOID)).to_ref(heap)?;
+    let descref = (call.arguments.get(2).unwrap_or(&Interpreted::VOID)).to_ref(heap)?;
 
     define_property(objref, prop, descref, heap)?;
     Ok(Interpreted::from(objref))
@@ -244,16 +213,14 @@ fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> Result
 
 #[allow(non_snake_case)]
 fn object_object_defineProperties(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
+    call: CallContext,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let obj_arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let objref = (obj_arg.to_ref(heap))
         .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
 
-    let desc_arg = arguments.get(1).unwrap_or(&Interpreted::VOID);
+    let desc_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
     let descs_ref = (desc_arg.to_ref(heap))
         .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
 
@@ -263,16 +230,14 @@ fn object_object_defineProperties(
 
 #[allow(non_snake_case)]
 fn object_object_setPrototypeOf(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
+    call: CallContext,
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
-    let obj_arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let objref = (obj_arg.to_ref(heap))
         .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
 
-    let proto_arg = arguments.get(1).unwrap_or(&Interpreted::VOID);
+    let proto_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
     if let Ok(protoref) = proto_arg.to_ref(heap) {
         let object = heap.get_mut(objref);
         object.proto = protoref;

@@ -1,10 +1,10 @@
 pub mod ast;
 mod builtin;
 pub mod error;
+pub mod function;
 pub mod heap;
 pub mod interpret;
 pub mod object;
-pub mod function;
 mod parse;
 pub mod source;
 #[cfg(test)]
@@ -20,5 +20,7 @@ pub type JSValue = object::JSValue;
 
 pub type Heap = heap::Heap;
 pub type JSRef = heap::JSRef;
+
+pub type CallContext = function::CallContext;
 
 pub type Exception = error::Exception;

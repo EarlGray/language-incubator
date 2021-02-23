@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use crate::ast::Identifier;
 use crate::builtin;
 use crate::error::Exception;
+use crate::function::CallContext;
 use crate::object::{
     Access,
     Content,
@@ -290,22 +291,17 @@ impl Heap {
     pub fn execute(
         &mut self,
         func_ref: JSRef,
-        this_ref: JSRef,
-        method_name: &str,
-        arguments: Vec<Interpreted>,
+        call: CallContext,
     ) -> Result<Interpreted, Exception> {
         // Yes, we do need a clone() to workaround borrow checker:
         match &self.get(func_ref).value {
-            ObjectValue::VMCall(vmcall) => {
-                vmcall
-                    .clone()
-                    .call(this_ref, method_name.to_string(), arguments, self)
-            }
-            ObjectValue::Closure(closure) => {
-                closure.clone().call(this_ref, method_name, arguments, self)
-            }
+            ObjectValue::VMCall(vmcall) => vmcall.clone().call(call, self),
+            ObjectValue::Closure(closure) => closure.clone().call(call, self),
             _ => {
-                let callee = Interpreted::member(this_ref, method_name);
+                let callee = Interpreted::Member {
+                    of: call.this_ref,
+                    name: call.method_name,
+                };
                 return Err(Exception::TypeErrorNotCallable(callee));
             }
         }

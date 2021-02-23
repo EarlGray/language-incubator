@@ -1,16 +1,46 @@
-use std::fmt;
 use std::collections::HashSet;
+use std::fmt;
 
 use crate::ast;
-use crate::interpret::Interpretable;
 use crate::error::Exception;
-use crate::heap::{Heap, JSRef};
+use crate::heap::{
+    Heap,
+    JSRef,
+};
+use crate::interpret::Interpretable;
 use crate::object::{
     Content,
     Interpreted,
     JSObject,
     JSValue,
+    ObjectValue,
 };
+
+pub struct CallContext {
+    pub this_ref: JSRef,
+    pub method_name: String,
+    pub arguments: Vec<Interpreted>,
+}
+
+impl CallContext {
+    pub fn execute(self, func_ref: JSRef, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        // Yes, we do need a clone() to workaround borrow checker:
+        match &heap.get(func_ref).value {
+            ObjectValue::VMCall(vmcall) => vmcall.clone().call(self, heap),
+            ObjectValue::Closure(closure) => closure.clone().call(self, heap),
+            _ => {
+                let callee = Interpreted::Member {
+                    of: self.this_ref,
+                    name: self.method_name,
+                };
+                return Err(Exception::TypeErrorNotCallable(callee));
+            }
+        }
+    }
+}
+
+pub type NativeFunction =
+    fn(ctx: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception>;
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.
 #[derive(Clone)]
@@ -21,14 +51,8 @@ impl VMCall {
         VMCall(f)
     }
 
-    pub fn call(
-        self,
-        this_ref: JSRef,
-        method_name: String,
-        arguments: Vec<Interpreted>,
-        heap: &mut Heap,
-    ) -> Result<Interpreted, Exception> {
-        self.0(this_ref, method_name, arguments, heap)
+    pub fn call(self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        self.0(call, heap)
     }
     pub fn ptr(&self) -> usize {
         self.0 as *const () as usize
@@ -41,13 +65,6 @@ impl fmt::Debug for VMCall {
     }
 }
 
-pub type NativeFunction = fn(
-    this_ref: JSRef,
-    method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &'_ mut Heap,
-) -> Result<Interpreted, Exception>;
-
 #[derive(Clone, Debug)]
 pub struct Closure {
     pub id: Option<ast::Identifier>,
@@ -58,16 +75,10 @@ pub struct Closure {
 }
 
 impl Closure {
-    pub fn call(
-        self,
-        this_ref: JSRef,
-        _method_name: &str,
-        arguments: Vec<Interpreted>,
-        heap: &mut Heap,
-    ) -> Result<Interpreted, Exception> {
-        let result = heap.enter_new_scope(this_ref, self.captured_scope, |heap, scoperef| {
+    pub fn call(self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap, scoperef| {
             // `arguments`
-            let argv = (arguments.iter())
+            let argv = (call.arguments.iter())
                 .map(|v| v.to_value(heap))
                 .collect::<Result<Vec<JSValue>, Exception>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
@@ -76,7 +87,7 @@ impl Closure {
 
             // set each argument
             for (i, param) in self.params.iter().enumerate() {
-                let value = (arguments.get(i))
+                let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
                 heap.get_mut(scoperef)

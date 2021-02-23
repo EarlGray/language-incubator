@@ -1,8 +1,6 @@
 use crate::error::Exception;
-use crate::heap::{
-    Heap,
-    JSRef,
-};
+use crate::function::CallContext;
+use crate::heap::Heap;
 use crate::object::{
     Content,
     Interpreted,
@@ -13,21 +11,15 @@ use crate::object::{
 /*
  *  parseInt
  */
-fn parse_int(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let argument = arguments.get(0).unwrap_or(&Interpreted::VOID);
+fn parse_int(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
     if let JSValue::Number(_) = value {
         return Ok(Interpreted::Value(value));
     }
-
     let value = value.stringify(heap)?;
 
-    let radix = arguments.get(1).unwrap_or(&Interpreted::VOID);
+    let radix = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
     let radix = radix.to_value(heap)?.numberify(heap);
     let mut radix = radix.unwrap_or(0.0) as u32;
     if radix == 0 {

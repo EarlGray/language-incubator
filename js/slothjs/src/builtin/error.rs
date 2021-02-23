@@ -1,8 +1,6 @@
 use crate::error::Exception;
-use crate::heap::{
-    Heap,
-    JSRef,
-};
+use crate::function::CallContext;
+use crate::heap::Heap;
 use crate::object::{
     Content,
     Interpreted,
@@ -10,13 +8,8 @@ use crate::object::{
     JSValue,
 };
 
-fn error_constructor(
-    _this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &'_ mut Heap,
-) -> Result<Interpreted, Exception> {
-    let message = (arguments.get(0))
+fn error_constructor(call: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception> {
+    let message = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?
         .stringify(heap)?;
@@ -36,21 +29,16 @@ fn error_constructor(
 }
 
 #[allow(non_snake_case)]
-fn error_proto_toString(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    heap: &'_ mut Heap,
-) -> Result<Interpreted, Exception> {
-    this_ref.expect_instance("Error", heap)?;
+fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception> {
+    call.this_ref.expect_instance("Error", heap)?;
 
-    let name = (heap.get(this_ref))
+    let name = (heap.get(call.this_ref))
         .lookup_value("name", heap)
         .map(|v| v.clone())
         .unwrap_or(JSValue::from(""))
         .stringify(heap)?;
 
-    let message = (heap.get(this_ref))
+    let message = (heap.get(call.this_ref))
         .lookup_value("message", heap)
         .map(|v| v.clone())
         .unwrap_or(JSValue::from(""))

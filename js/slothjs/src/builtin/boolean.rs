@@ -1,3 +1,4 @@
+use crate::function::CallContext;
 use crate::object::{
     Content,
     Interpreted,
@@ -10,21 +11,16 @@ use crate::{
     JSRef,
 };
 
-fn boolean_constructor(
-    this_ref: JSRef,
-    _method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+fn boolean_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let arg = arg.to_value(heap)?;
     let arg = arg.boolify(heap);
 
-    if !heap.smells_fresh(this_ref) {
+    if !heap.smells_fresh(call.this_ref) {
         return Ok(Interpreted::from(arg));
     }
 
-    *heap.get_mut(this_ref) = JSObject::from_bool(arg);
+    *heap.get_mut(call.this_ref) = JSObject::from_bool(arg);
     Ok(Interpreted::VOID)
 }
 
@@ -40,24 +36,14 @@ fn object_to_bool(this_ref: JSRef, heap: &Heap) -> Result<bool, Exception> {
 }
 
 #[allow(non_snake_case)]
-fn boolean_proto_toString(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let b = object_to_bool(this_ref, heap)?;
+fn boolean_proto_toString(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let b = object_to_bool(call.this_ref, heap)?;
     Ok(Interpreted::from(if b { "true" } else { "false" }))
 }
 
 #[allow(non_snake_case)]
-fn boolean_proto_valueOf(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let b = object_to_bool(this_ref, heap)?;
+fn boolean_proto_valueOf(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let b = object_to_bool(call.this_ref, heap)?;
     Ok(Interpreted::from(b))
 }
 

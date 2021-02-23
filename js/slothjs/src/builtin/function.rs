@@ -1,5 +1,6 @@
 /// The implementation of the Function object.
 use crate::error::Exception;
+use crate::function::CallContext;
 use crate::heap::{
     Heap,
     JSRef,
@@ -10,39 +11,28 @@ use crate::object::{
     JSObject,
 };
 
-fn function_constructor(
-    _this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    _heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
+fn function_constructor(_call: CallContext, _heap: &mut Heap) -> Result<Interpreted, Exception> {
     todo!()
 }
 
-fn function_proto_call(
-    this_ref: JSRef,
-    method_name: String,
-    mut arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    if arguments.len() == 0 {
-        arguments.push(Interpreted::VOID);
+fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    if call.arguments.len() == 0 {
+        call.arguments.push(Interpreted::VOID);
     }
-    arguments.rotate_left(1); // [this, arg1, .. , argN] => [arg1, .. , argN, this]
-    let this_arg = arguments.pop().unwrap();
+    call.arguments.rotate_left(1); // [this, arg1, .. , argN] => [arg1, .. , argN, this]
+    let this_arg = call.arguments.pop().unwrap();
     let bound_this = this_arg.to_ref(heap).unwrap_or(Heap::NULL);
-    heap.execute(this_ref, bound_this, &method_name, arguments)
+
+    let funcref = call.this_ref;
+    call.this_ref = bound_this;
+
+    call.execute(funcref, heap)
 }
 
-fn function_proto_apply(
-    this_ref: JSRef,
-    method_name: String,
-    arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let this_arg = arguments.get(0).unwrap_or(&Interpreted::VOID);
+fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let this_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let bound_this = this_arg.to_ref(heap)?;
-    let call_args = match arguments.get(1) {
+    let call_args = match call.arguments.get(1) {
         // TODO: convert from everything array-like.
         Some(object) => {
             let objref = object.to_ref(heap)?;
@@ -55,7 +45,14 @@ fn function_proto_apply(
         }
         None => Vec::new(),
     };
-    heap.execute(this_ref, bound_this, &method_name, call_args)
+
+    let funcref = call.this_ref;
+    CallContext {
+        this_ref: bound_this,
+        method_name: call.method_name,
+        arguments: call_args,
+    }
+    .execute(funcref, heap)
 }
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {

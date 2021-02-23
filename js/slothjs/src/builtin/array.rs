@@ -1,4 +1,5 @@
 use crate::error::Exception;
+use crate::function::CallContext;
 use crate::heap::{
     Heap,
     JSRef,
@@ -10,24 +11,17 @@ use crate::object::{
 };
 
 fn array_object_constructor(
-    _this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
+    _call: CallContext,
     _heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     todo!()
 }
 
 #[allow(non_snake_case)]
-fn array_toString(
-    this_ref: JSRef,
-    _method_name: String,
-    _arguments: Vec<Interpreted>,
-    heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
-    let array_object = heap.get(this_ref);
+fn array_toString(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let array_object = heap.get(call.this_ref);
     let array = (array_object.as_array()).ok_or(Exception::TypeErrorInstanceRequired(
-        Interpreted::from(this_ref),
+        Interpreted::from(call.this_ref),
         "Array".to_string(),
     ))?;
     let array = array.storage.clone();
