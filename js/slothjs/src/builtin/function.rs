@@ -51,6 +51,7 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interprete
         this_ref: bound_this,
         method_name: call.method_name,
         arguments: call_args,
+        loc: heap.loc.clone(),
     }
     .execute(funcref, heap)
 }

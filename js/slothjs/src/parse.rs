@@ -472,8 +472,9 @@ impl ParseFrom for ExpressionStatement {
 
 impl ParseFrom for Expression {
     fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
-        let expr_type = source.get_str("type")?;
+        let loc = source.get_location().map(|loc| Box::new(loc));
 
+        let expr_type = source.get_str("type")?;
         let expr = match expr_type {
             "ArrayExpression" => {
                 let jelements = source.get_array("elements")?;
@@ -581,7 +582,7 @@ impl ParseFrom for Expression {
                 })
             }
         };
-        Ok(Expression { expr, loc: None })
+        Ok(Expression { expr, loc })
     }
 }
 

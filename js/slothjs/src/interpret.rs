@@ -38,6 +38,7 @@ impl Interpretable for Program {
 
 impl Interpretable for Statement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        heap.loc = self.loc.clone();
         match &self.stmt {
             Stmt::Empty => Ok(Interpreted::VOID),
             Stmt::Expr(stmt) => stmt.interpret(heap),
@@ -322,7 +323,8 @@ impl Interpretable for ThrowStatement {
         let ThrowStatement(exc_expr) = self;
         let exc_value = exc_expr.interpret(heap)?;
         let exc_value = exc_value.to_value(heap)?;
-        Err(Exception::UserThrown(exc_value))
+
+        heap.throw(Exception::UserThrown(exc_value))
     }
 }
 
@@ -390,6 +392,7 @@ impl Interpretable for FunctionDeclaration {
 
 impl Interpretable for Expression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        heap.loc = self.loc.clone();
         match &self.expr {
             Expr::Literal(expr) => expr.interpret(heap),
             Expr::Identifier(expr) => expr.interpret(heap),
@@ -684,6 +687,7 @@ impl Interpretable for AssignmentExpression {
 impl Interpretable for CallExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let CallExpression(callee_expr, argument_exprs) = self;
+        let loc = heap.loc.clone();
 
         let arguments = (argument_exprs.iter())
             .map(|argexpr| argexpr.interpret(heap))
@@ -697,6 +701,7 @@ impl Interpretable for CallExpression {
             this_ref,
             method_name,
             arguments,
+            loc,
         };
         call.execute(func_ref, heap)
     }
@@ -705,6 +710,8 @@ impl Interpretable for CallExpression {
 impl Interpretable for NewExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let NewExpression(callee_expr, argument_exprs) = self;
+
+        let loc = heap.loc.clone();
 
         let arguments = (argument_exprs.iter())
             .map(|expr| expr.interpret(heap))
@@ -728,6 +735,7 @@ impl Interpretable for NewExpression {
             this_ref: object_ref,
             method_name: "<constructor>".to_string(),
             arguments,
+            loc,
         };
         let result = call.execute(funcref, heap)?;
         match result {

@@ -16,11 +16,13 @@ use crate::object::{
     JSValue,
     ObjectValue,
 };
+use crate::source;
 
 pub struct CallContext {
     pub this_ref: JSRef,
     pub method_name: String,
     pub arguments: Vec<Interpreted>,
+    pub loc: Option<Box<source::Location>>,
 }
 
 impl CallContext {
@@ -78,13 +80,13 @@ pub struct Closure {
 
 impl Closure {
     pub fn call(&self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap, scoperef| {
+        let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap| {
             // `arguments`
             let argv = (call.arguments.iter())
                 .map(|v| v.to_value(heap))
                 .collect::<Result<Vec<JSValue>, Exception>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
-            heap.get_mut(scoperef)
+            heap.scope_mut()
                 .set_nonconf("arguments", Content::from(arguments_ref))?;
 
             // set each argument
@@ -92,10 +94,11 @@ impl Closure {
                 let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
-                heap.get_mut(scoperef)
+                heap.scope_mut()
                     .set_nonconf(param.as_str(), Content::Value(value))?;
             }
-            // TODO: save caller site into the new scope
+
+            let _ = source::save_caller(call.loc.clone(), heap);
 
             heap.declare(self.variables.iter(), self.functions.iter())?;
 
