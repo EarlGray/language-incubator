@@ -4,6 +4,7 @@ pub mod error;
 pub mod heap;
 pub mod interpret;
 pub mod object;
+pub mod function;
 mod parse;
 pub mod source;
 #[cfg(test)]

@@ -2,7 +2,7 @@ use crate::ast::*; // yes, EVERYTHING
 
 use crate::error::Exception;
 use crate::heap::Heap;
-use crate::object;
+use crate::function::Closure;
 use crate::object::{
     Access,
     Content,
@@ -728,7 +728,7 @@ impl Interpretable for NewExpression {
 
 impl Interpretable for FunctionExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let closure = object::Closure {
+        let closure = Closure {
             id: self.id.clone(),
             params: self.params.clone(),
             body: self.body.clone(),
