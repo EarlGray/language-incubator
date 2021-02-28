@@ -356,7 +356,7 @@ impl Heap {
         }
     }
 
-    pub fn throw(&mut self, exc: Exception) -> Result<Interpreted, Exception> {
+    pub fn throw<T>(&self, exc: Exception) -> Result<T, Exception> {
         // TODO: capture the stack
         //let _ = source::print_callstack(self);
         Err(exc)

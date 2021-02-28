@@ -66,7 +66,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
     Ok(())
 }
 
-pub fn print_callstack(heap: &mut Heap) -> Result<(), Exception> {
+pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
     let loc = heap.loc.clone();
     eprintln!("{:?}", loc);
 

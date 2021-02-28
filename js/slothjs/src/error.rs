@@ -42,6 +42,12 @@ pub enum Exception {
     UserThrown(JSValue),
 }
 
+impl Exception {
+    pub fn instance_required(arg: &Interpreted, of: &str) -> Exception {
+        Exception::TypeErrorInstanceRequired(arg.clone(), of.to_string())
+    }
+}
+
 pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
     match e {
         Exception::TypeErrorSetReadonly(_, _) => Ok(()),
