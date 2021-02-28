@@ -412,6 +412,15 @@ fn test_scope() {
         Object.getOwnPropertyDescriptor(this, 'a').configurable
     "#, false);
 
+    // function hoisting
+    assert_eval!(r#"
+        // unlike variables, functions are declared *and* *initialized* when entering a scope.
+        var a = false;
+        hoisted();
+        function hoisted() { a = true; }
+        a
+    "#, true);
+
     // closures
     assert_eval!(r#"
         var adder = function(y) { return function(x) { return x + y + z; } };
