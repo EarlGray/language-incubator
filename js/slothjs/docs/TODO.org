@@ -16,7 +16,7 @@
 * DONE [2020-12-31 Thu] make it a library
 * DONE [2021-01-01 Fri] a repl executable
 * TODO move tests to =tests/=
-* TODO proper variable/declaration scopes
+* TODO proper variable/declaration scopes [3/5]
 ** DONE [2021-02-13 Sat] variable hoisting
 ** DONE [2021-02-13 Sat] assignment to an outer variable
 ** DONE [2021-02-13 Sat] free-variables analysis for closures
@@ -31,7 +31,7 @@
 ** DONE [2021-01-04 Mon] =delete=
 * DONE [2021-02-06 Sat] SequenceExpression
 * DONE [2021-02-06 Sat] SwitchStatement
-* DONE [2021-02-07 Sun] BinaryExpression
+* DONE [2021-02-07 Sun] BinaryExpression [17/17]
 ** DONE [2020-12-30 Wed] ~==~ Abstract Equality Comparison
 ** DONE [2020-12-22 Tue] ~<~ Abstract Relationl Comparison
 ** DONE [2021-01-13 Wed] ~+~ between all types
@@ -49,7 +49,7 @@
 ** DONE [2021-02-07 Sun] =<<=
 ** DONE [2021-02-07 Sun] =>>=
 ** DONE [2021-02-07 Sun] =>>>=
-* DONE [2021-02-07 Sun] AssignmentExpression
+* DONE [2021-02-07 Sun] AssignmentExpression [7/7]
 ** DONE [2020-12-21 Mon] ~=~
 ** DONE [2021-01-02 Sat] ~+=~
 ** DONE [2021-01-15 Fri] ~-=~
@@ -57,14 +57,14 @@
 ** DONE [2021-02-07 Sun] ~/=~
 ** DONE [2021-02-07 Sun] ~&=~
 ** DONE [2021-02-07 Sun] ~|=~
-* TODO user exceptions
+* TODO user exceptions [3/4]
 ** DONE [2021-01-27 Wed] =throw=
 ** DONE [2021-01-28 Thu] =try=, =catch=, =finally=
 ** DONE [2021-01-31 Sun] =Error= objects
 ** TODO stacktraces with source locations
 * TODO =Symbol= primitive
-* TODO builtin =Object=
-** TODO static methods
+* TODO builtin =Object= [0/2]
+** TODO static methods [5/20]
 *** DONE [2021-01-05 Tue] .getOwnPropertyDescriptor
 *** DONE [2021-01-08 Fri] .is()
 *** DONE [2021-01-18 Mon] Object() constructor
@@ -85,7 +85,7 @@
 *** TODO .isExtensible()
 *** TODO .seal()
 *** TODO .isSealed()
-** TODO Object.prototype
+** TODO Object.prototype [4/6]
 *** DONE [2021-01-05 Tue] create it!
 *** DONE [2021-01-08 Fri] .constructor
 *** DONE [2021-01-18 Mon] .valueOf()
@@ -95,7 +95,7 @@
 * TODO builtin =Function=
 ** DONE [2021-01-06 Wed] =src/builtin/function.rs=
 ** TODO static methods
-** TODO Function.prototype
+** TODO Function.prototype [3/5]
 *** DONE [2021-01-17 Sun] .constructor
 *** DONE [2021-01-20 Wed] .call()
 *** DONE [2021-01-20 Wed] .apply()
@@ -104,11 +104,11 @@
 * TODO builtin =Array=
 ** DONE [2021-01-10 Sun] =src/builtin/array.rs=
 ** DONE [2021-01-15 Fri] (de)serialization
-** TODO Array static methods
+** TODO Array static methods [0/3]
 *** TODO Array.from
 *** TODO Array.of
 *** TODO Array.isArray()
-** TODO Array.prototype
+** TODO Array.prototype [1/3]
 *** DONE [2021-01-16 Sat] .toString()
 *** TODO .length
 *** TODO ...everything else
@@ -116,14 +116,14 @@
 * TODO builtin arrays
 ** DONE [2021-01-11 Mon] ArrayExpression
 ** DONE [2021-01-11 Mon] array members get/assign
-* TODO builtin functions
+* TODO builtin functions [0/3]
 ** TODO =parseInt=
 ** TODO =eval=
 ** TODO =isNaN=
 * MAYBE builtin =assert= object
 * MAYBE =console= in sljs
   This is I/O and should not live in the interpreter core.
-* TODO builtin primitive wrappers
+* TODO builtin primitive wrappers [1/3]
 ** DONE [2021-01-20 Wed] =Boolean=
 *** DONE [2021-01-20 Wed] scaffolding in =src/builtin/boolean.rs=
 *** DONE [2021-01-20 Wed] Boolean constructor, =Object(true)=
@@ -149,7 +149,7 @@
 **** TODO .indexOf()
 **** TODO .lastIndexOf()
 **** TODO ...
-* DONE [2021-01-01 Fri] function calls
+* DONE [2021-01-01 Fri] function calls [3/3]
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
 ** DONE [2021-01-23 Sat] array member calls: ~a[0]()~

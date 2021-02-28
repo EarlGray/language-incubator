@@ -12,6 +12,11 @@ use crate::{
     JSRef,
 };
 
+fn object_reference(arg: &Interpreted, heap: &Heap) -> Result<JSRef, Exception> {
+    arg.to_ref(heap)
+        .or_else(|_| heap.throw(Exception::instance_required(arg, "Object")))
+}
+
 fn object_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
@@ -54,12 +59,10 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> Result<Interpret
 fn object_object_create(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let proto = (call.arguments.get(0))
         .ok_or_else(|| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
-    let protoref =
-        (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
+    let protoref = (proto.to_ref(heap))
+        .map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
 
-    let properties: Option<JSRef> = call
-        .arguments
-        .get(1)
+    let properties: Option<JSRef> = (call.arguments.get(1))
         .and_then(|props| props.to_ref(heap).ok());
 
     let mut object = JSObject::new();
@@ -105,14 +108,14 @@ fn object_object_getOwnPropertyDescriptor(
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let inspected = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let inspected_ref =
-        (inspected.to_ref(heap)).map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
+    let inspected_ref = (inspected.to_ref(heap))
+        .map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
 
     let propname = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(&*heap)?
         .stringify(heap)?;
 
-    let inspected_object = heap.get_mut(inspected_ref);
+    let inspected_object = heap.get(inspected_ref);
     let prop = match inspected_object.properties.get(&propname) {
         Some(prop) => prop.clone(),
         None => return Ok(Interpreted::VOID),
@@ -177,8 +180,7 @@ fn object_object_defineProperty(
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let objarg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = (objarg.to_ref(heap))
-        .map_err(|_| Exception::TypeErrorInstanceRequired(objarg.clone(), "Object".to_string()))?;
+    let objref = object_reference(objarg, heap)?;
 
     let prop = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(heap)?
@@ -217,12 +219,10 @@ fn object_object_defineProperties(
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = (obj_arg.to_ref(heap))
-        .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
+    let objref = object_reference(obj_arg, heap)?;
 
     let desc_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
-    let descs_ref = (desc_arg.to_ref(heap))
-        .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
+    let descs_ref = object_reference(desc_arg, heap)?;
 
     define_properties(objref, descs_ref, heap)?;
     Ok(Interpreted::from(objref))
@@ -234,8 +234,7 @@ fn object_object_setPrototypeOf(
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = (obj_arg.to_ref(heap))
-        .map_err(|_| Exception::TypeErrorInstanceRequired(obj_arg.clone(), "Object".to_string()))?;
+    let objref = object_reference(obj_arg, heap)?;
 
     let proto_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
     if let Ok(protoref) = proto_arg.to_ref(heap) {
