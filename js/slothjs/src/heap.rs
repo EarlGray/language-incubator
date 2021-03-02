@@ -1,10 +1,13 @@
-use std::collections::HashSet;
 use std::convert::TryFrom;
 
-use crate::ast::Identifier;
+use crate::ast::{
+    FunctionDeclaration,
+    Identifier,
+};
 use crate::builtin;
 use crate::error::Exception;
 use crate::function::CallContext;
+use crate::interpret::Interpretable;
 use crate::object::{
     Access,
     Content,
@@ -153,13 +156,30 @@ impl Heap {
         self.get_mut(scope_ref)
     }
 
-    pub fn declare_variables(&mut self, variables: &HashSet<Identifier>) -> Result<(), Exception> {
-        for var in variables.iter() {
-            let name = var.as_str();
-            if !self.scope().properties.contains_key(name) {
-                let content = Content::Value(JSValue::Undefined);
-                self.scope_mut().set(name, content, Access::NONCONF)?;
-            }
+    fn declare_variable(&mut self, var: &Identifier) -> Result<(), Exception> {
+        let name = var.as_str();
+        if !self.scope().properties.contains_key(name) {
+            let content = Content::Value(JSValue::Undefined);
+            self.scope_mut().set(name, content, Access::NONCONF)?;
+        }
+        Ok(())
+    }
+
+    pub fn declare<'a>(
+        &mut self,
+        variables: impl Iterator<Item = &'a Identifier>,
+        functions: impl Iterator<Item = &'a FunctionDeclaration>,
+    ) -> Result<(), Exception> {
+        for var in variables {
+            self.declare_variable(&var)?;
+        }
+        for func in functions {
+            let name = &func.id;
+            self.declare_variable(name)?;
+
+            let closure = func.function.interpret(self)?;
+            let closure = closure.to_value(self)?;
+            self.scope_mut().update(name.as_str(), closure)?;
         }
         Ok(())
     }

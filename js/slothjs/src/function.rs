@@ -70,6 +70,7 @@ pub struct Closure {
     pub id: Option<ast::Identifier>,
     pub params: Vec<ast::Identifier>, // cannot be a set, needs order
     pub variables: HashSet<ast::Identifier>,
+    pub functions: Vec<ast::FunctionDeclaration>,
     pub body: ast::BlockStatement,
     pub captured_scope: JSRef, // TODO: capture free variables only
 }
@@ -95,7 +96,7 @@ impl Closure {
             }
             // TODO: save caller site into the new scope
 
-            heap.declare_variables(&self.variables)?;
+            heap.declare(self.variables.iter(), self.functions.iter())?;
 
             self.body.interpret(heap)
         });

@@ -9,6 +9,7 @@ use crate::source;
 pub struct Program {
     pub body: Vec<Statement>,           // TODO: Either<Statement, Directive>
     pub variables: HashSet<Identifier>, // The set of scope variables
+    pub functions: Vec<FunctionDeclaration>,
 }
 
 // ==============================================
@@ -245,6 +246,7 @@ pub struct FunctionExpression {
     pub id: Option<Identifier>,
     pub params: Vec<Pattern>,           // cannot be a HashSet, needs order
     pub variables: HashSet<Identifier>, // the set of local variables
+    pub functions: Vec<FunctionDeclaration>, // the set of declared functions
     pub free_variables: HashSet<Identifier>,
     pub body: BlockStatement,
     pub is_generator: bool,

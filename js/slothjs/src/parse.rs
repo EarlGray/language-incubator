@@ -12,6 +12,7 @@ use crate::source;
 pub struct ParserContext {
     pub used_variables: HashSet<Identifier>,
     pub declared_variables: HashSet<Identifier>,
+    pub declared_functions: Vec<FunctionDeclaration>,
 }
 
 impl ParserContext {
@@ -19,6 +20,7 @@ impl ParserContext {
         ParserContext {
             used_variables: HashSet::new(),
             declared_variables: HashSet::new(),
+            declared_functions: Vec::new(),
         }
     }
 }
@@ -114,8 +116,16 @@ impl Program {
             .map(|jstmt| Statement::parse_from(jstmt, &mut ctx))
             .collect::<Result<Vec<Statement>, ParseError<JSON>>>()?;
 
-        let variables = ctx.declared_variables;
-        Ok(Program { body, variables })
+        let ParserContext {
+            declared_variables: variables,
+            declared_functions: functions,
+            ..
+        } = ctx;
+        Ok(Program {
+            body,
+            variables,
+            functions,
+        })
     }
 }
 
@@ -472,8 +482,9 @@ impl ParseFrom<JSON> for FunctionDeclaration {
             attr: "id",
             value: value.clone(),
         })?;
-        ctx.declared_variables.insert(id.clone());
-        Ok(FunctionDeclaration { id, function })
+        let funcdecl = FunctionDeclaration { id, function };
+        ctx.declared_functions.push(funcdecl.clone());
+        Ok(funcdecl)
     }
 }
 
@@ -848,6 +859,7 @@ impl ParseFrom<JSON> for FunctionExpression {
         let ParserContext {
             used_variables: mut free_variables,
             declared_variables: variables,
+            declared_functions: functions,
         } = inner_ctx;
 
         free_variables.remove(&Identifier::from("arguments"));
@@ -862,6 +874,7 @@ impl ParseFrom<JSON> for FunctionExpression {
             id,
             params,
             variables,
+            functions,
             free_variables,
             body,
             is_generator: json_get_bool(jexpr, "generator").unwrap_or(false),

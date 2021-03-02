@@ -24,8 +24,9 @@ pub trait Interpretable {
 
 impl Interpretable for Program {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        heap.declare(self.variables.iter(), self.functions.iter())?;
+
         let mut result = Interpreted::VOID;
-        heap.declare_variables(&self.variables)?;
         for stmt in self.body.iter() {
             result = stmt.interpret(heap)?;
         }
@@ -364,6 +365,7 @@ impl Interpretable for TryStatement {
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         for decl in self.declarations.iter() {
+            // compute and assign the initializer value:
             let optinit = (decl.init.as_ref())
                 .map(|initexpr| initexpr.interpret(heap))
                 .transpose()?;
@@ -380,13 +382,8 @@ impl Interpretable for VariableDeclaration {
 }
 
 impl Interpretable for FunctionDeclaration {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let function_ref = self.function.interpret(heap)?;
-
-        let value = function_ref.to_value(heap)?;
-        heap.scope_mut()
-            .update(self.id.as_str(), value)
-            .or_else(crate::error::ignore_set_readonly)?;
+    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+        // no-op: the work in done in Closure::call()
         Ok(Interpreted::VOID)
     }
 }
@@ -747,6 +744,7 @@ impl Interpretable for FunctionExpression {
             params: self.params.clone(),
             body: self.body.clone(),
             variables: self.variables.clone(),
+            functions: self.functions.clone(),
             captured_scope: heap.local_scope().unwrap_or(Heap::NULL),
         };
 
