@@ -8,6 +8,9 @@ use crate::error::ParseError;
 use crate::object::JSON;
 use crate::source;
 
+type ParseResult<T, S> = Result<T, ParseError<S>>;
+
+/// `ParserContext` collects lexical scope information to be used later.
 #[derive(Debug)]
 pub struct ParserContext {
     pub used_variables: HashSet<Identifier>,
@@ -25,96 +28,122 @@ impl ParserContext {
     }
 }
 
-trait ParseFrom<T> {
-    type Error;
+/// `ParseFrom` is a unifying interface for constructing all `ast::*` types.
+///
+/// It's not strictly necessary, `impl ast::X { fn parse_from(...) -> ParseResult<X> {...} }`
+/// would do just fine. On the other hand, it feels like a good idea to have all of these
+/// to conform to one interface.
+trait ParseFrom: Sized {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S>;
+}
 
-    fn parse_from(source: &T, ctx: &mut ParserContext) -> Result<Self, Self::Error>
+/// `SourceNode` is how `ParseFrom::parse_from` sees AST nodes.
+pub trait SourceNode: Sized + Clone {
+    /// Make the node into a literal.
+    fn get_literal(&self) -> Literal;
+
+    /// Try to get source mapping for `self`.
+    fn get_location(&self) -> Option<source::Location>;
+
+    /// Get a child node with this name; it's a ParseError if it does not exist.
+    fn get_node(&self, property: &'static str) -> ParseResult<&Self, Self>;
+
+    /// Get a child node with this name; if it does not exist, return None.
+    /// Then transform it through `action`, propagating its Result out.
+    fn map_node<T, F>(&self, property: &'static str, action: F) -> ParseResult<Option<T>, Self>
     where
-        Self: Sized;
+        F: FnMut(&Self) -> ParseResult<T, Self>;
+
+    /// Get the boolean value of a child node with name `property`.
+    /// It's a ParseError if it does not exist or does not have a boolean meaning.
+    fn get_bool(&self, property: &'static str) -> ParseResult<bool, Self>;
+
+    /// Get the string value of a child node with name `property`.
+    /// It's a ParseError if it does not exist or does not have a string meaning.
+    fn get_str(&self, property: &'static str) -> ParseResult<&str, Self>;
+
+    /// Get the array of children of a child node with name `property`.
+    /// It's a ParseError if it does not exist or does not have an array meaning.
+    fn get_array(&self, property: &'static str) -> ParseResult<&[Self], Self>;
+
+    /// Check that the value of `property` is a string equal to `value`.
+    fn expect_str(&self, property: &'static str, value: &'static str) -> ParseResult<(), Self>;
 }
 
-/*
- *  JSON helpers
- */
-
-fn json_get<'a>(json: &'a JSON, property: &'static str) -> Result<&'a JSON, ParseError<JSON>> {
-    json.get(property).ok_or(ParseError::ObjectWithout {
-        attr: property,
-        value: json.clone(),
-    })
-}
-
-fn json_get_bool<'a>(json: &'a JSON, property: &'static str) -> Result<bool, ParseError<JSON>> {
-    let jbool = json_get(json, property)?;
-    jbool.as_bool().ok_or(ParseError::ShouldBeBool {
-        value: jbool.clone(),
-    })
-}
-
-fn json_get_str<'a>(json: &'a JSON, property: &'static str) -> Result<&'a str, ParseError<JSON>> {
-    let jstr = json_get(json, property)?;
-    jstr.as_str().ok_or(ParseError::ShouldBeString {
-        value: jstr.clone(),
-    })
-}
-
-fn json_get_array<'a>(
-    json: &'a JSON,
-    property: &'static str,
-) -> Result<&'a Vec<JSON>, ParseError<JSON>> {
-    let jarray = json_get(json, property)?;
-    jarray.as_array().ok_or(ParseError::ShouldBeArray {
-        value: jarray.clone(),
-    })
-}
-
-/// maps `null` into None, an object into Some(T) using a closure.
-fn json_map_object<'a, T, F>(json: &'a JSON, mut action: F) -> Result<Option<T>, ParseError<JSON>>
-where
-    F: FnMut(&JSON) -> Result<T, ParseError<JSON>>,
-{
-    match json {
-        JSON::Null => Ok(None),
-        JSON::Object(_) => {
-            let value = action(json)?;
-            Ok(Some(value))
-        }
-        _ => {
-            let want = "null | object";
-            let value = json.clone();
-            Err(ParseError::UnexpectedValue { want, value })
-        }
+impl SourceNode for JSON {
+    fn get_literal(&self) -> Literal {
+        Literal(self.clone())
     }
-}
 
-fn json_expect_str<'a>(
-    json: &'a JSON,
-    property: &'static str,
-    value: &'static str,
-) -> Result<(), ParseError<JSON>> {
-    let jstr = json_get(json, property)?;
-    let got = jstr.as_str().ok_or(ParseError::ShouldBeString {
-        value: jstr.clone(),
-    })?;
-    if got == value {
-        Ok(())
-    } else {
-        Err(ParseError::UnexpectedValue {
-            want: value,
+    fn get_location(&self) -> Option<source::Location> {
+        // TODO: clone() can be costly
+        serde_json::from_value::<source::Location>(self.clone()).ok()
+    }
+
+    fn get_node(&self, property: &'static str) -> ParseResult<&Self, Self> {
+        self.get(property).ok_or_else(|| ParseError::ObjectWithout {
+            attr: property,
+            value: self.clone(),
+        })
+    }
+
+    fn map_node<T, F>(&self, property: &'static str, mut action: F) -> ParseResult<Option<T>, Self>
+    where
+        F: FnMut(&Self) -> ParseResult<T, Self>,
+    {
+        let result = match self.get(property) {
+            Some(child) if !child.is_null() => Some(action(child)?),
+            _ => None,
+        };
+        Ok(result)
+    }
+
+    fn get_bool(&self, property: &'static str) -> ParseResult<bool, Self> {
+        let jbool = self.get_node(property)?;
+        jbool.as_bool().ok_or_else(|| ParseError::ShouldBeBool {
+            value: jbool.clone(),
+        })
+    }
+
+    fn get_str(&self, property: &'static str) -> ParseResult<&str, Self> {
+        let jstr = self.get_node(property)?;
+        jstr.as_str().ok_or_else(|| ParseError::ShouldBeString {
             value: jstr.clone(),
         })
+    }
+
+    fn get_array(&self, property: &'static str) -> ParseResult<&[Self], Self> {
+        let jarray = self.get_node(property)?;
+        let array = jarray.as_array().ok_or_else(|| ParseError::ShouldBeArray {
+            value: jarray.clone(),
+        })?;
+        Ok(&array[..])
+    }
+
+    fn expect_str(&self, property: &'static str, value: &'static str) -> ParseResult<(), Self> {
+        let jstr = self.get_node(property)?;
+        let got = jstr.as_str().ok_or_else(|| ParseError::ShouldBeString {
+            value: jstr.clone(),
+        })?;
+        if got != value {
+            return Err(ParseError::UnexpectedValue {
+                want: value,
+                value: jstr.clone(),
+            });
+        }
+        Ok(())
     }
 }
 
 impl Program {
-    pub fn parse_from(json: &JSON) -> Result<Program, ParseError<JSON>> {
-        json_expect_str(json, "type", "Program")?;
+    pub fn parse_from<S: SourceNode>(source: &S) -> ParseResult<Program, S> {
+        source.expect_str("type", "Program")?;
 
         let mut ctx = ParserContext::new();
-        let jbody = json_get_array(json, "body")?;
+        let jbody = source.get_array("body")?;
         let body = (jbody.into_iter())
             .map(|jstmt| Statement::parse_from(jstmt, &mut ctx))
-            .collect::<Result<Vec<Statement>, ParseError<JSON>>>()?;
+            .collect::<Result<Vec<Statement>, _>>()?;
 
         let ParserContext {
             declared_variables: variables,
@@ -129,48 +158,47 @@ impl Program {
     }
 }
 
-impl ParseFrom<JSON> for Statement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for Statement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let loc = source.get_location().map(|loc| Box::new(loc));
 
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let typ = json_get_str(json, "type")?;
-        let loc = serde_json::from_value::<Box<source::Location>>(json.clone()).ok(); // TODO: clone() can be costly
+        let typ = source.get_str("type")?;
         let stmt = match typ {
-            "BlockStatement" => Stmt::Block(BlockStatement::parse_from(json, ctx)?),
-            "BreakStatement" => Stmt::Break(BreakStatement::parse_from(json, ctx)?),
-            "ContinueStatement" => Stmt::Continue(ContinueStatement::parse_from(json, ctx)?),
+            "BlockStatement" => Stmt::Block(BlockStatement::parse_from(source, ctx)?),
+            "BreakStatement" => Stmt::Break(BreakStatement::parse_from(source, ctx)?),
+            "ContinueStatement" => Stmt::Continue(ContinueStatement::parse_from(source, ctx)?),
             "DoWhileStatement" => {
-                let mut stmt = ForStatement::parse_from(json, ctx)?;
+                let mut stmt = ForStatement::parse_from(source, ctx)?;
                 stmt.init = stmt.body.clone();
                 Stmt::For(Box::new(stmt))
             }
             "EmptyStatement" => Stmt::Empty,
-            "ExpressionStatement" => Stmt::Expr(ExpressionStatement::parse_from(json, ctx)?),
+            "ExpressionStatement" => Stmt::Expr(ExpressionStatement::parse_from(source, ctx)?),
             "ForStatement" | "WhileStatement" => {
-                let stmt = ForStatement::parse_from(json, ctx)?;
+                let stmt = ForStatement::parse_from(source, ctx)?;
                 Stmt::For(Box::new(stmt))
             }
             "ForInStatement" => {
-                let stmt = ForInStatement::parse_from(json, ctx)?;
+                let stmt = ForInStatement::parse_from(source, ctx)?;
                 Stmt::ForIn(Box::new(stmt))
             }
-            "FunctionDeclaration" => Stmt::Function(FunctionDeclaration::parse_from(json, ctx)?),
+            "FunctionDeclaration" => Stmt::Function(FunctionDeclaration::parse_from(source, ctx)?),
             "IfStatement" => {
-                let stmt = IfStatement::parse_from(json, ctx)?;
+                let stmt = IfStatement::parse_from(source, ctx)?;
                 Stmt::If(Box::new(stmt))
             }
             "LabeledStatement" => {
-                let stmt = LabelStatement::parse_from(json, ctx)?;
+                let stmt = LabelStatement::parse_from(source, ctx)?;
                 Stmt::Label(Box::new(stmt))
             }
-            "ReturnStatement" => Stmt::Return(ReturnStatement::parse_from(json, ctx)?),
-            "SwitchStatement" => Stmt::Switch(SwitchStatement::parse_from(json, ctx)?),
-            "ThrowStatement" => Stmt::Throw(ThrowStatement::parse_from(json, ctx)?),
-            "TryStatement" => Stmt::Try(TryStatement::parse_from(json, ctx)?),
-            "VariableDeclaration" => Stmt::Variable(VariableDeclaration::parse_from(json, ctx)?),
+            "ReturnStatement" => Stmt::Return(ReturnStatement::parse_from(source, ctx)?),
+            "SwitchStatement" => Stmt::Switch(SwitchStatement::parse_from(source, ctx)?),
+            "ThrowStatement" => Stmt::Throw(ThrowStatement::parse_from(source, ctx)?),
+            "TryStatement" => Stmt::Try(TryStatement::parse_from(source, ctx)?),
+            "VariableDeclaration" => Stmt::Variable(VariableDeclaration::parse_from(source, ctx)?),
             _ => {
                 return Err(ParseError::UnknownType {
-                    value: json.clone(),
+                    value: source.clone(),
                 })
             }
         };
@@ -178,34 +206,27 @@ impl ParseFrom<JSON> for Statement {
     }
 }
 
-impl ParseFrom<JSON> for BlockStatement {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jbody = json_get_array(json, "body")?;
-        let mut body = vec![];
-        for jstmt in jbody.into_iter() {
-            let stmt = Statement::parse_from(jstmt, ctx)?;
-            body.push(stmt);
-        }
+impl ParseFrom for BlockStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jbody = source.get_array("body")?;
+        let body = (jbody.iter())
+            .map(|jstmt| Statement::parse_from(jstmt, ctx))
+            .collect::<ParseResult<Vec<Statement>, _>>()?;
         Ok(BlockStatement { body })
     }
 }
 
-impl ParseFrom<JSON> for IfStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for IfStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "IfStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "IfStatement")?;
-
-        let jtest = json_get(value, "test")?;
+        let jtest = source.get_node("test")?;
         let test = Expression::parse_from(jtest, ctx)?;
 
-        let jthen = json_get(value, "consequent")?;
+        let jthen = source.get_node("consequent")?;
         let consequent = Statement::parse_from(jthen, ctx)?;
 
-        let alternate =
-            (value.get("alternate")).and_then(|jelse| Statement::parse_from(jelse, ctx).ok());
+        let alternate = source.map_node("alternate", |jelse| Statement::parse_from(jelse, ctx))?;
 
         Ok(IfStatement {
             test,
@@ -215,29 +236,26 @@ impl ParseFrom<JSON> for IfStatement {
     }
 }
 
-impl ParseFrom<JSON> for SwitchStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for SwitchStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "SwitchStatement")?;
 
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(json, "type", "SwitchStatement")?;
-
-        let jdiscriminant = json_get(json, "discriminant")?;
+        let jdiscriminant = source.get_node("discriminant")?;
         let discriminant = Expression::parse_from(jdiscriminant, ctx)?;
 
-        let jcases = json_get_array(json, "cases")?;
+        let jcases = source.get_array("cases")?;
         let cases = (jcases.into_iter())
             .map(|jcase| {
-                let jtest = json_get(jcase, "test")?;
-                let test = json_map_object(jtest, |jtest| Expression::parse_from(jtest, ctx))?;
+                let test = jcase.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
 
-                let jconsequent = json_get_array(jcase, "consequent")?;
+                let jconsequent = jcase.get_array("consequent")?;
                 let consequent = (jconsequent.into_iter())
                     .map(|jstmt| Statement::parse_from(jstmt, ctx))
-                    .collect::<Result<Vec<Statement>, Self::Error>>()?;
+                    .collect::<Result<Vec<Statement>, _>>()?;
 
                 Ok(SwitchCase { test, consequent })
             })
-            .collect::<Result<Vec<SwitchCase>, Self::Error>>()?;
+            .collect::<Result<Vec<SwitchCase>, _>>()?;
 
         Ok(SwitchStatement {
             discriminant,
@@ -246,17 +264,15 @@ impl ParseFrom<JSON> for SwitchStatement {
     }
 }
 
-impl ParseFrom<JSON> for ForStatement {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let for_ok = json_expect_str(json, "type", "ForStatement");
-        let while_ok = json_expect_str(json, "type", "WhileStatement");
-        let dowhile_ok = json_expect_str(json, "type", "DoWhileStatement");
+impl ParseFrom for ForStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let for_ok = source.expect_str("type", "ForStatement");
+        let while_ok = source.expect_str("type", "WhileStatement");
+        let dowhile_ok = source.expect_str("type", "DoWhileStatement");
         for_ok.or(while_ok).or(dowhile_ok)?;
 
-        let init = match json.get("init") {
-            Some(jinit) => json_map_object(jinit, |jinit| {
+        let init = source
+            .map_node("init", |jinit| {
                 if let Ok(var) = VariableDeclaration::parse_from(jinit, ctx) {
                     let stmt = Stmt::Variable(var);
                     Ok(Statement { stmt, loc: None })
@@ -270,21 +286,12 @@ impl ParseFrom<JSON> for ForStatement {
             .unwrap_or(Statement {
                 stmt: Stmt::Empty,
                 loc: None,
-            }),
-            _ => Statement {
-                stmt: Stmt::Empty,
-                loc: None,
-            },
-        };
-        let test = match json.get("test") {
-            Some(jtest) if !jtest.is_null() => Some(Expression::parse_from(jtest, ctx)?),
-            _ => None,
-        };
-        let update = match json.get("update") {
-            Some(jupdate) if !jupdate.is_null() => Some(Expression::parse_from(jupdate, ctx)?),
-            _ => None,
-        };
-        let jbody = json_get(json, "body")?;
+            });
+
+        let test = source.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+        let update = source.map_node("update", |jupdate| Expression::parse_from(jupdate, ctx))?;
+
+        let jbody = source.get_node("body")?;
         let body = Statement::parse_from(jbody, ctx)?;
         Ok(ForStatement {
             init,
@@ -295,13 +302,11 @@ impl ParseFrom<JSON> for ForStatement {
     }
 }
 
-impl ParseFrom<JSON> for ForInStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ForInStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ForInStatement")?;
 
-    fn parse_from(json: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(json, "type", "ForInStatement")?;
-
-        let jleft = json_get(json, "left")?;
+        let jleft = source.get_node("left")?;
         let left = if let Ok(vardecl) = VariableDeclaration::parse_from(jleft, ctx) {
             ForInTarget::Var(vardecl)
         } else if let Ok(expr) = Expression::parse_from(jleft, ctx) {
@@ -313,111 +318,86 @@ impl ParseFrom<JSON> for ForInStatement {
             });
         };
 
-        let jright = json_get(json, "right")?;
+        let jright = source.get_node("right")?;
         let right = Expression::parse_from(jright, ctx)?;
 
-        let jbody = json_get(json, "body")?;
+        let jbody = source.get_node("body")?;
         let body = Statement::parse_from(jbody, ctx)?;
 
         Ok(ForInStatement { left, right, body })
     }
 }
 
-impl ParseFrom<JSON> for BreakStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for BreakStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "BreakStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "BreakStatement")?;
-
-        let label = match value.get("label") {
-            Some(JSON::Null) => None,
-            Some(jlabel) => Some(Identifier::parse_from(jlabel, ctx)?),
-            _ => None,
-        };
-
+        let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
         Ok(BreakStatement(label))
     }
 }
 
-impl ParseFrom<JSON> for ContinueStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ContinueStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ContinueStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "ContinueStatement")?;
-
-        let label = match value.get("label") {
-            Some(JSON::Null) => None,
-            Some(jlabel) => Some(Identifier::parse_from(jlabel, ctx)?),
-            _ => None,
-        };
-
+        let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
         Ok(ContinueStatement(label))
     }
 }
 
-impl ParseFrom<JSON> for LabelStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for LabelStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "LabeledStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "LabeledStatement")?;
-
-        let jlabel = json_get(value, "label")?;
+        let jlabel = source.get_node("label")?;
         let label = Identifier::parse_from(jlabel, ctx)?;
 
-        let jbody = json_get(value, "body")?;
+        let jbody = source.get_node("body")?;
         let body = Statement::parse_from(jbody, ctx)?;
 
         Ok(LabelStatement(label, body))
     }
 }
 
-impl ParseFrom<JSON> for ReturnStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ReturnStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ReturnStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "ReturnStatement")?;
-
-        let jargument = json_get(value, "argument")?;
-        let argument = json_map_object(jargument, |jobject| Expression::parse_from(jobject, ctx))?;
-
+        let argument =
+            source.map_node("argument", |jobject| Expression::parse_from(jobject, ctx))?;
         Ok(ReturnStatement(argument))
     }
 }
 
-impl ParseFrom<JSON> for ThrowStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ThrowStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ThrowStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "ThrowStatement")?;
-
-        let jargument = json_get(value, "argument")?;
+        let jargument = source.get_node("argument")?;
         let argument = Expression::parse_from(jargument, ctx)?;
         Ok(ThrowStatement(argument))
     }
 }
 
-impl ParseFrom<JSON> for TryStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for TryStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "TryStatement")?;
 
-    fn parse_from(jstmt: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(jstmt, "type", "TryStatement")?;
-
-        let jblock = json_get(jstmt, "block")?;
+        let jblock = source.get_node("block")?;
         let block = BlockStatement::parse_from(jblock, ctx)?;
 
-        let jhandler = json_get(jstmt, "handler")?;
-        let handler = json_map_object(jhandler, |jobject| {
-            let jparam = json_get(jobject, "param")?;
+        let handler = source.map_node("handler", |jhandler| {
+            let jparam = jhandler.get_node("param")?;
             let param = Identifier::parse_from(jparam, ctx)?;
 
-            let jbody = json_get(jobject, "body")?;
+            let jbody = jhandler.get_node("body")?;
             let body = BlockStatement::parse_from(jbody, ctx)?;
 
             Ok(CatchClause { param, body })
         })?;
 
-        let jfinalizer = json_get(jstmt, "finalizer")?;
-        let finalizer = json_map_object(jfinalizer, |jobject| {
+        let finalizer = source.map_node("finalizer", |jobject| {
             BlockStatement::parse_from(jobject, ctx)
         })?;
 
@@ -429,40 +409,34 @@ impl ParseFrom<JSON> for TryStatement {
     }
 }
 
-impl ParseFrom<JSON> for VariableDeclaration {
-    type Error = ParseError<JSON>;
+impl ParseFrom for VariableDeclaration {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "VariableDeclaration")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "VariableDeclaration")?;
-
-        let kind = match json_get_str(value, "kind")? {
+        let kind = match source.get_str("kind")? {
             "const" => todo!(), // DeclarationKind::Const,
             "let" => todo!(),   // DeclarationKind::Let,
             "var" => DeclarationKind::Var,
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "var | let | const",
-                    value: value.get("kind").unwrap().clone(),
+                    value: source.get_node("kind")?.clone(),
                 })
             }
         };
-        let jdeclarations = json_get_array(value, "declarations")?;
+        let jdeclarations = source.get_array("declarations")?;
 
         let mut declarations = vec![];
         for decl in jdeclarations.into_iter() {
-            json_expect_str(decl, "type", "VariableDeclarator")?;
+            decl.expect_str("type", "VariableDeclarator")?;
 
-            let jid = json_get(decl, "id")?;
+            let jid = decl.get_node("id")?;
             let name = Identifier::parse_from(jid, ctx)?;
 
-            let jinit = json_get(decl, "init")?;
-            let init = match jinit {
-                JSON::Null => None,
-                _ => {
-                    let expr = Expression::parse_from(jinit, ctx)?;
-                    Some(Box::new(expr))
-                }
-            };
+            let init = decl.map_node("init", |jinit| {
+                let expr = Expression::parse_from(jinit, ctx)?;
+                Ok(Box::new(expr))
+            })?;
 
             ctx.declared_variables.insert(name.clone());
             declarations.push(VariableDeclarator { name, init });
@@ -471,16 +445,14 @@ impl ParseFrom<JSON> for VariableDeclaration {
     }
 }
 
-impl ParseFrom<JSON> for FunctionDeclaration {
-    type Error = ParseError<JSON>;
+impl ParseFrom for FunctionDeclaration {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "FunctionDeclaration")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "FunctionDeclaration")?;
-
-        let function = FunctionExpression::parse_from(value, ctx)?;
-        let id = function.id.clone().ok_or(ParseError::ObjectWithout {
+        let function = FunctionExpression::parse_from(source, ctx)?;
+        let id = (function.id.clone()).ok_or_else(|| ParseError::ObjectWithout {
             attr: "id",
-            value: value.clone(),
+            value: source.clone(),
         })?;
         let funcdecl = FunctionDeclaration { id, function };
         ctx.declared_functions.push(funcdecl.clone());
@@ -488,60 +460,56 @@ impl ParseFrom<JSON> for FunctionDeclaration {
     }
 }
 
-impl ParseFrom<JSON> for ExpressionStatement {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ExpressionStatement {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ExpressionStatement")?;
 
-    fn parse_from(value: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(value, "type", "ExpressionStatement")?;
-
-        let jexpr = json_get(value, "expression")?;
+        let jexpr = source.get_node("expression")?;
         let expression = Expression::parse_from(jexpr, ctx)?;
         Ok(ExpressionStatement { expression })
     }
 }
 
-impl ParseFrom<JSON> for Expression {
-    type Error = ParseError<JSON>;
+impl ParseFrom for Expression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let expr_type = source.get_str("type")?;
 
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jexpr_ty = json_get_str(jexpr, "type")?;
-
-        let expr = match jexpr_ty {
+        let expr = match expr_type {
             "ArrayExpression" => {
-                let jelements = json_get_array(jexpr, "elements")?;
+                let jelements = source.get_array("elements")?;
                 let elements = (jelements.into_iter())
                     .map(|jelem| Expression::parse_from(jelem, ctx))
-                    .collect::<Result<Vec<Expression>, ParseError<JSON>>>();
-                let expr = ArrayExpression(elements?);
+                    .collect::<Result<Vec<Expression>, _>>()?;
+                let expr = ArrayExpression(elements);
                 Expr::Array(expr)
             }
             "AssignmentExpression" => {
-                let expr = AssignmentExpression::parse_from(jexpr, ctx)?;
+                let expr = AssignmentExpression::parse_from(source, ctx)?;
                 Expr::Assign(Box::new(expr))
             }
             "BinaryExpression" => {
-                let expr = BinaryExpression::parse_from(jexpr, ctx)?;
+                let expr = BinaryExpression::parse_from(source, ctx)?;
                 Expr::BinaryOp(Box::new(expr))
             }
             "CallExpression" => {
-                let jcallee = json_get(jexpr, "callee")?;
+                let jcallee = source.get_node("callee")?;
                 let callee = Expression::parse_from(jcallee, ctx)?;
 
-                let jarguments = json_get_array(jexpr, "arguments")?;
+                let jarguments = source.get_array("arguments")?;
                 let arguments = (jarguments.into_iter())
                     .map(|jarg| Expression::parse_from(jarg, ctx))
-                    .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
+                    .collect::<Result<Vec<Expression>, _>>()?;
 
                 Expr::Call(Box::new(CallExpression(callee, arguments)))
             }
             "ConditionalExpression" => {
-                let jtest = json_get(jexpr, "test")?;
+                let jtest = source.get_node("test")?;
                 let condexpr = Expression::parse_from(jtest, ctx)?;
 
-                let jthen = json_get(jexpr, "consequent")?;
+                let jthen = source.get_node("consequent")?;
                 let thenexpr = Expression::parse_from(jthen, ctx)?;
 
-                let jelse = json_get(jexpr, "alternate")?;
+                let jelse = source.get_node("alternate")?;
                 let elseexpr = Expression::parse_from(jelse, ctx)?;
 
                 let expr = ConditionalExpression {
@@ -552,65 +520,64 @@ impl ParseFrom<JSON> for Expression {
                 Expr::Conditional(Box::new(expr))
             }
             "FunctionExpression" => {
-                let expr = FunctionExpression::parse_from(jexpr, ctx)?;
+                let expr = FunctionExpression::parse_from(source, ctx)?;
                 Expr::Function(expr)
             }
             "Identifier" => {
-                let expr = Identifier::parse_from(jexpr, ctx)?;
+                let expr = Identifier::parse_from(source, ctx)?;
                 Expr::Identifier(expr)
             }
             "Literal" => {
-                let jval = json_get(jexpr, "value")?;
-                let expr = Literal(jval.clone());
-                Expr::Literal(expr)
+                let jval = source.get_node("value")?;
+                Expr::Literal(jval.get_literal())
             }
             "LogicalExpression" => {
-                let expr = LogicalExpression::parse_from(jexpr, ctx)?;
+                let expr = LogicalExpression::parse_from(source, ctx)?;
                 Expr::LogicalOp(Box::new(expr))
             }
             "MemberExpression" => {
-                let computed = json_get_bool(jexpr, "computed")?;
+                let computed = source.get_bool("computed")?;
 
-                let jobject = json_get(jexpr, "object")?;
+                let jobject = source.get_node("object")?;
                 let object = Expression::parse_from(jobject, ctx)?;
 
-                let jproperty = json_get(jexpr, "property")?;
+                let jproperty = source.get_node("property")?;
                 let property = Expression::parse_from(jproperty, ctx)?;
                 let expr = MemberExpression(object, property, computed);
                 Expr::Member(Box::new(expr))
             }
             "NewExpression" => {
-                let jcallee = json_get(jexpr, "callee")?;
+                let jcallee = source.get_node("callee")?;
                 let callee = Expression::parse_from(jcallee, ctx)?;
 
-                let jarguments = json_get_array(jexpr, "arguments")?;
+                let jarguments = source.get_array("arguments")?;
                 let arguments = (jarguments.into_iter())
                     .map(|jarg| Expression::parse_from(jarg, ctx))
-                    .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
+                    .collect::<Result<Vec<Expression>, _>>()?;
 
                 let expr = NewExpression(callee, arguments);
                 Expr::New(Box::new(expr))
             }
             "ObjectExpression" => {
-                let expr = ObjectExpression::parse_from(jexpr, ctx)?;
+                let expr = ObjectExpression::parse_from(source, ctx)?;
                 Expr::Object(expr)
             }
             "SequenceExpression" => {
-                let expr = SequenceExpression::parse_from(jexpr, ctx)?;
+                let expr = SequenceExpression::parse_from(source, ctx)?;
                 Expr::Sequence(expr)
             }
             "ThisExpression" => Expr::This,
             "UnaryExpression" => {
-                let expr = UnaryExpression::parse_from(jexpr, ctx)?;
+                let expr = UnaryExpression::parse_from(source, ctx)?;
                 Expr::Unary(expr)
             }
             "UpdateExpression" => {
-                let expr = UpdateExpression::parse_from(jexpr, ctx)?;
+                let expr = UpdateExpression::parse_from(source, ctx)?;
                 Expr::Update(Box::new(expr))
             }
             _ => {
                 return Err(ParseError::UnknownType {
-                    value: jexpr.clone(),
+                    value: source.clone(),
                 })
             }
         };
@@ -618,22 +585,18 @@ impl ParseFrom<JSON> for Expression {
     }
 }
 
-impl ParseFrom<JSON> for Identifier {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let name = json_get_str(jexpr, "name")?;
+impl ParseFrom for Identifier {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let name = source.get_str("name")?;
         let identifier = Identifier::from(name);
         ctx.used_variables.insert(identifier.clone());
         Ok(identifier)
     }
 }
 
-impl ParseFrom<JSON> for UnaryExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jop = json_get_str(jexpr, "operator")?;
+impl ParseFrom for UnaryExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jop = source.get_str("operator")?;
         let op = match jop {
             "+" => UnOp::Plus,
             "-" => UnOp::Minus,
@@ -645,27 +608,25 @@ impl ParseFrom<JSON> for UnaryExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "+ | - | ! | ~ | typeof | void",
-                    value: jexpr.clone(),
+                    value: source.clone(),
                 })
             }
         };
 
-        let jargument = json_get(jexpr, "argument")?;
+        let jargument = source.get_node("argument")?;
         let argument = Expression::parse_from(jargument, ctx)?;
 
         Ok(UnaryExpression(op, Box::new(argument)))
     }
 }
 
-impl ParseFrom<JSON> for UpdateExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jargument = json_get(jexpr, "argument")?;
+impl ParseFrom for UpdateExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jargument = source.get_node("argument")?;
         let argument = Expression::parse_from(jargument, ctx)?;
 
-        let prefix = json_get_bool(jexpr, "prefix")?;
-        let operator = json_get_str(jexpr, "operator")?;
+        let prefix = source.get_bool("prefix")?;
+        let operator = source.get_str("operator")?;
 
         let op = match operator {
             "++" => UpdOp::Increment,
@@ -673,7 +634,7 @@ impl ParseFrom<JSON> for UpdateExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "++ or --",
-                    value: jexpr.clone(),
+                    value: source.clone(),
                 })
             }
         };
@@ -681,30 +642,26 @@ impl ParseFrom<JSON> for UpdateExpression {
     }
 }
 
-impl ParseFrom<JSON> for SequenceExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jexprs = json_get_array(jexpr, "expressions")?;
+impl ParseFrom for SequenceExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jexprs = source.get_array("expressions")?;
 
         let exprs = (jexprs.into_iter())
             .map(|jexpr| Expression::parse_from(jexpr, ctx))
-            .collect::<Result<Vec<Expression>, ParseError<JSON>>>()?;
+            .collect::<Result<Vec<Expression>, _>>()?;
         Ok(SequenceExpression(exprs))
     }
 }
 
-impl ParseFrom<JSON> for BinaryExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jleft = json_get(jexpr, "left")?;
+impl ParseFrom for BinaryExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jleft = source.get_node("left")?;
         let left = Expression::parse_from(jleft, ctx)?;
 
-        let jright = json_get(jexpr, "right")?;
+        let jright = source.get_node("right")?;
         let right = Expression::parse_from(jright, ctx)?;
 
-        let opstr = json_get_str(jexpr, "operator")?;
+        let opstr = source.get_str("operator")?;
         let op = match opstr {
             "+" => BinOp::Plus,
             "-" => BinOp::Minus,
@@ -730,7 +687,7 @@ impl ParseFrom<JSON> for BinaryExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "one of: + - * / % == === != < > <= >= instanceof | ^ & << >> >>>",
-                    value: jexpr.get("operator").unwrap().clone(),
+                    value: source.get_node("operator")?.clone(),
                 })
             }
         };
@@ -738,24 +695,22 @@ impl ParseFrom<JSON> for BinaryExpression {
     }
 }
 
-impl ParseFrom<JSON> for LogicalExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jleft = json_get(jexpr, "left")?;
+impl ParseFrom for LogicalExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jleft = source.get_node("left")?;
         let left = Expression::parse_from(jleft, ctx)?;
 
-        let jright = json_get(jexpr, "right")?;
+        let jright = source.get_node("right")?;
         let right = Expression::parse_from(jright, ctx)?;
 
-        let opstr = json_get_str(jexpr, "operator")?;
+        let opstr = source.get_str("operator")?;
         let op = match opstr {
             "&&" => BoolOp::And,
             "||" => BoolOp::Or,
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "&& or ||",
-                    value: jexpr.get("operator").unwrap().clone(),
+                    value: source.get_node("operator")?.clone(),
                 })
             }
         };
@@ -763,17 +718,15 @@ impl ParseFrom<JSON> for LogicalExpression {
     }
 }
 
-impl ParseFrom<JSON> for AssignmentExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let jright = json_get(jexpr, "right")?;
+impl ParseFrom for AssignmentExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let jright = source.get_node("right")?;
         let right = Expression::parse_from(jright, ctx)?;
 
-        let jleft = json_get(jexpr, "left")?;
+        let jleft = source.get_node("left")?;
         let left = Expression::parse_from(jleft, ctx)?;
 
-        let jop = json_get_str(jexpr, "operator")?;
+        let jop = source.get_str("operator")?;
         let modop = match jop {
             "=" => None,
             "+=" => Some(BinOp::Plus),
@@ -790,7 +743,7 @@ impl ParseFrom<JSON> for AssignmentExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "one of: = += -= *= /= %= <<= >>= >>>= |= ^= &=",
-                    value: jexpr.get("operator").unwrap().clone(),
+                    value: source.get_node("operator")?.clone(),
                 })
             }
         };
@@ -798,21 +751,19 @@ impl ParseFrom<JSON> for AssignmentExpression {
     }
 }
 
-impl ParseFrom<JSON> for ObjectExpression {
-    type Error = ParseError<JSON>;
+impl ParseFrom for ObjectExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        source.expect_str("type", "ObjectExpression")?;
 
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        json_expect_str(jexpr, "type", "ObjectExpression")?;
-
-        let jproperties = json_get_array(jexpr, "properties")?;
+        let jproperties = source.get_array("properties")?;
 
         let mut properties = vec![];
         for jprop in jproperties.into_iter() {
-            json_expect_str(jprop, "type", "Property")?;
+            jprop.expect_str("type", "Property")?;
 
-            let jkey = json_get(jprop, "key")?;
+            let jkey = jprop.get_node("key")?;
             let keyexpr = Expression::parse_from(jkey, ctx)?;
-            let key = if json_get_bool(jprop, "computed")? {
+            let key = if jprop.get_bool("computed")? {
                 ObjectKey::Computed(keyexpr)
             } else {
                 match keyexpr.expr {
@@ -830,7 +781,7 @@ impl ParseFrom<JSON> for ObjectExpression {
                 }
             };
 
-            let jvalue = json_get(jprop, "value")?;
+            let jvalue = jprop.get_node("value")?;
             let value = Expression::parse_from(jvalue, ctx)?;
 
             properties.push((key, value));
@@ -839,21 +790,20 @@ impl ParseFrom<JSON> for ObjectExpression {
     }
 }
 
-impl ParseFrom<JSON> for FunctionExpression {
-    type Error = ParseError<JSON>;
-
-    fn parse_from(jexpr: &JSON, ctx: &mut ParserContext) -> Result<Self, Self::Error> {
-        let id: Option<Identifier> = json_get(jexpr, "id")
+impl ParseFrom for FunctionExpression {
+    fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S> {
+        let id: Option<Identifier> = source
+            .get_node("id")
             .and_then(|jid| Identifier::parse_from(jid, ctx))
             .ok();
 
         let mut inner_ctx = ParserContext::new();
-        let jparams = json_get_array(jexpr, "params")?;
+        let jparams = source.get_array("params")?;
         let params = (jparams.into_iter())
             .map(|jparam| Identifier::parse_from(jparam, &mut inner_ctx))
-            .collect::<Result<Vec<_>, ParseError<JSON>>>()?;
+            .collect::<Result<Vec<Identifier>, _>>()?;
 
-        let jbody = json_get(jexpr, "body")?;
+        let jbody = source.get_node("body")?;
         let body = BlockStatement::parse_from(jbody, &mut inner_ctx)?;
 
         let ParserContext {
@@ -877,9 +827,9 @@ impl ParseFrom<JSON> for FunctionExpression {
             functions,
             free_variables,
             body,
-            is_generator: json_get_bool(jexpr, "generator").unwrap_or(false),
-            is_expression: json_get_bool(jexpr, "expression").unwrap_or(false),
-            is_async: json_get_bool(jexpr, "async").unwrap_or(false),
+            is_generator: source.get_bool("generator").unwrap_or(false),
+            is_expression: source.get_bool("expression").unwrap_or(false),
+            is_async: source.get_bool("async").unwrap_or(false),
         })
     }
 }
