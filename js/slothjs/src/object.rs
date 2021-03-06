@@ -173,8 +173,14 @@ impl JSValue {
         match self {
             JSValue::Undefined => Heap::NULL,
             JSValue::Bool(b) => heap.alloc(JSObject::from_bool(*b)),
-            JSValue::Number(_n) => todo!(), // TODO: Number object
-            JSValue::String(s) => heap.alloc(JSObject::from_str(s.as_ref())),
+            JSValue::Number(_n) => {
+                let _ = crate::source::print_callstack(heap);
+                todo!(); // TODO: Number object
+            }
+            JSValue::String(_s) => {
+                let _ = crate::source::print_callstack(heap);
+                todo!(); // TODO: String object
+            }
             JSValue::Ref(r) => *r,
         }
     }

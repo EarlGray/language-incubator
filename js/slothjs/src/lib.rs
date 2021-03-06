@@ -12,6 +12,7 @@ pub mod source;
 mod test;
 
 pub type Program = ast::Program;
+pub type HeapNode<'a> = parse::HeapNode<'a>;
 
 pub type Interpreted = object::Interpreted;
 pub type JSON = object::JSON;

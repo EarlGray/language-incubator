@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt;
 
 use serde_json;
 
@@ -7,6 +8,10 @@ use crate::ast::*; // yes, EVERYTHING.
 use crate::error::ParseError;
 use crate::object::JSON;
 use crate::source;
+use crate::{
+    Heap,
+    JSRef,
+};
 
 type ParseResult<T, S> = Result<T, ParseError<S>>;
 
@@ -132,6 +137,57 @@ impl SourceNode for JSON {
             });
         }
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct HeapNode<'a> {
+    pub heap: &'a Heap,
+    pub node: JSRef,
+}
+
+impl<'a> fmt::Debug for HeapNode<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HeapNode{{ {:?} }}", self.node)
+    }
+}
+
+impl<'a> SourceNode for HeapNode<'a> {
+    fn get_literal(&self) -> Literal {
+        let HeapNode { heap, node } = self;
+        let json = heap.get(*node).to_json(heap).unwrap();
+        Literal(json)
+    }
+
+    fn get_location(&self) -> Option<source::Location> {
+        todo!()
+    }
+
+    fn get_node(&self, _property: &'static str) -> ParseResult<&Self, Self> {
+        todo!()
+    }
+
+    fn map_node<T, F>(&self, _property: &'static str, _action: F) -> ParseResult<Option<T>, Self>
+    where
+        F: FnMut(&Self) -> ParseResult<T, Self>,
+    {
+        todo!()
+    }
+
+    fn get_bool(&self, _property: &'static str) -> ParseResult<bool, Self> {
+        todo!()
+    }
+
+    fn get_str(&self, _property: &'static str) -> ParseResult<&str, Self> {
+        todo!()
+    }
+
+    fn get_array(&self, _property: &'static str) -> ParseResult<&[Self], Self> {
+        todo!()
+    }
+
+    fn expect_str(&self, _property: &'static str, _value: &'static str) -> ParseResult<(), Self> {
+        todo!()
     }
 }
 
