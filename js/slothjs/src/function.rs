@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::rc::Rc;
 
 use crate::ast;
 use crate::error::Exception;
@@ -27,7 +28,7 @@ impl CallContext {
         // Yes, we do need a clone() to workaround borrow checker:
         match &heap.get(func_ref).value {
             ObjectValue::VMCall(vmcall) => vmcall.clone().call(self, heap),
-            ObjectValue::Closure(closure) => closure.clone().call(self, heap),
+            ObjectValue::Closure(closure) => Rc::clone(closure).call(self, heap),
             _ => {
                 let callee = Interpreted::Member {
                     of: self.this_ref,
@@ -76,7 +77,7 @@ pub struct Closure {
 }
 
 impl Closure {
-    pub fn call(self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    pub fn call(&self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap, scoperef| {
             // `arguments`
             let argv = (call.arguments.iter())

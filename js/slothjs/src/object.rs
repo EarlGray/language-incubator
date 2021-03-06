@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -394,7 +395,7 @@ impl JSObject {
         let params_count = closure.params.len() as f64;
         let mut function_object = JSObject {
             proto: Heap::FUNCTION_PROTO,
-            value: ObjectValue::Closure(Box::new(closure)),
+            value: ObjectValue::Closure(Rc::new(closure)),
             properties: HashMap::new(),
         };
         function_object
@@ -713,7 +714,7 @@ pub enum ObjectValue {
 
     // Function
     VMCall(VMCall),
-    Closure(Box<Closure>),
+    Closure(Rc<Closure>),
 
     // Array
     Array(JSArray),
