@@ -3,7 +3,7 @@ name = "slothjs"
 version = "0.1.0"
 authors = ["Dmytro S <me@dmytrish.net>"]
 edition = "2018"
-default-run = "sljs"
+default-run = "sljs-node"
 
 [dependencies]
 atty = "0.2"        # TODO: make this binary-only somehow
