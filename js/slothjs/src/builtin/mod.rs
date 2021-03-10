@@ -5,6 +5,7 @@ mod error;
 mod function;
 mod global;
 mod object;
+mod string;
 
 use crate::error::Exception;
 use crate::heap::Heap;
@@ -28,6 +29,10 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let the_boolean = boolean::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
         .set_hidden("Boolean", Content::from(the_boolean))?;
+
+    let the_string = string::init(heap)?;
+    heap.get_mut(Heap::GLOBAL)
+        .set_hidden("String", Content::from(the_string))?;
 
     error::init(heap)?;
 

@@ -174,7 +174,7 @@ impl JSValue {
             JSValue::Undefined => Heap::NULL,
             JSValue::Bool(b) => heap.alloc(JSObject::from_bool(*b)),
             JSValue::Number(_n) => todo!(), // TODO: Number object
-            JSValue::String(_s) => todo!(), // TODO: String object
+            JSValue::String(s) => heap.alloc(JSObject::from_str(s.as_ref())),
             JSValue::Ref(r) => *r,
         }
     }
@@ -414,10 +414,21 @@ impl JSObject {
         }
     }
 
+    /// Wrap the given bool into Boolean
     pub fn from_bool(value: bool) -> JSObject {
         JSObject {
             proto: Heap::BOOLEAN_PROTO,
             value: ObjectValue::Boolean(value),
+            properties: HashMap::new(),
+        }
+    }
+
+    /// Wrap the given bool into Boolean
+    pub fn from_str(value: &str) -> JSObject {
+        // TODO: length
+        JSObject {
+            proto: Heap::STRING_PROTO,
+            value: ObjectValue::String(value.to_string()),
             properties: HashMap::new(),
         }
     }

@@ -1093,6 +1093,12 @@ fn test_builtin_function() {
 fn test_builtin_boolean() {
     assert_eval!("true instanceof Boolean", false);
 
+    // auto-objectification:
+    assert_eval!("true.toString()",   "true");
+    assert_eval!("false.toString()",  "false");
+    assert_eval!("var a = {b: true}; a.b.toString()",  "true");
+
+    // Boolean()
     assert_eval!("var b = new Boolean(false); b.valueOf()",     false);
     assert_eval!("var b = new Boolean(); b.valueOf()",          false);
     assert_eval!("var b = new Boolean(undefined); b.valueOf()", false);
@@ -1118,14 +1124,24 @@ fn test_builtin_boolean() {
 
     // Boolean.prototype.toString()
     assert_eval!("new Boolean().toString()",  "false");
-    // auto-objectification:
-    assert_eval!("true.toString()",   "true");
-    assert_eval!("false.toString()",  "false");
-    assert_eval!("var a = {b: true}; a.b.toString()",  "true");
 
     // Boolean.prototype.valueOf()
     assert_eval!("new Boolean().valueOf()", false);
     assert_eval!("new Boolean(1).valueOf()", true);
+}
+
+#[test]
+fn test_builtin_string() {
+    // auto-objectification:
+    assert_eval!("'aaa'.length",   3.0);
+    assert_eval!("var a = {b: 'hello'}; a.b.length", 5.0);
+
+    // String()
+    assert_eval!("String()", "");
+    assert_eval!("String(true)", "true");
+    assert_eval!("String(undefined)", "undefined");
+    assert_eval!("String({})", "[object Object]");
+    assert_eval!("String(NaN)", "NaN");
 }
 
 #[test]

@@ -80,7 +80,7 @@ impl Heap {
     pub const ARRAY_PROTO: JSRef = JSRef(4);
     pub const BOOLEAN_PROTO: JSRef = JSRef(5);
     //pub const NUMBER_PROTO: JSRef = JSRef(6);
-    //pub const STRING_PROTO: JSRef = JSRef(7);
+    pub const STRING_PROTO: JSRef = JSRef(7);
 
     pub const ERROR_PROTO: JSRef = JSRef(8);
 
