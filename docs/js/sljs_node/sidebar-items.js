@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["ESPARSE",""],["ESPRIMA",""],["TMPDIRNAME",""]],"enum":[["EvalError",""]],"fn":[["batch_main",""],["die",""],["die_io",""],["evaluate_input",""],["main",""],["prepare_temporary_directory","Prepare a temporary directory, e.g. /tmp/sljs/"],["repl_main",""],["run_esprima",""]]});

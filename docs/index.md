@@ -1,14 +1,14 @@
 language-incubator
 ==================
 
-An incubator/sandbox for learning compilers, interpreters, code generation, virtual machines, assemblers, JITs, etc.
+My incubator/sandbox for learning and toying with compilers, interpreters, code generation, virtual machines, assemblers, JITs, etc.
 
 Hacks that have grown into separate projects:
 
-- [x86/hasm](https://github.com/EarlGray/hasm): a simple x86 assembler written in Haskell, for now it's opcode set is very limited;
 - [fp/secd](https://github.com/EarlGray/SECD): implementation of SECD virtual machine in C with a Scheme-to-SECD compiler;
+- [x86/hasm](https://github.com/EarlGray/hasm): a simple x86 assembler written in Haskell, its opcode set is very limited at the moment;
 
-Some protoprojects that may be interesting:
+Some protoprojects that might be interesting to you:
 
 - [js/slothjs](js/slothjs): an effort at a naïve, primitive, savage Javascript interpreter (with parsing offloaded to [Esprima](https://esprima.org/));
 - bf/bfjc: a primitive but fully functional x86\_64 JIT compiler for BrainFuck, inspired by [_Adventures in JIT compilation_ by eliben](https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/) ;
