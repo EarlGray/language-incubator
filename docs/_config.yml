@@ -1,0 +1,8 @@
+title: Language-snippets
+description: "Learning snippets for compilers, interpreters, code generation, virtual machines, assemblers, JITs, etc. "
+google_analytics: 
+show_downloads: true
+theme: jekyll-theme-cayman
+
+gems:
+  - jekyll-mentions
