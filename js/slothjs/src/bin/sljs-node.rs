@@ -1,18 +1,19 @@
-//! This is the Javascript interpreter:
+//! This is the Javascript interpreter and REPL binary:
+//!
 //! ```sh
-//! $ echo "2 + 2" | cargo run --bin sljs
+//! $ echo "2 + 2" | cargo run -q --bin sljs-node
 //! 4
 //!
-//! $ cargo run
-//! var a = {one: 1}
-//! a.one
-//! ^D
-//! 1
+//! // REPL mode (rlwrap is recommended):
+//! $ $(which rlwrap) cargo run -q
+//! sljs> var a = {one: 1}
+//! sljs> a.one + 2
+//! 3
 //! ```
 //!
-//! It bundles Esrpima for parsing and still relies on nodejs
-//! to execute the Esprima parser. It uses $TMPDIR/sljs/ to unpack
-//! its auxiliary files.
+//! It bundles Esrpima for parsing and relies on `node` executable
+//! to execute the Esprima parser. It uses `$TMPDIR/sljs/` to unpack
+//! its helper files.
 
 use std::env;
 use std::fmt::Debug;

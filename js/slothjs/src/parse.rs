@@ -140,6 +140,8 @@ impl SourceNode for JSON {
     }
 }
 
+/// `HeapNode` contains a heap reference and a `JSRef` to an AST subtree in it.
+/// It implements [`SourceNode`] for on-heap AST trees.
 #[derive(Clone)]
 pub struct HeapNode<'a> {
     pub heap: &'a Heap,
