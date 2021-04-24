@@ -177,10 +177,7 @@ impl JSValue {
                 let _ = crate::source::print_callstack(heap);
                 todo!(); // TODO: Number object
             }
-            JSValue::String(_s) => {
-                let _ = crate::source::print_callstack(heap);
-                todo!(); // TODO: String object
-            }
+            JSValue::String(s) => heap.alloc(JSObject::from_str(s.clone())),
             JSValue::Ref(r) => *r,
         }
     }
@@ -429,13 +426,20 @@ impl JSObject {
         }
     }
 
-    /// Wrap the given bool into Boolean
-    pub fn from_str(value: &str) -> JSObject {
-        // TODO: length
+    /// Wrap the given string into String
+    pub fn from_str(value: String) -> JSObject {
+        let mut properties = HashMap::new();
+        properties.insert(
+            String::from("length"),
+            Property {
+                access: Access::empty(),
+                content: Content::from(value.chars().count() as i64),
+            },
+        );
         JSObject {
             proto: Heap::STRING_PROTO,
-            value: ObjectValue::String(value.to_string()),
-            properties: HashMap::new(),
+            value: ObjectValue::String(value),
+            properties,
         }
     }
 
@@ -468,21 +472,27 @@ impl JSObject {
 
     /// Tries to get JSValue of the own property `name`.
     /// This might call getters of the property.
-    pub fn get_value(&self, name: &str) -> Option<&JSValue> {
-        if let Some(array) = self.as_array() {
-            if let Ok(index) = usize::from_str(name) {
+    pub fn get_value(&self, name: &str) -> Option<JSValue> {
+        if let Ok(index) = usize::from_str(name) {
+            if let Some(array) = self.as_array() {
                 if let Some(value) = array.storage.get(index) {
-                    return Some(value);
+                    return Some(value.clone());
+                }
+            }
+            if let ObjectValue::String(s) = &self.value {
+                // TODO: optimizie nth()'s sequential access
+                if let Some(c) = s.chars().nth(index) {
+                    return Some(JSValue::from(String::from(c)));
                 }
             }
         }
         (self.properties.get(name)).and_then(|prop| match &prop.content {
-            Content::Value(value) => Some(value),
+            Content::Value(value) => Some(value.clone()),
         })
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.
-    pub fn lookup_value<'a>(&'a self, name: &str, heap: &'a Heap) -> Option<&'a JSValue> {
+    pub fn lookup_value(&self, name: &str, heap: &Heap) -> Option<JSValue> {
         if let Some(value) = self.get_value(name) {
             return Some(value);
         }
@@ -885,7 +895,7 @@ impl Interpreted {
         match self {
             Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
-                Some(JSValue::Ref(r)) => Ok(*r),
+                Some(JSValue::Ref(r)) => Ok(r),
                 None if heap.is_scope(*of) => {
                     let ident = ast::Identifier(name.clone());
                     Err(Exception::ReferenceNotFound(ident))
@@ -915,14 +925,10 @@ impl Interpreted {
                     Some(_) => unreachable!(),
                     None => return Err(Exception::TypeErrorNotCallable(self.clone())),
                 };
-                let func_value =
-                    heap.get(of)
-                        .get_value(&name)
-                        .ok_or(Exception::TypeErrorNotCallable(Interpreted::member(
-                            of, &name,
-                        )))?;
-                let func_ref = func_value
-                    .to_ref()
+                let func_value = (heap.get(of).get_value(&name)).ok_or(
+                    Exception::TypeErrorNotCallable(Interpreted::member(of, &name)),
+                )?;
+                let func_ref = (func_value.to_ref())
                     .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))?;
                 Ok((func_ref, *this_ref, name))
             }

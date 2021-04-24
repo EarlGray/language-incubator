@@ -59,11 +59,11 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> Result<Interpret
 fn object_object_create(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let proto = (call.arguments.get(0))
         .ok_or_else(|| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
-    let protoref = (proto.to_ref(heap))
-        .map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
+    let protoref =
+        (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
 
-    let properties: Option<JSRef> = (call.arguments.get(1))
-        .and_then(|props| props.to_ref(heap).ok());
+    let properties: Option<JSRef> =
+        (call.arguments.get(1)).and_then(|props| props.to_ref(heap).ok());
 
     let mut object = JSObject::new();
     object.proto = protoref;
@@ -108,8 +108,8 @@ fn object_object_getOwnPropertyDescriptor(
     heap: &mut Heap,
 ) -> Result<Interpreted, Exception> {
     let inspected = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let inspected_ref = (inspected.to_ref(heap))
-        .map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
+    let inspected_ref =
+        (inspected.to_ref(heap)).map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
 
     let propname = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(&*heap)?
@@ -140,10 +140,7 @@ fn define_property(
     heap: &mut Heap,
 ) -> Result<(), Exception> {
     let get_value = |object: &JSObject, name: &str| {
-        object
-            .get_value(name)
-            .unwrap_or(&JSValue::Undefined)
-            .clone()
+        object.get_value(name).unwrap_or(JSValue::Undefined).clone()
     };
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
 

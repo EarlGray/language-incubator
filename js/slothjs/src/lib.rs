@@ -180,16 +180,16 @@ mod test;
 pub use ast::Program;
 pub use error::Exception;
 pub use function::CallContext;
-pub use interpret::Interpretable;
 pub use heap::{
     Heap,
     JSRef,
 };
+pub use interpret::Interpretable;
 pub use object::{
     Interpreted,
-    JSON,
     JSObject,
     JSValue,
+    JSON,
 };
 pub use parse::{
     HeapNode,

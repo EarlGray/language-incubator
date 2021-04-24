@@ -171,7 +171,7 @@ impl Heap {
     /// If there's a local scope, return a `JSRef` to it.
     pub(crate) fn local_scope(&self) -> Option<JSRef> {
         match self.get(Heap::GLOBAL).get_value(Heap::LOCAL_SCOPE) {
-            Some(JSValue::Ref(scope_ref)) => Some(*scope_ref),
+            Some(JSValue::Ref(scope_ref)) => Some(scope_ref),
             _ => None,
         }
     }

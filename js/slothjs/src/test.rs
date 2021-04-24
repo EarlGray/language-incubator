@@ -1136,12 +1136,38 @@ fn test_builtin_string() {
     assert_eval!("'aaa'.length",   3.0);
     assert_eval!("var a = {b: 'hello'}; a.b.length", 5.0);
 
+    // addition
+    assert_eval!("'con' + 'cat'", "concat");
+    assert_eval!("var s = 'con'; s += 'cat'; s", "concat");
+
+    // char access
+    assert_eval!("'abc'[1]", "b");
+    assert_eval!("'привіт'[2]", "и");
+
     // String()
     assert_eval!("String()", "");
     assert_eval!("String(true)", "true");
     assert_eval!("String(undefined)", "undefined");
     assert_eval!("String({})", "[object Object]");
     assert_eval!("String(NaN)", "NaN");
+    assert_eval!("String([1,2])", "1,2");
+
+    // new String()
+    assert_eval!("new String().valueOf()", "");
+    assert_eval!("new String(true).valueOf()", "true");
+    assert_eval!("new String(undefined).valueOf()", "undefined");
+    assert_eval!("new String({}).valueOf()", "[object Object]");
+    assert_eval!("new String(NaN).valueOf()", "NaN");
+    assert_eval!("new String([1,2]).valueOf()", "1,2");
+
+    // String.prototype.valueOf()
+    assert_eval!("'str'.valueOf()", "str");
+    assert_eval!("'str'.toString()", "str");
+    //assert_exception!("String.prototype.valueOf.call(1)", Exception::TypeErrorInstanceRequired);
+
+    // String.prototype.charAt()
+    //assert_eval!("'abc'.charAt(1)", "b");
+    //assert_eval!("'привіт'.charAt(2)", "и");
 }
 
 #[test]
