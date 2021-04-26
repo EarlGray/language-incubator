@@ -36,8 +36,8 @@ fn load_esprima(heap: &mut Heap) -> Result<(), Exception> {
 }
 
 fn evaluate_input(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let esprima: JSRef = heap.lookup_path(&["esprima"])?.to_ref(heap)?;
-    let esparse = (heap.get(esprima))
+    let esprima_ref: JSRef = heap.lookup_path(&["esprima"])?.to_ref(heap)?;
+    let esparse = (heap.get(esprima_ref))
         .get_value("parse")
         .ok_or_else(|| Exception::ReferenceNotFound(ast::Identifier::from("esprima.parse")))?
         .to_ref()?;
@@ -49,7 +49,7 @@ fn evaluate_input(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception
     let estree: Interpreted = heap.execute(
         esparse,
         CallContext {
-            this_ref: esprima,
+            this_ref: esprima_ref,
             method_name: "parse".to_string(),
             arguments,
             loc: None,
@@ -75,6 +75,38 @@ fn batch_main(heap: &mut Heap) -> io::Result<()> {
     Ok(())
 }
 
+fn repl_main(heap: &mut Heap) -> io::Result<()> {
+    let stdin = io::stdin();
+    let mut input_iter = stdin.lock().lines();
+
+    loop {
+        // prompt
+        print!("sljs> ");
+        io::stdout().flush().unwrap();
+
+        // get input
+        let input = input_iter.next();
+        if input.is_none() {
+            break;
+        }
+        let input = input.unwrap().unwrap();
+        if input.len() == 0 {
+            continue;
+        }
+
+        match evaluate_input(&input, heap) {
+            Ok(result) => {
+                let result = result.to_value(heap).expect("result value");
+                let result = result.to_json(heap).expect("result json");
+                println!("{}", result);
+            }
+            Err(e) => eprintln!("Exception: {:?}", e),
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> io::Result<()> {
     let interactive = atty::is(Stream::Stdin);
 
@@ -87,6 +119,7 @@ fn main() -> io::Result<()> {
 
     if interactive {
         eprintln!("\rWelcome to sljs!");
+        repl_main(&mut heap)?;
     } else {
         batch_main(&mut heap).unwrap_or_else(|e| die("Error: ", e, 1));
     }
