@@ -1168,6 +1168,11 @@ fn test_builtin_string() {
     // String.prototype.charAt()
     //assert_eval!("'abc'.charAt(1)", "b");
     //assert_eval!("'привіт'.charAt(2)", "и");
+
+    // String.prototype.charCodeAt()
+    assert_eval!("'abc'.charCodeAt(1)", 98.0);
+    assert_eval!("'привіт'.charCodeAt(2)", 1080.0);
+    assert_eval!("''.charCodeAt(0)", (f64::NAN));
 }
 
 #[test]
