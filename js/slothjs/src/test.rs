@@ -886,6 +886,19 @@ fn test_global_methods() {
     assert_eval!( "parseInt('020', 10)", 20.0 );
     assert_eval!( "parseInt('020')",     16.0 );
     //assert_eval!( "parseInt('0x10')",   16.0 );
+    //assert_eval!( "parseInt(new Number(64))", 64.0 );
+    assert_eval!( "parseInt(new String(64))", 64.0 );
+    assert_eval!( "parseInt(true)", (f64::NAN));
+    assert_eval!( "parseInt(null)", (f64::NAN));
+    assert_eval!( "parseInt({})", (f64::NAN));
+
+    // parseFloat()
+    assert_eval!("parseFloat('0')", 0.0);
+    assert_eval!("parseFloat('-0')", (-0.0));
+    assert_eval!("parseFloat('.1e1')", (1.0));
+    //assert_eval!("parseFloat('1.23abc')", 1.23);
+    assert_eval!("parseFloat()", (f64::NAN));
+    assert_eval!("parseFloat('whut')", (f64::NAN));
 }
 
 #[test]

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::error::Exception;
 use crate::function::CallContext;
 use crate::heap::Heap;
@@ -45,6 +47,16 @@ fn parse_int(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exceptio
     Ok(Interpreted::from(result))
 }
 
+#[allow(non_snake_case)]
+fn global_parseFloat(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let value = argument.to_value(heap)?.stringify(heap)?;
+
+    // TODO: proper implementation
+    let result = f64::from_str(&value).unwrap_or(f64::NAN);
+    Ok(Interpreted::from(result))
+}
+
 /*
  *  init
  */
@@ -59,6 +71,7 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     global.set_system(Heap::SCOPE_THIS, Content::from(Heap::GLOBAL))?;
 
     global.set_hidden("parseInt", Content::from_func(parse_int, heap))?;
+    global.set_hidden("parseFloat", Content::from_func(global_parseFloat, heap))?;
 
     *heap.get_mut(Heap::GLOBAL) = global;
 
