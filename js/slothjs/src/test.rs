@@ -1191,6 +1191,27 @@ fn test_builtin_string() {
     assert_eval!("'привіт'.charCodeAt(2)", 1080.0);
     assert_eval!("''.charCodeAt(0)", (f64::NAN));
     assert_eval!("String.prototype.charCodeAt.call(false, 1)", 97.0);
+
+    // String.prototype.slice()
+    assert_eval!("'abc'.slice()", "abc");
+    assert_eval!("'abc'.slice('?')", "abc");
+    assert_eval!("'abcde'.slice(3)", "de");
+    assert_eval!("'abcde'.slice(-3)", "cde");
+    assert_eval!("'abcde'.slice(-4, 2)", "b");
+    assert_eval!("'abcde'.slice(-5, 2)", "ab");
+    assert_eval!("'abcde'.slice(-8, 2)", "ab");
+    assert_eval!("'abcde'.slice(6)", "");
+    assert_eval!("'abcde'.slice(1, 3)", "bc");
+    assert_eval!("'abc'.slice(1, 10)", "bc");
+    assert_eval!("'abcde'.slice('1', '3')", "bc");
+    assert_eval!("'abcde'.slice(1, -2)", "bc");
+    assert_eval!("'abcde'.slice(0, -5)", "");
+    assert_eval!("'abcde'.slice(0, -6)", "");
+    assert_eval!("'abcde'.slice(1, '?')", "");
+    assert_eval!("'abcde'.slice(3, 1)", "");
+    assert_eval!("'abcde'.slice(-1, -3)", "");
+    assert_eval!("String.prototype.slice.call(true, 2)", "ue");
+    //assert_eval!("String.prototype.slice.call(123, 1)", "23");
 }
 
 #[test]

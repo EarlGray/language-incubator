@@ -13,8 +13,7 @@ use crate::{
 
 fn boolean_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let arg = arg.to_value(heap)?;
-    let arg = arg.boolify(heap);
+    let arg = arg.to_value(heap)?.boolify(heap);
 
     if !heap.smells_fresh(call.this_ref) {
         return Ok(Interpreted::from(arg));
