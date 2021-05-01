@@ -45,6 +45,24 @@ fn string_proto_valueOf(call: CallContext, heap: &mut Heap) -> Result<Interprete
 }
 
 #[allow(non_snake_case)]
+fn string_proto_charAt(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let arg = (call.arguments.get(0))
+        .unwrap_or(&Interpreted::from(0))
+        .to_value(heap)?;
+    let index = arg.numberify(heap).unwrap_or(0.0) as i64;
+
+    let s = (heap.get(call.this_ref))
+        .to_primitive(heap)
+        .unwrap_or(JSValue::from(call.this_ref))
+        .stringify(heap)?;
+    let result = match s.chars().nth(index as usize) {
+        Some(c) => c.to_string(),
+        None => "".to_string(),
+    };
+    Ok(Interpreted::from(result))
+}
+
+#[allow(non_snake_case)]
 fn string_proto_charCodeAt(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let arg = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(0))
@@ -66,6 +84,7 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut string_proto = JSObject::new();
     string_proto.set_hidden("valueOf", Content::from_func(string_proto_valueOf, heap))?;
     string_proto.set_hidden("toString", Content::from_func(string_proto_valueOf, heap))?;
+    string_proto.set_hidden("charAt", Content::from_func(string_proto_charAt, heap))?;
     string_proto.set_hidden(
         "charCodeAt",
         Content::from_func(string_proto_charCodeAt, heap),

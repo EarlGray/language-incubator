@@ -1179,8 +1179,12 @@ fn test_builtin_string() {
     //assert_exception!("String.prototype.valueOf.call(1)", Exception::TypeErrorInstanceRequired);
 
     // String.prototype.charAt()
-    //assert_eval!("'abc'.charAt(1)", "b");
-    //assert_eval!("'привіт'.charAt(2)", "и");
+    assert_eval!("'abc'.charAt(1)", "b");
+    assert_eval!("'abc'.charAt(4)", "");
+    assert_eval!("'abc'.charAt(-1)", "");
+    assert_eval!("'abc'.charAt()", "a");
+    assert_eval!("'привіт'.charAt(2)", "и");
+    assert_eval!("String.prototype.charAt.call(true, 1)", "r");
 
     // String.prototype.charCodeAt()
     assert_eval!("'abc'.charCodeAt(1)", 98.0);
