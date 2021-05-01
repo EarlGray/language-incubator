@@ -9,6 +9,7 @@ use crate::{
     Interpreted,
     JSObject,
     JSRef,
+    JSValue,
 };
 
 fn string_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
@@ -50,7 +51,10 @@ fn string_proto_charCodeAt(call: CallContext, heap: &mut Heap) -> Result<Interpr
         .to_value(heap)?;
     let index = arg.numberify(heap).unwrap_or(0.0) as i64;
 
-    let s = object_to_str(call.this_ref, heap)?;
+    let s = (heap.get(call.this_ref))
+        .to_primitive(heap)
+        .unwrap_or(JSValue::from(call.this_ref))
+        .stringify(heap)?;
     let result = match s.chars().nth(index as usize) {
         Some(c) => c as i64 as f64,
         None => f64::NAN,

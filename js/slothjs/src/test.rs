@@ -1186,6 +1186,7 @@ fn test_builtin_string() {
     assert_eval!("'abc'.charCodeAt(1)", 98.0);
     assert_eval!("'привіт'.charCodeAt(2)", 1080.0);
     assert_eval!("''.charCodeAt(0)", (f64::NAN));
+    assert_eval!("String.prototype.charCodeAt.call(false, 1)", 97.0);
 }
 
 #[test]

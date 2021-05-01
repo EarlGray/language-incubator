@@ -103,7 +103,7 @@ impl JSValue {
             JSValue::Bool(b) => Ok(b.to_string()),
             JSValue::Number(n) => Ok(n.to_string()),
             JSValue::String(s) => Ok(s.clone()),
-            JSValue::Ref(Heap::NULL) => Ok("null".to_string()),
+            JSValue::Ref(r) if r == &Heap::NULL => Ok("null".to_string()),
             JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
                 Some(to_string) => {
                     let funcref = to_string.to_ref(heap)?;
@@ -868,6 +868,7 @@ impl Interpreted {
     pub const VOID: Interpreted = Interpreted::Value(JSValue::Undefined);
     pub const NAN: Interpreted = Interpreted::Value(JSValue::Number(f64::NAN));
 
+    /// A convenience wrapper for Interpreted::Member{} construction
     pub fn member(of: JSRef, name: &str) -> Interpreted {
         Interpreted::Member {
             of,
@@ -875,6 +876,8 @@ impl Interpreted {
         }
     }
 
+    /// If Interpreted::Value, unwrap;
+    /// if Interpreted::Member{of, name}, [`JSObject::lookup_value`] of `name` in `of`.
     pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
         match self {
             Interpreted::Value(value) => Ok(value.clone()),
