@@ -69,9 +69,13 @@ fn batch_main(heap: &mut Heap) -> io::Result<()> {
     let mut input = String::new();
     io::stdin().lock().read_to_string(&mut input)?;
 
-    let result = evaluate_input(&input, heap).unwrap();
-    let output = result.to_value(heap).unwrap().to_string(heap).unwrap();
-    println!("{}", output);
+    match evaluate_input(&input, heap) {
+        Ok(result) => {
+            let output = result.to_value(heap).unwrap().to_string(heap).unwrap();
+            println!("{}", output);
+        }
+        Err(e) => eprintln!("Exception: {:?}", e),
+    };
     Ok(())
 }
 
