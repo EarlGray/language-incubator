@@ -1349,10 +1349,33 @@ fn test_arrays() {
     assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a[2]", "two" );
     assert_eval!( "var a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
 
-    //assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
-    //assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
+    // .length
+    /*
+    assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
+    assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
+    */
 
-    //assert_eval!( "var a = ['zero']; a.push('one'); a[1]",  "one" );
+    /*
+    // Array.prototype.push()
+    assert_eval!("var a = []; a.push(1); a", [1.0]);
+    assert_eval!("var a = []; a.push(true); a.length", 1.0);
+
+    assert_eval!("var a = []; a.push(); a", []);
+    assert_eval!("var a = []; a.push(1, 2, 3); a.length", [1.0, 2.0, 3.0]);
+    assert_eval!(r#"
+      var a = [1, 2];
+      var b = [3, 4];
+      Array.prototype.push.apply(a, b);
+      a
+    "#, [1.0, 2.0, 3.0, 4.0]);
+
+    assert_eval!("var a = []; a.push('len++')", 1.0);  // return value is the new length
+    assert_eval!(r#" // generic use
+        var obj = {length: 3.2};
+        Array.prototype.push.call(obj, 8);
+        obj[4]*10 + obj.length
+    "#, 45.0);
+    */
 }
 
 /// ```sh
