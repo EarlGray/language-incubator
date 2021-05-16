@@ -108,16 +108,17 @@
 *** TODO Array.from
 *** TODO Array.of
 *** TODO Array.isArray()
-** TODO Array.prototype [1/3]
+** TODO Array.prototype [2/3]
 *** DONE [2021-01-16 Sat] .toString()
-*** TODO .length
+*** DONE [2021-05-16 Sun] .length
 *** TODO ...everything else
 * TODO builtin =JSON=
 * TODO builtin arrays
 ** DONE [2021-01-11 Mon] ArrayExpression
 ** DONE [2021-01-11 Mon] array members get/assign
-* TODO builtin functions [0/3]
+* TODO builtin functions [1/4]
 ** TODO =parseInt=
+** DONE [2021-04-28 Wed] =parseFloat=
 ** TODO =eval=
 ** TODO =isNaN=
 * MAYBE builtin =assert= object
@@ -130,25 +131,26 @@
 *** DONE [2021-01-20 Wed] Boolean.prototype
 **** DONE [2021-01-20 Wed] .valueOf
 **** DONE [2021-01-20 Wed] .toString
-** TODO =Number=
-** TODO =String=
-*** TODO string indexing
-*** TODO =src/builtin/string.rs=
-*** TODO String() constructor; Object("string")
+** TODO =String= [3/6]
+*** DONE [2021-04-24 Sat] string indexing
+*** DONE [2021-04-24 Sat] =src/builtin/string.rs=
+*** DONE [2021-04-24 Sat] String() constructor; Object("string")
 *** TODO check escape notation
-*** TODO static methods
+*** TODO static methods [0/3]
 **** TODO String.fromCharCode()
 **** TODO String.fromCodePoint()
 **** TODO String.raw()
-*** TODO prototype
-**** TODO .length
-**** TODO .charAt()
+*** TODO prototype [3/9]
+**** DONE [2021-03-10 Wed] .length
+**** DONE [2021-05-01 Sat] .charAt()
+**** DONE [2021-04-28 Wed] .charCodeAt()
 **** TODO .concat()
 **** TODO .includes()
 **** TODO .endsWith()
 **** TODO .indexOf()
 **** TODO .lastIndexOf()
 **** TODO ...
+** TODO =Number=
 * DONE [2021-01-01 Fri] function calls [3/3]
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~

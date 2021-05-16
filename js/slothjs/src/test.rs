@@ -1350,10 +1350,8 @@ fn test_arrays() {
     assert_eval!( "var a = ['zero', 'one']; a[1] = 'один'; a[1]", "один" );
 
     // .length
-    /*
-    assert_eval!( "var a = ['zero', 'one']; a.length", 2 );
-    assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3 );
-    */
+    assert_eval!( "var a = ['zero', 'one']; a.length", 2.0 );
+    assert_eval!( "var a = ['zero', 'one']; a[2] = 'two'; a.length", 3.0 );
 
     /*
     // Array.prototype.push()

@@ -473,19 +473,36 @@ impl JSObject {
     /// Tries to get JSValue of the own property `name`.
     /// This might call getters of the property.
     pub fn get_value(&self, name: &str) -> Option<JSValue> {
+        // indexing
         if let Ok(index) = usize::from_str(name) {
-            if let Some(array) = self.as_array() {
-                if let Some(value) = array.storage.get(index) {
-                    return Some(value.clone());
+            match &self.value {
+                ObjectValue::Array(array) => {
+                    if let Some(value) = array.storage.get(index) {
+                        return Some(value.clone());
+                    }
                 }
+                ObjectValue::String(s) => {
+                    // TODO: optimizie nth()'s sequential access
+                    if let Some(c) = s.chars().nth(index) {
+                        return Some(JSValue::from(String::from(c)));
+                    }
+                }
+                _ => (),
             }
-            if let ObjectValue::String(s) = &self.value {
-                // TODO: optimizie nth()'s sequential access
-                if let Some(c) = s.chars().nth(index) {
-                    return Some(JSValue::from(String::from(c)));
+        } else if name == "length" {
+            // TODO: make this hack a regular getter once getters are ready
+            match &self.value {
+                ObjectValue::Array(array) => {
+                    return Some(JSValue::from(array.storage.len() as i64))
                 }
+                ObjectValue::Closure(closure) => {
+                    return Some(JSValue::from(closure.params.len() as i64))
+                }
+                ObjectValue::String(s) => return Some(JSValue::from(s.len() as i64)),
+                _ => (),
             }
         }
+
         (self.properties.get(name)).and_then(|prop| match &prop.content {
             Content::Value(value) => Some(value.clone()),
         })
