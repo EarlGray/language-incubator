@@ -1212,6 +1212,17 @@ fn test_builtin_string() {
     assert_eval!("'abcde'.slice(-1, -3)", "");
     assert_eval!("String.prototype.slice.call(true, 2)", "ue");
     //assert_eval!("String.prototype.slice.call(123, 1)", "23");
+
+    // String.prototype.substr
+    assert_eval!("'abcde'.substr(2)", "cde");
+    assert_eval!("'abcde'.substr(10)", "");
+    assert_eval!("'abcde'.substr(-1)", "e");
+    assert_eval!("'abcde'.substr(-6)", "abcde");
+    assert_eval!("'abcde'.substr(1, 2)", "bc");
+    assert_eval!("'abcde'.substr(3, -2)", "");
+    assert_eval!("'abcde'.substr(NaN, 3)", "abc");
+    assert_eval!("'abcde'.substr('zz', 3)", "abc");
+    assert_eval!("String.prototype.substr.call(true, 2)", "ue");
 }
 
 #[test]
