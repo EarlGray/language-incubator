@@ -1218,6 +1218,7 @@ fn test_builtin_string() {
     assert_eval!("'abcde'.substr(10)", "");
     assert_eval!("'abcde'.substr(-1)", "e");
     assert_eval!("'abcde'.substr(-6)", "abcde");
+    //assert_eval!("'abcde'.substr(Number.NEGATIVE_INFINITY)", "abcde");
     assert_eval!("'abcde'.substr(1, 2)", "bc");
     assert_eval!("'abcde'.substr(3, -2)", "");
     assert_eval!("'abcde'.substr(NaN, 3)", "abc");

@@ -109,6 +109,25 @@ fn string_proto_slice(call: CallContext, heap: &mut Heap) -> Result<Interpreted,
     Ok(Interpreted::from(substr))
 }
 
+fn string_proto_substr(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let s = heap.ref_to_string(call.this_ref)?;
+    let strlen = s.chars().count() as i64;
+    let begin = match call.arg_as_index(0, heap)?.unwrap_or(0) {
+        b if b > strlen => return Ok(Interpreted::from("")),
+        b if b < -strlen => 0,
+        b if b < 0 => b + strlen,
+        b => b,
+    } as usize;
+    let end = match call.arg_as_index(1, heap)? {
+        Some(e) if e <= 0 => begin as i64,
+        Some(e) if e < strlen => begin as i64 + e,
+        _ => strlen,
+    } as usize;
+
+    let substr = &s[begin..end];
+    Ok(Interpreted::from(substr))
+}
+
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut string_proto = JSObject::new();
     string_proto.set_hidden("valueOf", Content::from_func(string_proto_valueOf, heap))?;
@@ -119,6 +138,7 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
         Content::from_func(string_proto_charCodeAt, heap),
     )?;
     string_proto.set_hidden("slice", Content::from_func(string_proto_slice, heap))?;
+    string_proto.set_hidden("substr", Content::from_func(string_proto_substr, heap))?;
 
     *heap.get_mut(Heap::STRING_PROTO) = string_proto;
 
