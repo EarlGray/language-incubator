@@ -61,6 +61,11 @@ impl JSRef {
             }
         }
     }
+
+    /// This should only be used for debugging
+    pub unsafe fn from_index(index: usize) -> JSRef {
+        JSRef(index)
+    }
 }
 
 /// Runtime heap

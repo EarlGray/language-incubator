@@ -119,8 +119,8 @@ fn string_proto_substr(call: CallContext, heap: &mut Heap) -> Result<Interpreted
         b => b,
     } as usize;
     let end = match call.arg_as_index(1, heap)? {
-        Some(e) if e <= 0 => begin as i64,
-        Some(e) if e < strlen => begin as i64 + e,
+        Some(len) if len <= 0 => begin as i64,
+        Some(len) if begin as i64 + len < strlen => begin as i64 + len,
         _ => strlen,
     } as usize;
 

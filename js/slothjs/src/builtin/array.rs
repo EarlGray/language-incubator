@@ -62,7 +62,9 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Ex
             Ok(Interpreted::from(value))
         }
         // TODO: generic object path
-        _ => Err(Exception::TypeErrorNotArraylike(Interpreted::from(call.this_ref))),
+        _ => Err(Exception::TypeErrorNotArraylike(Interpreted::from(
+            call.this_ref,
+        ))),
     }
 }
 

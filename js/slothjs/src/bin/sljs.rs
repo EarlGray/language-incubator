@@ -1,10 +1,12 @@
 use std::fmt::Debug;
 use std::io;
 use std::io::prelude::*;
+use std::str::FromStr;
 
 use atty::Stream;
 
 use slothjs::ast;
+use slothjs::error::ParseError;
 use slothjs::interpret::Interpretable;
 use slothjs::{
     CallContext,
@@ -60,7 +62,12 @@ fn evaluate_input(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception
         node: estree.to_ref(heap)?,
     };
 
-    let program = Program::parse_from(&estree).unwrap();
+    let program = Program::parse_from(estree).map_err(|e| {
+        eprintln!("Syntax error: {:?}", e);
+        Exception::SyntaxError(ParseError::InvalidJSON {
+            err: "TODO".to_string(),
+        })
+    })?;
 
     program.interpret(heap)
 }
@@ -95,6 +102,15 @@ fn repl_main(heap: &mut Heap) -> io::Result<()> {
         }
         let input = input.unwrap().unwrap();
         if input.len() == 0 {
+            continue;
+        }
+
+        if let Some(refstr) = input.strip_prefix(":dbg ") {
+            if let Ok(refnum) = usize::from_str(refstr) {
+                let href = unsafe { JSRef::from_index(refnum) };
+                let object = heap.get(href);
+                dbg!(object);
+            }
             continue;
         }
 
