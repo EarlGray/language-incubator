@@ -54,11 +54,24 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> Result<Interpreted, E
     }
 }
 
+fn array_proto_pop(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let array_object = heap.get_mut(call.this_ref);
+    match &mut array_object.value {
+        ObjectValue::Array(array) => {
+            let value = array.storage.pop().unwrap_or(JSValue::Undefined);
+            Ok(Interpreted::from(value))
+        }
+        // TODO: generic object path
+        _ => Err(Exception::TypeErrorNotArraylike(Interpreted::from(call.this_ref))),
+    }
+}
+
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut array_proto = JSObject::new();
 
     array_proto.set_hidden("toString", Content::from_func(array_toString, heap))?;
     array_proto.set_hidden("push", Content::from_func(array_proto_push, heap))?;
+    array_proto.set_hidden("pop", Content::from_func(array_proto_pop, heap))?;
 
     *heap.get_mut(Heap::ARRAY_PROTO) = array_proto;
 

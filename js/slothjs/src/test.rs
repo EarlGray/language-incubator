@@ -1378,13 +1378,25 @@ fn test_arrays() {
       a
     "#, [1.0, 2.0, 3.0, 4.0]);
     assert_eval!("var a = []; a.push('len++')", 1.0);  // return value is the new length
-
     /*
     assert_eval!(r#" // generic use
         var obj = {length: 3.2};
         Array.prototype.push.call(obj, 8);
         obj[4]*10 + obj.length
     "#, 84.0);
+    */
+
+    // Array.prototype.pop()
+    assert_eval!("[].pop()", null);
+    assert_eval!("[true].pop()", true);
+    assert_eval!("[1, 2].pop()", 2.0);
+    assert_eval!("var a = ['one', 'two', 'three']; a.pop(); a.length", 2.0);
+    /*
+    assert_eval!(r#"
+        var obj = {0:'one', 1:'two', length: 2};
+        Array.prototype.pop.call(obj);
+        a.length
+    "#, 1.0);
     */
 }
 
