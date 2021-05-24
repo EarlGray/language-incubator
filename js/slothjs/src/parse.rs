@@ -77,9 +77,11 @@ pub trait SourceNode: Sized + Copy {
     /// It's a ParseError if it does not exist or does not have a string meaning.
     fn get_str(self, property: &'static str) -> ParseResult<String, Self::Error>;
 
-    /// Get the array of children of a child node with name `property`.
+    /// Map the array of children of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have an array meaning.
-    fn get_array(self, property: &'static str) -> ParseResult<Vec<Self>, Self::Error>;
+    fn map_array<T, F>(self, property: &'static str, func: F) -> ParseResult<Vec<T>, Self::Error>
+    where
+        F: FnMut(Self) -> ParseResult<T, Self::Error>;
 
     /// Check that the value of `property` is a string equal to `value`.
     fn expect_str(
@@ -147,7 +149,10 @@ impl<'a> SourceNode for &'a JSON {
         Ok(s.to_string())
     }
 
-    fn get_array(self, property: &'static str) -> ParseResult<Vec<Self>, Self::Error> {
+    fn map_array<T, F>(self, property: &'static str, func: F) -> ParseResult<Vec<T>, Self::Error>
+    where
+        F: FnMut(Self) -> ParseResult<T, Self::Error>,
+    {
         let jarray = (self.get(property)).ok_or_else(|| ParseError::ObjectWithout {
             attr: property,
             value: self.to_error(),
@@ -155,7 +160,7 @@ impl<'a> SourceNode for &'a JSON {
         let array = (jarray.as_array()).ok_or_else(|| ParseError::ShouldBeArray {
             value: JSON::Null.to_error(),
         })?;
-        Ok(array.iter().collect())
+        array.iter().map(func).collect()
     }
 
     fn expect_str(
@@ -273,7 +278,14 @@ impl<'a> SourceNode for HeapNode<'a> {
         }
     }
 
-    fn get_array(self, property: &'static str) -> ParseResult<Vec<HeapNode<'a>>, Self::Error> {
+    fn map_array<T, F>(
+        self,
+        property: &'static str,
+        mut func: F,
+    ) -> ParseResult<Vec<T>, Self::Error>
+    where
+        F: FnMut(Self) -> ParseResult<T, Self::Error>,
+    {
         let value = (self.heap.get(self.node))
             .get_value(property)
             .ok_or_else(|| ParseError::ObjectWithout {
@@ -289,19 +301,18 @@ impl<'a> SourceNode for HeapNode<'a> {
                 .ok_or_else(|| ParseError::ShouldBeArray {
                     value: self.to_error(),
                 })?;
-        let result = (array.storage.iter())
-            .map(|node| {
-                let childref = node.to_ref().map_err(|_| ParseError::UnexpectedValue {
+        (array.storage.iter())
+            .map(|child| {
+                let childref = child.to_ref().map_err(|_| ParseError::UnexpectedValue {
                     want: "objects",
                     value: self.to_error(),
                 })?;
-                Ok(HeapNode {
+                func(HeapNode {
                     heap: self.heap,
                     node: childref,
                 })
             })
-            .collect::<Result<Vec<Self>, ParseError<Self>>>()?;
-        Ok(result)
+            .collect()
     }
 
     fn expect_str(
@@ -333,10 +344,7 @@ impl Program {
         source.expect_str("type", "Program")?;
 
         let mut ctx = ParserContext::new();
-        let jbody = source.get_array("body")?;
-        let body = (jbody.into_iter())
-            .map(|jstmt| Statement::parse_from(jstmt, &mut ctx))
-            .collect::<Result<Vec<Statement>, _>>()?;
+        let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt, &mut ctx))?;
 
         let ParserContext {
             declared_variables: variables,
@@ -407,11 +415,7 @@ impl ParseFrom for BlockStatement {
         source: S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jbody = source.get_array("body")?;
-        let body = jbody
-            .iter()
-            .map(|jstmt| Statement::parse_from(jstmt.clone(), ctx))
-            .collect::<ParseResult<Vec<Statement>, _>>()?;
+        let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt.clone(), ctx))?;
         Ok(BlockStatement { body })
     }
 }
@@ -449,19 +453,13 @@ impl ParseFrom for SwitchStatement {
         let jdiscriminant = source.get_node("discriminant")?;
         let discriminant = Expression::parse_from(jdiscriminant, ctx)?;
 
-        let jcases = source.get_array("cases")?;
-        let cases = (jcases.into_iter())
-            .map(|jcase| {
-                let test = jcase.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+        let cases = source.map_array("cases", |jcase| {
+            let test = jcase.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
 
-                let jconsequent = jcase.get_array("consequent")?;
-                let consequent = (jconsequent.into_iter())
-                    .map(|jstmt| Statement::parse_from(jstmt, ctx))
-                    .collect::<Result<Vec<Statement>, _>>()?;
-
-                Ok(SwitchCase { test, consequent })
-            })
-            .collect::<Result<Vec<SwitchCase>, _>>()?;
+            let consequent =
+                jcase.map_array("consequent", |jstmt| Statement::parse_from(jstmt, ctx))?;
+            Ok(SwitchCase { test, consequent })
+        })?;
 
         Ok(SwitchStatement {
             discriminant,
@@ -657,10 +655,7 @@ impl ParseFrom for VariableDeclaration {
                 })
             }
         };
-        let jdeclarations = source.get_array("declarations")?;
-
-        let mut declarations = vec![];
-        for decl in jdeclarations.into_iter() {
+        let declarations = source.map_array("declarations", |decl| {
             decl.expect_str("type", "VariableDeclarator")?;
 
             let jid = decl.get_node("id")?;
@@ -672,8 +667,9 @@ impl ParseFrom for VariableDeclaration {
             })?;
 
             ctx.declared_variables.insert(name.clone());
-            declarations.push(VariableDeclarator { name, init });
-        }
+            Ok(VariableDeclarator { name, init })
+        })?;
+
         Ok(VariableDeclaration { kind, declarations })
     }
 }
@@ -719,10 +715,8 @@ impl ParseFrom for Expression {
         let expr_type = source.get_str("type")?;
         let expr = match expr_type.as_str() {
             "ArrayExpression" => {
-                let jelements = source.get_array("elements")?;
-                let elements = (jelements.into_iter())
-                    .map(|jelem| Expression::parse_from(jelem, ctx))
-                    .collect::<Result<Vec<Expression>, _>>()?;
+                let elements =
+                    source.map_array("elements", |jelem| Expression::parse_from(jelem, ctx))?;
                 let expr = ArrayExpression(elements);
                 Expr::Array(expr)
             }
@@ -738,11 +732,8 @@ impl ParseFrom for Expression {
                 let jcallee = source.get_node("callee")?;
                 let callee = Expression::parse_from(jcallee, ctx)?;
 
-                let jarguments = source.get_array("arguments")?;
-                let arguments = (jarguments.into_iter())
-                    .map(|jarg| Expression::parse_from(jarg, ctx))
-                    .collect::<Result<Vec<Expression>, _>>()?;
-
+                let arguments =
+                    source.map_array("arguments", |jarg| Expression::parse_from(jarg, ctx))?;
                 Expr::Call(Box::new(CallExpression(callee, arguments)))
             }
             "ConditionalExpression" => {
@@ -793,11 +784,8 @@ impl ParseFrom for Expression {
                 let jcallee = source.get_node("callee")?;
                 let callee = Expression::parse_from(jcallee, ctx)?;
 
-                let jarguments = source.get_array("arguments")?;
-                let arguments = (jarguments.into_iter())
-                    .map(|jarg| Expression::parse_from(jarg, ctx))
-                    .collect::<Result<Vec<Expression>, _>>()?;
-
+                let arguments =
+                    source.map_array("arguments", |jarg| Expression::parse_from(jarg, ctx))?;
                 let expr = NewExpression(callee, arguments);
                 Expr::New(Box::new(expr))
             }
@@ -834,7 +822,7 @@ impl ParseFrom for Identifier {
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let name = source.get_str("name")?;
-        let identifier = Identifier::from(name.as_str());
+        let identifier = Identifier(name);
         ctx.used_variables.insert(identifier.clone());
         Ok(identifier)
     }
@@ -899,11 +887,7 @@ impl ParseFrom for SequenceExpression {
         source: S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jexprs = source.get_array("expressions")?;
-
-        let exprs = (jexprs.into_iter())
-            .map(|jexpr| Expression::parse_from(jexpr, ctx))
-            .collect::<Result<Vec<Expression>, _>>()?;
+        let exprs = source.map_array("expressions", |jexpr| Expression::parse_from(jexpr, ctx))?;
         Ok(SequenceExpression(exprs))
     }
 }
@@ -1022,10 +1006,7 @@ impl ParseFrom for ObjectExpression {
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ObjectExpression")?;
 
-        let jproperties = source.get_array("properties")?;
-
-        let mut properties = vec![];
-        for jprop in jproperties.into_iter() {
+        let properties = source.map_array("properties", |jprop| {
             jprop.expect_str("type", "Property")?;
 
             let jkey = jprop.get_node("key")?;
@@ -1051,8 +1032,9 @@ impl ParseFrom for ObjectExpression {
             let jvalue = jprop.get_node("value")?;
             let value = Expression::parse_from(jvalue, ctx)?;
 
-            properties.push((key, value));
-        }
+            Ok((key, value))
+        })?;
+
         Ok(ObjectExpression(properties))
     }
 }
@@ -1067,10 +1049,9 @@ impl ParseFrom for FunctionExpression {
             .ok();
 
         let mut inner_ctx = ParserContext::new();
-        let jparams = source.get_array("params")?;
-        let params = (jparams.into_iter())
-            .map(|jparam| Identifier::parse_from(jparam, &mut inner_ctx))
-            .collect::<Result<Vec<Identifier>, _>>()?;
+        let params = source.map_array("params", |jparam| {
+            Identifier::parse_from(jparam, &mut inner_ctx)
+        })?;
 
         let jbody = source.get_node("body")?;
         let body = BlockStatement::parse_from(jbody, &mut inner_ctx)?;
