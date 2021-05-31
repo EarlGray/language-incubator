@@ -9,7 +9,7 @@ use crate::function::{
 use crate::prelude::*;
 use crate::{
     builtin,
-    object::ObjectValue,
+    object::{ObjectValue, Content, Property},
     source,
     Exception,
     Interpretable,
@@ -66,6 +66,7 @@ impl JSRef {
 #[derive(Debug)]
 pub struct Heap {
     objects: Vec<JSObject>,
+    n_objects_last_gc: usize,
     pub loc: Option<Box<source::Location>>,
 }
 
@@ -99,7 +100,11 @@ impl Heap {
             objects.push(JSObject::new());
         }
 
-        let mut heap = Heap { objects, loc: None };
+        let mut heap = Heap {
+            objects,
+            n_objects_last_gc: 64,
+            loc: None,
+        };
         builtin::init(&mut heap).expect("failed to initialize builtin objects");
         heap
     }
@@ -370,5 +375,143 @@ impl Heap {
         // TODO: capture the stack
         //let _ = source::print_callstack(self);
         Err(exc)
+    }
+
+    pub fn try_garbage_collect(&mut self) {
+        if self.objects.len() >= 2 * self.n_objects_last_gc {
+            let n_before = self.objects.len();
+            SimpleCopyingGC::garbage_collect(self);
+            let n_after = self.objects.len();
+            self.n_objects_last_gc = n_after;
+
+            eprintln!("GC: {} objects before, {} after", n_before, n_after);
+        }
+    }
+}
+
+struct SimpleCopyingGC {
+    visitset: Vec<JSRef>,
+    objects: Vec<JSObject>,
+}
+
+impl SimpleCopyingGC {
+    pub fn garbage_collect(heap: &mut Heap) {
+        let mut gc = Self {
+            visitset: vec![],
+            objects: vec![],
+        };
+        gc.collect(heap);
+
+        heap.objects = gc.objects;
+    }
+
+    fn collect(&mut self, heap: &mut Heap) {
+        use std::mem;
+
+        // Phase I: bootstrap
+        for i in 0..Heap::USERSTART {
+            let object = heap.get_mut(JSRef(i));
+            self.visit(object);
+
+            let forwarder = self.add_forwarder();
+            mem::swap(object, forwarder);
+        }
+
+        // Phase II: visit all live objects
+        while let Some(objref) = self.visitset.pop() {
+            let object = heap.get_mut(objref);
+            if let ObjectValue::GCForwarded(_) = object.value {
+                continue;
+            }
+            self.visit(object);
+
+            let forwarder = self.add_forwarder();
+            mem::swap(object, forwarder);
+        }
+
+        // Phase III: patch all forwarded references
+        for object in self.objects.iter_mut() {
+            Self::patch(object, heap);
+        }
+    }
+
+    fn resolve_forwarding(heap: &Heap, oldref: JSRef) -> JSRef {
+        if oldref.0 < Heap::USERSTART {
+            return oldref;
+        }
+        match heap.get(oldref).value {
+            ObjectValue::GCForwarded(newref) => JSRef(newref),
+            _ => unreachable!(),
+        }
+    }
+
+    fn add_forwarder(&mut self) -> &mut JSObject {
+        let newref = self.objects.len();
+        let mut forwarder = JSObject::new();
+        forwarder.value = ObjectValue::GCForwarded(newref);
+        self.objects.push(forwarder);
+        self.objects.get_mut(newref).unwrap()
+    }
+
+    fn add_live(&mut self, href: JSRef) {
+        if href.0 >= Heap::USERSTART {
+            self.visitset.push(href);
+        }
+    }
+
+    fn visit(&mut self, object: &JSObject) {
+        self.add_live(object.proto);
+
+        match &object.value {
+            ObjectValue::Closure(closure) => {
+                self.add_live(closure.captured_scope);
+            }
+            ObjectValue::Array(array) => {
+                for item in array.storage.iter() {
+                    if let JSValue::Ref(href) = item {
+                        self.add_live(*href);
+                    }
+                }
+            }
+            _ => (),
+        };
+
+        for Property { content, .. } in object.properties.values() {
+            match content {
+                Content::Value(JSValue::Ref(href)) => {
+                    self.add_live(*href);
+                }
+                Content::Value(_) => (),
+            }
+        }
+    }
+
+    fn patch(object: &mut JSObject, heap: &Heap) {
+        object.proto = Self::resolve_forwarding(heap, object.proto);
+
+        match &mut object.value {
+            ObjectValue::Closure(closure) => {
+                closure.captured_scope = Self::resolve_forwarding(heap, closure.captured_scope);
+            }
+            ObjectValue::Array(array) => {
+                for item in array.storage.iter_mut() {
+                    if let JSValue::Ref(oldref) = item {
+                        let newref = Self::resolve_forwarding(heap, *oldref);
+                        *item = JSValue::from(newref);
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        for Property { content, .. } in object.properties.values_mut() {
+            match content {
+                Content::Value(JSValue::Ref(oldref)) => {
+                    let newref = Self::resolve_forwarding(heap, *oldref);
+                    *content = Content::from(newref);
+                }
+                Content::Value(_) => (),
+            };
+        }
     }
 }

@@ -39,6 +39,7 @@ impl Interpretable for Program {
 
 impl Interpretable for Statement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
+        heap.try_garbage_collect();
         heap.loc = self.loc.clone();
         match &self.stmt {
             Stmt::Empty => Ok(Interpreted::VOID),
@@ -765,9 +766,10 @@ impl Interpretable for NewExpression {
 
 impl Interpretable for FunctionExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
+        let captured_scope = heap.local_scope().unwrap_or(Heap::NULL);
         let closure = Closure {
             function: Rc::clone(&self.func),
-            captured_scope: heap.local_scope().unwrap_or(Heap::GLOBAL),
+            captured_scope,
         };
 
         let function_object = JSObject::from_closure(closure);
