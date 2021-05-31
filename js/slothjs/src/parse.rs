@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::rc::Rc;
 
 use serde_json;
 
@@ -691,7 +692,7 @@ impl ParseFrom for FunctionDeclaration {
         source.expect_str("type", "FunctionDeclaration")?;
 
         let function = FunctionExpression::parse_from(source, ctx)?;
-        let id = (function.id.clone()).ok_or_else(|| ParseError::ObjectWithout {
+        let id = (function.func.id.clone()).ok_or_else(|| ParseError::ObjectWithout {
             attr: "id",
             value: source.to_error(),
         })?;
@@ -1079,7 +1080,7 @@ impl ParseFrom for FunctionExpression {
         ctx.used_variables
             .extend(free_variables.clone().into_iter());
 
-        Ok(FunctionExpression {
+        let func = Function {
             id,
             params,
             variables,
@@ -1089,6 +1090,9 @@ impl ParseFrom for FunctionExpression {
             is_generator: source.get_bool("generator").unwrap_or(false),
             is_expression: source.get_bool("expression").unwrap_or(false),
             is_async: source.get_bool("async").unwrap_or(false),
+        };
+        Ok(FunctionExpression {
+            func: Rc::new(func),
         })
     }
 }

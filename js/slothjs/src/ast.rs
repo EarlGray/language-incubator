@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::rc::Rc;
 
 use crate::object::JSON;
 use crate::source;
@@ -242,7 +243,7 @@ pub struct ConditionalExpression {
 }
 
 #[derive(Clone, Debug)]
-pub struct FunctionExpression {
+pub struct Function {
     pub id: Option<Identifier>,
     pub params: Vec<Pattern>,           // cannot be a HashSet, needs order
     pub variables: HashSet<Identifier>, // the set of local variables
@@ -252,6 +253,11 @@ pub struct FunctionExpression {
     pub is_generator: bool,
     pub is_expression: bool,
     pub is_async: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionExpression {
+    pub func: Rc<Function>,
 }
 
 // TODO: enum { AssignmentPattern, Identifier, BindingPattern }

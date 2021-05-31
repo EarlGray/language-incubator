@@ -748,11 +748,7 @@ impl Interpretable for NewExpression {
 impl Interpretable for FunctionExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let closure = Closure {
-            id: self.id.clone(),
-            params: self.params.clone(),
-            body: self.body.clone(),
-            variables: self.variables.clone(),
-            functions: self.functions.clone(),
+            function: self.func.clone(),
             captured_scope: heap.local_scope().unwrap_or(Heap::NULL),
         };
 

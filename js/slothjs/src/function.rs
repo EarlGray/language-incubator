@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
@@ -30,7 +29,7 @@ impl CallContext {
         // Yes, we do need a clone() to workaround borrow checker:
         match &heap.get(func_ref).value {
             ObjectValue::VMCall(vmcall) => vmcall.clone().call(self, heap),
-            ObjectValue::Closure(closure) => Rc::clone(closure).call(self, heap),
+            ObjectValue::Closure(closure) => closure.clone().call(self, heap),
             _ => {
                 let callee = Interpreted::Member {
                     of: self.this_ref,
@@ -70,11 +69,7 @@ impl fmt::Debug for VMCall {
 
 #[derive(Clone, Debug)]
 pub struct Closure {
-    pub id: Option<ast::Identifier>,
-    pub params: Vec<ast::Identifier>, // cannot be a set, needs order
-    pub variables: HashSet<ast::Identifier>,
-    pub functions: Vec<ast::FunctionDeclaration>,
-    pub body: ast::BlockStatement,
+    pub function: Rc<ast::Function>,
     pub captured_scope: JSRef, // TODO: capture free variables only
 }
 
@@ -90,7 +85,7 @@ impl Closure {
                 .set_nonconf("arguments", Content::from(arguments_ref))?;
 
             // set each argument
-            for (i, param) in self.params.iter().enumerate() {
+            for (i, param) in self.function.params.iter().enumerate() {
                 let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
@@ -100,9 +95,12 @@ impl Closure {
 
             let _ = source::save_caller(call.loc.clone(), heap);
 
-            heap.declare(self.variables.iter(), self.functions.iter())?;
+            heap.declare(
+                self.function.variables.iter(),
+                self.function.functions.iter(),
+            )?;
 
-            self.body.interpret(heap)
+            self.function.body.interpret(heap)
         });
         match result {
             Ok(_) => Ok(Interpreted::VOID), // BlockStatement result

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -396,10 +395,10 @@ impl JSObject {
 
     /// Wrap the given `closure` into a Function.
     pub fn from_closure(closure: Closure) -> JSObject {
-        let params_count = closure.params.len() as f64;
+        let params_count = closure.function.params.len() as f64;
         let mut function_object = JSObject {
             proto: Heap::FUNCTION_PROTO,
-            value: ObjectValue::Closure(Rc::new(closure)),
+            value: ObjectValue::Closure(closure),
             properties: HashMap::new(),
         };
         function_object
@@ -496,7 +495,7 @@ impl JSObject {
                     return Some(JSValue::from(array.storage.len() as i64))
                 }
                 ObjectValue::Closure(closure) => {
-                    return Some(JSValue::from(closure.params.len() as i64))
+                    return Some(JSValue::from(closure.function.params.len() as i64))
                 }
                 ObjectValue::String(s) => return Some(JSValue::from(s.len() as i64)),
                 _ => (),
@@ -759,7 +758,7 @@ pub enum ObjectValue {
 
     // Function
     VMCall(VMCall),
-    Closure(Rc<Closure>),
+    Closure(Closure),
 
     // Array
     Array(JSArray),
