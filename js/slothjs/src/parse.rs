@@ -64,10 +64,17 @@ pub trait SourceNode: Sized + Copy {
     fn map_node<T, F>(
         self,
         property: &'static str,
-        action: F,
+        mut action: F,
     ) -> ParseResult<Option<T>, Self::Error>
     where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>;
+        F: FnMut(Self) -> ParseResult<T, Self::Error>,
+    {
+        match self.get_node(property) {
+            Ok(node) => action(node).map(|result| Some(result)),
+            Err(ParseError::ObjectWithout { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
 
     /// Get the boolean value of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have a boolean meaning.
@@ -237,6 +244,7 @@ impl<'a> SourceNode for HeapNode<'a> {
         })
     }
 
+    /*
     fn map_node<T, F>(
         self,
         _property: &'static str,
@@ -247,6 +255,7 @@ impl<'a> SourceNode for HeapNode<'a> {
     {
         todo!()
     }
+    */
 
     fn get_bool(self, property: &'static str) -> ParseResult<bool, Self::Error> {
         let value = (self.heap.get(self.node))
