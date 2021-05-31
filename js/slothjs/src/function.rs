@@ -75,7 +75,8 @@ pub struct Closure {
 
 impl Closure {
     pub fn call(&self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap| {
+        let capture_ref = self.captured_scope;
+        let result = heap.enter_new_scope(call.this_ref, capture_ref, |heap| {
             // `arguments`
             let argv = (call.arguments.iter())
                 .map(|v| v.to_value(heap))

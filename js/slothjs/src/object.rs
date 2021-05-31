@@ -762,6 +762,9 @@ pub enum ObjectValue {
 
     // Array
     Array(JSArray),
+
+    // Only used during GC
+    GCForwarded(usize),
 }
 
 impl ObjectValue {
