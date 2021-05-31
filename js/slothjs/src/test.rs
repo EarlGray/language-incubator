@@ -1224,6 +1224,21 @@ fn test_builtin_string() {
     assert_eval!("'abcde'.substr(NaN, 3)", "abc");
     assert_eval!("'abcde'.substr('zz', 3)", "abc");
     assert_eval!("String.prototype.substr.call(true, 2)", "ue");
+
+    // String.prototype.indexOf()
+    assert_eval!("'abcde'.indexOf('bc')", 1.0);
+    assert_eval!("'abcde'.indexOf('bce')", (-1.0));
+    assert_eval!("'абвгд'.indexOf('гд')", 3.0);
+    assert_eval!("'abcdeabcd'.indexOf('ab', 3)", 5.0);
+    assert_eval!("'abcde'.indexOf('ab', -3)", 0.0);
+    assert_eval!("'abcde'.indexOf('ab', 6)", (-1.0));
+    assert_eval!("'abcde'.indexOf('')", 0.0);
+    assert_eval!("'abcde'.indexOf('', 3)", 3.0);
+    assert_eval!("'abcde'.indexOf('', 7)", 5.0);
+    assert_eval!("'abcde'.indexOf('Ab')", (-1.0));
+    assert_eval!("'abcdefghi'.indexOf('ab', 3)", (-1.0));
+    assert_eval!("'undefined'.indexOf()", 0.0);
+
 }
 
 #[test]

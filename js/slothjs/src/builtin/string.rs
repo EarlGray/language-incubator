@@ -128,6 +128,44 @@ fn string_proto_substr(call: CallContext, heap: &mut Heap) -> Result<Interpreted
     Ok(Interpreted::from(substr))
 }
 
+#[allow(non_snake_case)]
+fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    let NOT_FOUND = Interpreted::from(-1);
+
+    let heystack = heap.ref_to_string(call.this_ref)?;
+    let strlen = heystack.chars().count() as i64; // COSTLY
+
+    let needle = (call.arguments.get(0))
+        .unwrap_or(&Interpreted::from("undefined"))
+        .to_value(heap)?
+        .stringify(heap)?;
+
+    let char_start = match call.arg_as_index(1, heap)?.unwrap_or(0) {
+        b if b < 0 => 0,
+        b if b > strlen && &needle == "" => return Ok(Interpreted::from(strlen)),
+        b if b > strlen => return Ok(NOT_FOUND),
+        b => b,
+    };
+    // COSTLY
+    let byte_start = match heystack.as_str().char_indices().nth(char_start as usize) {
+        None => return Ok(NOT_FOUND),
+        Some((offset, _)) => offset,
+    };
+    let heystack = &heystack[byte_start..];
+
+    // COSTLY, but kudos to std::str for providing a fast and tested substring search
+    let byte_index = match heystack.find(&needle) {
+        None => return Ok(NOT_FOUND),
+        Some(byte_index) => byte_index,
+    };
+
+    // COSTLY
+    let char_index = (heystack.char_indices())
+        .position(|(bi, _)| bi == byte_index)
+        .unwrap(); // yes, there must be a position since we've `find`ed it.
+    Ok(Interpreted::from(char_start + char_index as i64))
+}
+
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut string_proto = JSObject::new();
     string_proto.set_hidden("valueOf", Content::from_func(string_proto_valueOf, heap))?;
@@ -139,6 +177,7 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     )?;
     string_proto.set_hidden("slice", Content::from_func(string_proto_slice, heap))?;
     string_proto.set_hidden("substr", Content::from_func(string_proto_substr, heap))?;
+    string_proto.set_hidden("indexOf", Content::from_func(string_proto_indexOf, heap))?;
 
     *heap.get_mut(Heap::STRING_PROTO) = string_proto;
 
