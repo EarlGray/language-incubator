@@ -18,7 +18,6 @@ use slothjs::{
     Program,
 };
 
-// TODO: add build.rs to install esprima and create its json tree.
 const ESPRIMA: &'static str = include_str!("../../tmp/esprima.json");
 
 fn die<E: Debug>(msg: &str, err: E, errcode: i32) -> ! {

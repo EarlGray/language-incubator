@@ -20,7 +20,11 @@ fn main() -> Result<(), io::Error> {
     println!("cargo:rerun-if-changed={}", ESPRIMA);
     println!("cargo:rerun-if-changed={}", ESJSON);
 
-    let npm = if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" };
+    let npm = if cfg!(target_os = "windows") {
+        "npm.cmd"
+    } else {
+        "npm"
+    };
     let esjson = Path::new(ESJSON);
 
     if let Some(outdir) = esjson.parent() {
@@ -33,7 +37,8 @@ fn main() -> Result<(), io::Error> {
     if cfg!(target_os = "windows") {
         let status = Command::new(npm)
             .args(["exec", "esparse", "--", ESPRIMA])
-            .output().unwrap();
+            .output()
+            .unwrap();
         // yes, Windows, I do hate you.
         let json = decode_utf16(&status.stdout).unwrap();
         fs::write(esjson, json).unwrap();
@@ -42,7 +47,8 @@ fn main() -> Result<(), io::Error> {
         let exitcode = Command::new(npm)
             .args(["exec", "esparse", "--", ESPRIMA])
             .stdout(esjson)
-            .status().unwrap();
+            .status()
+            .unwrap();
         println!("esparse: {}", exitcode);
     }
 

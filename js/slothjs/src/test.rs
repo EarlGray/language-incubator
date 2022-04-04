@@ -14,11 +14,12 @@ use crate::interpret::Interpretable;
 use crate::object;
 use crate::error::{Exception, ParseError};
 
-const ESPARSE: &str = "./node_modules/.bin/esparse";
+const NODE: &str = if cfg!(target_os = "windows") { "node.exe" } else { "node" };
+const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
 
 fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let mut child = Command::new(ESPARSE)
-        //.arg("--loc")
+    let mut child = Command::new(NODE)
+        .args([ESPARSE /*, "--loc" */])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
