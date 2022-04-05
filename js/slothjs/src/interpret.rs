@@ -1,3 +1,5 @@
+use smol_str::SmolStr;
+
 use crate::ast::*; // yes, EVERYTHING
 
 use crate::error::Exception;
@@ -202,10 +204,10 @@ impl Interpretable for ForInStatement {
             let object = heap.get(objref);
             let mut keys = (object.properties.keys())
                 .map(|s| s.clone())
-                .collect::<HashSet<String>>();
+                .collect::<HashSet<SmolStr>>();
             if let Some(array) = object.as_array() {
                 let indices = 0..array.storage.len();
-                keys.extend(indices.map(|i| i.to_string()));
+                keys.extend(indices.map(|i| format!("{}", i).into()));
             }
             // TODO: strings iteration
 
@@ -596,7 +598,7 @@ impl Interpretable for MemberExpression {
         // compute the name of the property:
         let propname = if *computed {
             let propval = propexpr.interpret(heap)?.to_value(heap)?;
-            propval.stringify(heap)?
+            SmolStr::from(propval.stringify(heap)?)
         } else {
             match &propexpr.expr {
                 Expr::Identifier(name) => name.0.clone(),
@@ -630,7 +632,7 @@ impl Interpretable for ObjectExpression {
                 ObjectKey::Identifier(ident) => ident.clone(),
                 ObjectKey::Computed(expr) => {
                     let result = expr.interpret(heap)?.to_value(heap)?;
-                    result.stringify(heap)?
+                    result.stringify(heap)?.into()
                 }
             };
             let valresult = valexpr.interpret(heap)?;
@@ -696,7 +698,7 @@ impl Interpretable for CallExpression {
         let callee = callee_expr.interpret(heap)?;
         let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
 
-        let method_name = name.to_string();
+        let method_name = SmolStr::from(name);
         let call = CallContext {
             this_ref,
             method_name,
@@ -733,7 +735,7 @@ impl Interpretable for NewExpression {
         // call its constructor
         let call = CallContext {
             this_ref: object_ref,
-            method_name: "<constructor>".to_string(),
+            method_name: SmolStr::from("<constructor>"),
             arguments,
             loc,
         };

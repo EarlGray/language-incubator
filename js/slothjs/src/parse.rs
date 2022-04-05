@@ -832,7 +832,7 @@ impl ParseFrom for Identifier {
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let name = source.get_str("name")?;
-        let identifier = Identifier(name);
+        let identifier = Identifier::from(name);
         ctx.used_variables.insert(identifier.clone());
         Ok(identifier)
     }
@@ -1027,8 +1027,8 @@ impl ParseFrom for ObjectExpression {
                 match keyexpr.expr {
                     Expr::Identifier(ident) => ObjectKey::Identifier(ident.0),
                     Expr::Literal(jval) => match jval.0.as_str() {
-                        Some(val) => ObjectKey::Identifier(val.to_string()),
-                        None => ObjectKey::Identifier(jval.0.to_string()),
+                        Some(val) => ObjectKey::from(val),
+                        None => ObjectKey::from(jval.0.to_string()),
                     },
                     _ => {
                         return Err(ParseError::UnexpectedValue {

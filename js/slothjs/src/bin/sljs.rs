@@ -17,6 +17,7 @@ use slothjs::{
     JSRef,
     Program,
 };
+use smol_str::SmolStr;
 
 const ESPRIMA: &'static str = include_str!("../../tmp/esprima.json");
 
@@ -51,7 +52,7 @@ fn evaluate_input(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception
         esparse,
         CallContext {
             this_ref: esprima_ref,
-            method_name: "parse".to_string(),
+            method_name: SmolStr::from("parse"),
             arguments,
             loc: None,
         },

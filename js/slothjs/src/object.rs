@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use smol_str::SmolStr;
+
 use bitflags::bitflags;
 use serde_json::json;
 
@@ -108,7 +110,7 @@ impl JSValue {
                     let funcref = to_string.to_ref(heap)?;
                     let call = CallContext {
                         this_ref: *r,
-                        method_name: "toString".to_string(),
+                        method_name: SmolStr::from("toString"),
                         arguments: vec![],
                         loc: None,
                     };
@@ -372,7 +374,7 @@ fn test_boolify() {
 pub struct JSObject {
     pub proto: JSRef,
     pub value: ObjectValue,
-    pub properties: HashMap<String, Property>,
+    pub properties: HashMap<SmolStr, Property>,
 }
 
 impl JSObject {
@@ -429,7 +431,7 @@ impl JSObject {
     pub fn from_str(value: String) -> JSObject {
         let mut properties = HashMap::new();
         properties.insert(
-            String::from("length"),
+            SmolStr::from("length"),
             Property {
                 access: Access::empty(),
                 content: Content::from(value.chars().count() as i64),
@@ -565,7 +567,7 @@ impl JSObject {
             }
             None => {
                 let prop = Property { content, access };
-                self.properties.insert(name.to_string(), prop);
+                self.properties.insert(SmolStr::from(name), prop);
             }
         }
         Ok(())
@@ -649,7 +651,7 @@ impl JSObject {
             }
 
             let jvalue = property.content.to_value()?.to_json(heap)?;
-            json[key] = jvalue;
+            json[key.to_string()] = jvalue;
         }
         Ok(json)
     }
@@ -874,7 +876,7 @@ impl JSArray {}
 #[derive(Debug, Clone, PartialEq)]
 pub enum Interpreted {
     /// An object member; might not exist yet.
-    Member { of: JSRef, name: String },
+    Member { of: JSRef, name: SmolStr },
 
     /// A value
     Value(JSValue),
@@ -888,7 +890,7 @@ impl Interpreted {
     pub fn member(of: JSRef, name: &str) -> Interpreted {
         Interpreted::Member {
             of,
-            name: name.to_string(),
+            name: SmolStr::from(name),
         }
     }
 

@@ -1,3 +1,5 @@
+use smol_str::SmolStr;
+
 use crate::object::{
     Access,
     Content,
@@ -116,7 +118,7 @@ fn object_object_getOwnPropertyDescriptor(
         .stringify(heap)?;
 
     let inspected_object = heap.get(inspected_ref);
-    let prop = match inspected_object.properties.get(&propname) {
+    let prop = match inspected_object.properties.get(propname.as_str()) {
         Some(prop) => prop.clone(),
         None => return Ok(Interpreted::VOID),
     };
@@ -135,7 +137,7 @@ fn object_object_getOwnPropertyDescriptor(
 
 fn define_property(
     objref: JSRef,
-    propname: String,
+    propname: SmolStr,
     descref: JSRef,
     heap: &mut Heap,
 ) -> Result<(), Exception> {
@@ -182,6 +184,7 @@ fn object_object_defineProperty(
     let prop = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
         .to_value(heap)?
         .stringify(heap)?;
+    let prop = SmolStr::from(prop);
 
     let descref = (call.arguments.get(2).unwrap_or(&Interpreted::VOID)).to_ref(heap)?;
 
@@ -190,7 +193,7 @@ fn object_object_defineProperty(
 }
 
 fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> Result<(), Exception> {
-    let mut pairs: Vec<(String, JSRef)> = (heap.get(descs_ref).properties.iter())
+    let mut pairs: Vec<(SmolStr, JSRef)> = (heap.get(descs_ref).properties.iter())
         .map(|(prop, desc)| {
             let descref = match desc.to_ref() {
                 Some(descref) => descref,

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use smol_str::SmolStr;
 
 use crate::ast;
 use crate::error::Exception;
@@ -19,7 +20,7 @@ use crate::source;
 
 pub struct CallContext {
     pub this_ref: JSRef,
-    pub method_name: String,
+    pub method_name: SmolStr,
     pub arguments: Vec<Interpreted>,
     pub loc: Option<Box<source::Location>>,
 }

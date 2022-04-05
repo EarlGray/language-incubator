@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use smol_str::SmolStr;
+
 use crate::object::JSON;
 use crate::source;
 
@@ -44,7 +46,13 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub enum ObjectKey {
     Computed(Expression),
-    Identifier(String),
+    Identifier(SmolStr),
+}
+
+impl<S> From<S> for ObjectKey where S: AsRef<str> {
+    fn from(s: S) -> Self {
+        ObjectKey::Identifier(SmolStr::from(s))
+    }
 }
 
 // ==============================================
@@ -191,7 +199,7 @@ pub enum Expr {
 pub struct Literal(pub JSON);
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-pub struct Identifier(pub String);
+pub struct Identifier(pub SmolStr);
 
 impl Identifier {
     pub fn as_str(&self) -> &str {
@@ -199,9 +207,9 @@ impl Identifier {
     }
 }
 
-impl From<&str> for Identifier {
-    fn from(s: &str) -> Identifier {
-        Identifier(s.to_string())
+impl<S> From<S> for Identifier where S: AsRef<str> {
+    fn from(s: S) -> Identifier {
+        Identifier(SmolStr::from(s))
     }
 }
 

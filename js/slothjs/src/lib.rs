@@ -148,7 +148,7 @@
 //! // Finally, call `zoom(10)`:
 //! let result: Interpreted = heap.execute(zoomref, function::CallContext{
 //!     this_ref: Heap::GLOBAL,
-//!     method_name: String::from("zoom"),  // TODO: get zoom.name
+//!     method_name: smol_str::SmolStr::from("zoom"),  // TODO: get zoom.name
 //!     arguments: vec![Interpreted::from(10.0)],
 //!     loc: None,
 //! }).expect("call result");
