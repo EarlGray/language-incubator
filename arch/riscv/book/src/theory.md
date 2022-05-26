@@ -47,7 +47,7 @@ The standard **C** (compressed) extension relaxes boundaries to be 16bit.
   ..xxxx | xxxxxxxx xxxxxxxx | xxxxxxxx x0111111 |     64-bit
 
   _______________________________________________
-  ..xxxx | xxxxxxxx xxxxxxxx | xNNNxxxx x1111111 |     (80 + 16*NNN)-bit, nnn ≠ 111)
+  ..xxxx | xxxxxxxx xxxxxxxx | xNNNxxxx x1111111 |     (80 + 16*NNN)-bit, NNN ≠ 111)
 
 ```
 
