@@ -1,6 +1,6 @@
-## RV32I: Computational instructions
+# RV32I: Computational Instructions
 
-There are 21 computational instructions. Instructions with _rs2_ are R-type. `lui` and `auipc` are U-type. Everything else is I-type.
+There are 21 computational instructions.
 
 
 | Instruction                     | "C"                                       | Meaning              |
@@ -40,7 +40,7 @@ Notes:
 
 - NOT can be implemented as `xori rd, rs1, -1`
 - a pseudoinstruction `seqz`: `sltiu rd, rs1, 1`, computes if _rs1_ is 0.
-- a pseudoinstruction `li rd, imm`: `lui rd, imm[31:12]; addi rd, rd, imm[12:0]`
+- a pseudoinstruction `li rd, imm`: `lui rd, imm[31:12]; addi rd, rd, imm[11:0]`
 
 `auipc` is a position-independent code shortcut, e.g.:
 
@@ -51,7 +51,20 @@ lw x4, 0x234(x4)
 
 allows to read a word from memory at `pc + 0x1234` into `x4`
 
-#### Encoding
+## Encoding
+
+`lui` and `auipc` are [U-type](/rv32i/encoding.md#u-type-encoding).
+Least significant byte looks like 37/B7, 17/97.
+
+|           |imm[31:12]|_rd_| opcode      | 
+|-----------|----------|----|-------------|
+| **lui**   |          |    | `01 101 11` |
+| **auipc** |          |    | `00 101 11` |
+
+---
+
+Instructions with _rs2_ are [R-type](/rv32i/encoding.md#r-type-encoding).
+Least significant byte looks like 33/B3.
 
 |          |_funct7_ |_rs2_|_rs1_|_funct3_|_rd_ | opcode    | 
 |----------|---------|-----|-----|--------|-----|-----------|
@@ -66,7 +79,10 @@ allows to read a word from memory at `pc + 0x1234` into `x4`
 | **or**   |`0000000`|     |     | `110`  |     |`01 100 11`|
 | **and**  |`0000000`|     |     | `111`  |     |`01 100 11`|
 
-<br>
+---
+
+Everything else is [I-type](/rv32i.md/encoding#i-type-encoding).
+Least significant byte looks like 13/93.
 
 |          |imm[11:5]|imm[4:0]|_rs1_|_funct3_|_rd_ | opcode    | 
 |----------|---------|--------|-----|--------|-----|-----------|
@@ -80,9 +96,3 @@ allows to read a word from memory at `pc + 0x1234` into `x4`
 | **srli** |`0000000`|  shamt |     | `101`  |     |`00 100 11`|
 | **srai** |`0100000`|  shamt |     | `101`  |     |`00 100 11`|
 
-<br>
-
-|           |imm[31:12]|_rd_| opcode      | 
-|-----------|----------|----|-------------|
-| **lui**   |          |    | `01 101 11` |
-| **auipc** |          |    | `00 101 11` |

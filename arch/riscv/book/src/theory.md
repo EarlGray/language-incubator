@@ -22,35 +22,6 @@ Most common standard extensions:
 The **G**eneral variant, **RVxxG**, is a shortcut for **RVxxIMAFD**
 
 
-## Instruction Length Encoding
-
-The base set contains fixed-length 32-bit instructions, naturally aligned to 
-32-bit boundaries. This instructions have the five least significant bits set to
-`xxx11` except `11111` (see below).
-
-The encoding supports variable-length instructions of one or more 16bit
-_parcels_ (with least significant bits 00, 01, 10).
-
-The standard **C** (compressed) extension relaxes boundaries to be 16bit.
-
-```
-                              ___________________ 
-                             | xxxxxxxx xxxxxxAA |     16-bit (AA ≠ 11)
-
-          _______________________________________
-         | xxxxxxxx xxxxxxxx | xxxxxxxx xxxBBB11 |     32-bit (BBB ≠ 111)
-
-  _______________________________________________
-  ..xxxx | xxxxxxxx xxxxxxxx | xxxxxxxx xx011111 |     48-bit
-
-  _______________________________________________
-  ..xxxx | xxxxxxxx xxxxxxxx | xxxxxxxx x0111111 |     64-bit
-
-  _______________________________________________
-  ..xxxx | xxxxxxxx xxxxxxxx | xNNNxxxx x1111111 |     (80 + 16*NNN)-bit, NNN ≠ 111)
-
-```
-
 ## Endianness
 
 The base set memory system is assumed to be _little-endian_ in respect to parcels.
@@ -71,4 +42,3 @@ thread. _Trap_ is a synchronous transfer of control to a _trap handler_ (usually
 executed in a more privileged environment).
 
 _Interrupts_ are caused by events external to the current thread of execution.
-
