@@ -51,9 +51,9 @@ lw x4, 0x234(x4)
 
 allows to read a word from memory at `pc + 0x1234` into `x4`
 
-## Encoding
+## Encoding `auipc` and `lui`
 
-`lui` and `auipc` are [U-type](/rv32i/encoding.md#u-type-encoding).
+`lui` and `auipc` are [U-type](../riscv/encoding.md#u-type-encoding).
 Least significant byte looks like 37/B7, 17/97.
 
 |           |imm[31:12]|_rd_| opcode      | 
@@ -61,9 +61,10 @@ Least significant byte looks like 37/B7, 17/97.
 | **lui**   |          |    | `01 101 11` |
 | **auipc** |          |    | `00 101 11` |
 
----
 
-Instructions with _rs2_ are [R-type](/rv32i/encoding.md#r-type-encoding).
+## Encoding register instructions
+
+Instructions with _rs2_ are [R-type](../riscv/encoding.md#r-type-encoding).
 Least significant byte looks like 33/B3.
 
 |          |_funct7_ |_rs2_|_rs1_|_funct3_|_rd_ | opcode    | 
@@ -79,9 +80,10 @@ Least significant byte looks like 33/B3.
 | **or**   |`0000000`|     |     | `110`  |     |`01 100 11`|
 | **and**  |`0000000`|     |     | `111`  |     |`01 100 11`|
 
----
 
-Everything else is [I-type](/rv32i.md/encoding#i-type-encoding).
+## Encoding instructions with immediates
+
+Everything else is [I-type](../riscv/encoding.md#i-type-encoding).
 Least significant byte looks like 13/93.
 
 |          |imm[11:5]|imm[4:0]|_rs1_|_funct3_|_rd_ | opcode    | 

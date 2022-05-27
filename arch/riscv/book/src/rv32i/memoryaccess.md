@@ -1,16 +1,18 @@
 # RV32I: Memory Access Instructions
 
 [Computational](computational.md) instructions only work on the contents of
-registers. Memory access instruction load/store values from registers to RAM
-locations. There are 5 _load_ ("RAM to register") instructions and 3 _store_
-("register to RAM") instructions using byte addresses in RAM which are encoded
+registers. Memory access instruction exchange 8/16/32-bit values ("bytes"/
+"halfs"/"words") between registers and RAM locations.
+
+There are 5 _load_ ("RAM to register") instructions and 3 _store_
+("register to RAM") instructions. They using byte addresses in RAM encoded
 as the value in register _rs1_ added with 12-bit sign-extended immediate.
 
 Misaligned RAM access is allowed, but can be non-atomic and/or much slower.
 
 ## Load instructions
 
-All in [I-type format](/rv32i/encoding.md#i-type-encoding).
+All in [I-type format](../riscv/encoding.md#i-type-encoding).
 
 | instr   | description              | "C" |
 |---------|--------------------------|-----|
@@ -23,7 +25,7 @@ All in [I-type format](/rv32i/encoding.md#i-type-encoding).
 
 ## Store instructions
 
-All in [S-type format](/rv32i/encoding.md#s-type-encoding).
+All in [S-type format](../riscv/encoding.md#s-type-encoding).
 
 | instr   | description  | "C" |
 |---------|--------------|-----|

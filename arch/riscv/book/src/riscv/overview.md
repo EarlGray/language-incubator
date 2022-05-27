@@ -1,4 +1,4 @@
-# Introduction to RISC-V
+# RISC-V basics
 
 ## The basic sets and extensions
 
@@ -17,10 +17,21 @@ Most common standard extensions:
 - integer **A**tomic operations
 - single-precision (32bit) **F**loating-point operations
 - **D**ouble-precision (64bit) floating-point operations
-- **C**compressed instruction encoding
+- **C**ompressed instruction encoding
 
-The **G**eneral variant, **RVxxG**, is a shortcut for **RVxxIMAFD**
+The **G**eneral variant, **RV*nn*G**, is a shortcut for **RV*nn*IMAFD**
 
+A popular compilation target is the **GC** combination:
+
+```console
+$ rustup target list | grep riscv
+riscv32i-unknown-none-elf
+riscv32imac-unknown-none-elf
+riscv32imc-unknown-none-elf
+riscv64gc-unknown-linux-gnu
+riscv64gc-unknown-none-elf 
+riscv64imac-unknown-none-elf
+```
 
 ## Endianness
 
