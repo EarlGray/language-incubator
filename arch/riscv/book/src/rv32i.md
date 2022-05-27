@@ -4,7 +4,7 @@
 
 The user-visible architectural state is:
 
-- Value of `x0`/`zero` is always 0, it's a read-only register.
+- Value of `x0`/`zero` is always 0; writes do not change it.
 - 31 registers `x1` .. `x31`;
 - the `pc` register
 

@@ -48,7 +48,7 @@ impl Location {
 
 #[derive(Clone, Debug)]
 pub struct Document {
-    name: String,
+    _name: String,
 }
 
 pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(), Exception> {
