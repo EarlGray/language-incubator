@@ -35,7 +35,7 @@ impl CallContext {
                     of: self.this_ref,
                     name: self.method_name,
                 };
-                return Err(Exception::TypeErrorNotCallable(callee));
+                Err(Exception::TypeErrorNotCallable(callee))
             }
         }
     }

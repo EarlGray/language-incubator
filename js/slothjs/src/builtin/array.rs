@@ -22,7 +22,7 @@ fn array_object_constructor(
 #[allow(non_snake_case)]
 fn array_toString(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let array_object = heap.get(call.this_ref);
-    let array = (array_object.as_array()).ok_or(Exception::TypeErrorInstanceRequired(
+    let array = array_object.as_array().ok_or_else(|| Exception::TypeErrorInstanceRequired(
         Interpreted::from(call.this_ref),
         "Array".to_string(),
     ))?;
@@ -44,7 +44,7 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> Result<Interpreted, E
     match &mut array_object.value {
         ObjectValue::Array(array) => {
             array.storage.extend(arguments.into_iter());
-            let length = array_object.get_value("length").unwrap_or(JSValue::from(0));
+            let length = array_object.get_value("length").unwrap_or_else(|| JSValue::from(0));
             Ok(Interpreted::from(length))
         }
         // TODO: generic object path

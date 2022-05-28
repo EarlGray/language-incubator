@@ -115,6 +115,7 @@ fn run_esprima(esparse_path: &Path, input: &str) -> io::Result<(String, String)>
     Ok((stdout, stderr))
 }
 
+#[allow(clippy::upper_case_acronyms)]
 enum EvalError {
     /// Esprima was not able to produce AST JSON
     Syntax(io::Error),
@@ -133,13 +134,13 @@ enum EvalError {
 }
 
 fn evaluate_input(esparse_path: &Path, input: &str, heap: &mut Heap) -> Result<JSValue, EvalError> {
-    let (stdout, _stderr) = run_esprima(esparse_path, input).map_err(|e| EvalError::Syntax(e))?;
-    let json = serde_json::from_str(&stdout).map_err(|e| EvalError::JSON(e))?;
-    let ast = Program::parse_from(&json).map_err(|e| EvalError::Parser(e))?;
+    let (stdout, _stderr) = run_esprima(esparse_path, input).map_err(EvalError::Syntax)?;
+    let json = serde_json::from_str(&stdout).map_err(EvalError::JSON)?;
+    let ast = Program::parse_from(&json).map_err(EvalError::Parser)?;
 
-    let result = ast.interpret(heap).map_err(|e| EvalError::Exception(e))?;
+    let result = ast.interpret(heap).map_err(EvalError::Exception)?;
 
-    result.to_value(heap).map_err(|e| EvalError::Value(e))
+    result.to_value(heap).map_err(EvalError::Value)
 }
 
 #[allow(unreachable_code)]
@@ -183,7 +184,7 @@ fn repl_main(esparse_path: &Path) -> io::Result<()> {
             break;
         }
         let input = input.unwrap().unwrap();
-        if input.len() == 0 {
+        if input.is_empty() {
             continue;
         }
 

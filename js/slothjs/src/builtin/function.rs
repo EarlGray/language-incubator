@@ -16,7 +16,7 @@ fn function_constructor(_call: CallContext, _heap: &mut Heap) -> Result<Interpre
 }
 
 fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    if call.arguments.len() == 0 {
+    if call.arguments.is_empty() {
         call.arguments.push(Interpreted::VOID);
     }
     call.arguments.rotate_left(1); // [this, arg1, .. , argN] => [arg1, .. , argN, this]
@@ -40,7 +40,7 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interprete
             let objref = object.to_ref(heap)?;
             let array = (heap.get(objref))
                 .as_array()
-                .ok_or(Exception::TypeErrorNotArraylike(object.clone()))?;
+                .ok_or_else(|| Exception::TypeErrorNotArraylike(object.clone()))?;
             (array.storage.iter())
                 .map(|val| Interpreted::Value(val.clone()))
                 .collect()

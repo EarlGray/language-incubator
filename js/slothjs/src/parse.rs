@@ -2,8 +2,6 @@ use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
-use serde_json;
-
 use crate::ast::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
@@ -281,7 +279,7 @@ impl<'a> SourceNode for HeapNode<'a> {
                 value: self.to_error(),
             })?;
         match value {
-            JSValue::String(s) => Ok(s.clone()),
+            JSValue::String(s) => Ok(s),
             _ => Err(ParseError::ShouldBeString {
                 value: self.to_error(),
             }),
@@ -374,7 +372,7 @@ impl ParseFrom for Statement {
         source: S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let loc = source.get_location().map(|loc| Box::new(loc));
+        let loc = source.get_location().map(Box::new);
 
         let typ = source.get_str("type")?;
         let stmt = match typ.as_str() {
@@ -425,7 +423,7 @@ impl ParseFrom for BlockStatement {
         source: S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt.clone(), ctx))?;
+        let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt, ctx))?;
         Ok(BlockStatement { body })
     }
 }
@@ -720,7 +718,7 @@ impl ParseFrom for Expression {
         source: S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let loc = source.get_location().map(|loc| Box::new(loc));
+        let loc = source.get_location().map(Box::new);
 
         let expr_type = source.get_str("type")?;
         let expr = match expr_type.as_str() {

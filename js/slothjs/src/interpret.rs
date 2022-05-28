@@ -200,9 +200,7 @@ impl Interpretable for ForInStatement {
         let mut objref = iteratee;
         while objref != Heap::NULL {
             let object = heap.get(objref);
-            let mut keys = (object.properties.keys())
-                .map(|s| s.clone())
-                .collect::<HashSet<String>>();
+            let mut keys = object.properties.keys().cloned().collect::<HashSet<String>>();
             if let Some(array) = object.as_array() {
                 let indices = 0..array.storage.len();
                 keys.extend(indices.map(|i| i.to_string()));
@@ -467,7 +465,7 @@ impl BinOp {
             BinOp::NotEq => JSValue::from(!JSValue::loose_eq(lval, rval, heap)),
             BinOp::EqEqEq => JSValue::from(JSValue::strict_eq(lval, rval, heap)),
             BinOp::NotEqEq => JSValue::from(!JSValue::strict_eq(lval, rval, heap)),
-            BinOp::Less => JSValue::compare(lval, &rval, heap, |a, b| a < b, |a, b| a < b),
+            BinOp::Less => JSValue::compare(lval, rval, heap, |a, b| a < b, |a, b| a < b),
             BinOp::Greater => JSValue::compare(lval, rval, heap, |a, b| a > b, |a, b| a > b),
             BinOp::LtEq => JSValue::compare(lval, rval, heap, |a, b| a <= b, |a, b| a <= b),
             BinOp::GtEq => JSValue::compare(lval, rval, heap, |a, b| a >= b, |a, b| a >= b),
@@ -607,7 +605,7 @@ impl Interpretable for MemberExpression {
         // get the object reference for member computation:
         let objresult = objexpr.interpret(heap)?;
         let objref = match objresult.to_value(heap)? {
-            JSValue::Undefined => return Err(Exception::ReferenceNotAnObject(objresult.clone())),
+            JSValue::Undefined => return Err(Exception::ReferenceNotAnObject(objresult)),
             value => value.objectify(heap),
         };
 

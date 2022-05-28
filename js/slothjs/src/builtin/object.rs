@@ -58,7 +58,7 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> Result<Interpret
 
 fn object_object_create(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let proto = (call.arguments.get(0))
-        .ok_or_else(|| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
+        .ok_or(Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
     let protoref =
         (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
 
@@ -85,7 +85,7 @@ fn object_object_is(call: CallContext, heap: &mut Heap) -> Result<Interpreted, E
 
     let answer = match (left.to_value(heap), right.to_value(heap)) {
         (Ok(Undefined), Ok(Undefined)) => true,
-        (Ok(String(lstr)), Ok(String(rstr))) if &lstr == &rstr => true,
+        (Ok(String(lstr)), Ok(String(rstr))) if lstr == rstr => true,
         (Ok(Bool(lb)), Ok(Bool(rb))) if lb == rb => true,
         (Ok(Number(lnum)), Ok(Number(rnum))) => {
             if f64::abs(lnum) == 0.0 && f64::abs(rnum) == 0.0 {
@@ -140,7 +140,7 @@ fn define_property(
     heap: &mut Heap,
 ) -> Result<(), Exception> {
     let get_value = |object: &JSObject, name: &str| {
-        object.get_value(name).unwrap_or(JSValue::Undefined).clone()
+        object.get_value(name).unwrap_or(JSValue::Undefined)
     };
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
 

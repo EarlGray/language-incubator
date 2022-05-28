@@ -151,7 +151,7 @@ impl JSValue {
     pub fn boolify(&self, heap: &Heap) -> bool {
         match self {
             JSValue::Undefined => false,
-            JSValue::String(s) => s.len() > 0,
+            JSValue::String(s) => !s.is_empty(),
             JSValue::Ref(Heap::NULL) => false,
             JSValue::Ref(_) => true,
             _ => {
@@ -176,7 +176,7 @@ impl JSValue {
                 let _ = crate::source::print_callstack(heap);
                 todo!(); // TODO: Number object
             }
-            JSValue::String(s) => heap.alloc(JSObject::from_str(s.clone())),
+            JSValue::String(s) => heap.alloc(JSObject::from_string(s.clone())),
             JSValue::Ref(r) => *r,
         }
     }
@@ -426,7 +426,7 @@ impl JSObject {
     }
 
     /// Wrap the given string into String
-    pub fn from_str(value: String) -> JSObject {
+    fn from_string(value: String) -> JSObject {
         let mut properties = HashMap::new();
         properties.insert(
             String::from("length"),
@@ -502,9 +502,10 @@ impl JSObject {
             }
         }
 
-        (self.properties.get(name)).and_then(|prop| match &prop.content {
-            Content::Value(value) => Some(value.clone()),
-        })
+        self.properties.get(name)
+            .map(|prop| match &prop.content {
+                Content::Value(value) => value.clone(),
+            })
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.
@@ -695,7 +696,7 @@ impl JSObject {
             }
 
             s.push(' ');
-            if is_valid_identifier(&key) {
+            if is_valid_identifier(key) {
                 s.push_str(key);
             } else {
                 let skey = JSON::from(key.as_str()).to_string();
@@ -721,6 +722,18 @@ impl JSObject {
             s.push('}');
         }
         Ok(s)
+    }
+}
+
+impl From<String> for JSObject {
+    fn from(s: String) -> Self {
+        JSObject::from_string(s)
+    }
+}
+
+impl Default for JSObject {
+    fn default() -> Self {
+        JSObject::new()
     }
 }
 
@@ -899,7 +912,7 @@ impl Interpreted {
             Interpreted::Value(value) => Ok(value.clone()),
             Interpreted::Member { of, name } => {
                 if let Some(value) = heap.get(*of).lookup_value(name, heap) {
-                    Ok(value.clone())
+                    Ok(value)
                 } else if heap.is_scope(*of) {
                     let ident = ast::Identifier(name.clone());
                     Err(Exception::ReferenceNotFound(ident))
@@ -930,7 +943,7 @@ impl Interpreted {
 
     pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> Result<(), Exception> {
         match self {
-            Interpreted::Member { of, name } => heap.get_mut(*of).update(&name, value),
+            Interpreted::Member { of, name } => heap.get_mut(*of).update(name, value),
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
         }
     }
@@ -944,18 +957,17 @@ impl Interpreted {
                     Some(_) => unreachable!(),
                     None => return Err(Exception::TypeErrorNotCallable(self.clone())),
                 };
-                let func_value = (heap.get(of).get_value(&name)).ok_or(
-                    Exception::TypeErrorNotCallable(Interpreted::member(of, &name)),
-                )?;
+                let func_value = (heap.get(of).get_value(name))
+                    .ok_or_else(|| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
                 let func_ref = (func_value.to_ref())
-                    .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, &name)))?;
+                    .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
                 Ok((func_ref, *this_ref, name))
             }
             Interpreted::Value(JSValue::Ref(func_ref)) => {
                 let this_ref = Heap::GLOBAL; // TODO: figure out what is this
                 Ok((*func_ref, this_ref, "<anonymous>"))
             }
-            _ => return Err(Exception::TypeErrorNotCallable(self.clone())),
+            _ => Err(Exception::TypeErrorNotCallable(self.clone())),
         }
     }
 

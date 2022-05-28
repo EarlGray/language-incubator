@@ -34,14 +34,12 @@ fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpr
 
     let name = (heap.get(call.this_ref))
         .lookup_value("name", heap)
-        .map(|v| v.clone())
-        .unwrap_or(JSValue::from(""))
+        .unwrap_or_else(|| JSValue::from(""))
         .stringify(heap)?;
 
     let message = (heap.get(call.this_ref))
         .lookup_value("message", heap)
-        .map(|v| v.clone())
-        .unwrap_or(JSValue::from(""))
+        .unwrap_or_else(|| JSValue::from(""))
         .stringify(heap)?;
 
     Ok(Interpreted::from(match () {

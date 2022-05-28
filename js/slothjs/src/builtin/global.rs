@@ -13,6 +13,7 @@ use crate::object::{
 /*
  *  parseInt
  */
+#[allow(clippy::manual_range_contains)]
 fn parse_int(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;

@@ -15,7 +15,7 @@ use crate::{
 fn string_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let arg = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(""))
-        .to_value(&heap)?;
+        .to_value(heap)?;
     let s = arg.stringify(heap)?;
 
     if !heap.smells_fresh(call.this_ref) {
@@ -23,7 +23,7 @@ fn string_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted,
         return Ok(Interpreted::from(s));
     }
 
-    *heap.get_mut(call.this_ref) = JSObject::from_str(s);
+    *heap.get_mut(call.this_ref) = JSObject::from(s);
     Ok(Interpreted::VOID)
 }
 
@@ -52,7 +52,7 @@ impl Heap {
     fn ref_to_string(&mut self, href: JSRef) -> Result<String, Exception> {
         self.get(href)
             .to_primitive(self)
-            .unwrap_or(JSValue::from(href))
+            .unwrap_or_else(|| JSValue::from(href))
             .stringify(self)
     }
 }
@@ -142,7 +142,7 @@ fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> Result<Interprete
 
     let char_start = match call.arg_as_index(1, heap)?.unwrap_or(0) {
         b if b < 0 => 0,
-        b if b > strlen && &needle == "" => return Ok(Interpreted::from(strlen)),
+        b if b > strlen && needle.is_empty() => return Ok(Interpreted::from(strlen)),
         b if b > strlen => return Ok(NOT_FOUND),
         b => b,
     };

@@ -18,7 +18,7 @@ use slothjs::{
     Program,
 };
 
-const ESPRIMA: &'static str = include_str!("../../tmp/esprima.json");
+const ESPRIMA: &str = include_str!("../../tmp/esprima.json");
 
 fn die<E: Debug>(msg: &str, err: E, errcode: i32) -> ! {
     eprintln!("{}: {:?}", msg, err);
@@ -100,7 +100,7 @@ fn repl_main(heap: &mut Heap) -> io::Result<()> {
             break;
         }
         let input = input.unwrap().unwrap();
-        if input.len() == 0 {
+        if input.is_empty() {
             continue;
         }
 

@@ -14,7 +14,7 @@ use crate::{
     JSON,
 };
 
-const CALLER_LOCATION: &'static str = "[[caller_location]]";
+const CALLER_LOCATION: &str = "[[caller_location]]";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Position {

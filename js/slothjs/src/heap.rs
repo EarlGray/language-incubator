@@ -34,8 +34,7 @@ impl JSRef {
 
         let found = (heap.get(*self))
             .protochain(heap)
-            .find(|pref| *pref == protoref)
-            .is_some();
+            .any(|pref| pref == protoref);
         Ok(found)
     }
 
@@ -49,7 +48,7 @@ impl JSRef {
     pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> Result<(), Exception> {
         let ctrval = (heap.scope())
             .get_value(constructor)
-            .ok_or(Exception::ReferenceNotFound(Identifier::from(constructor)))?;
+            .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from(constructor)))?;
 
         let ctrref = ctrval.to_ref()?;
         match self.isinstance(ctrref, heap)? {
@@ -62,6 +61,7 @@ impl JSRef {
         }
     }
 
+    /// # Safety 
     /// This should only be used for debugging
     pub unsafe fn from_index(index: usize) -> JSRef {
         JSRef(index)
@@ -96,6 +96,7 @@ impl Heap {
     pub(crate) const SAVED_SCOPE: &'static str = "[[saved_scope]]";
     const CAPTURED_SCOPE: &'static str = "[[captured_scope]]";
 
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut objects = Vec::new();
         for _ in 0..Self::USERSTART {
@@ -126,6 +127,7 @@ impl Heap {
     }
 
     /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true)` calls.
+    #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn smells_fresh(&self, objref: JSRef) -> bool {
         match objref {
             Heap::NULL => false,
@@ -134,7 +136,7 @@ impl Heap {
                     value: ObjectValue::None,
                     properties,
                     ..
-                } if properties.len() == 0 => true,
+                } if properties.is_empty() => true,
                 _ => false,
             },
         }
@@ -206,7 +208,7 @@ impl Heap {
         functions: impl Iterator<Item = &'a FunctionDeclaration>,
     ) -> Result<(), Exception> {
         for var in variables {
-            self.declare_variable(&var)?;
+            self.declare_variable(var)?;
         }
         for func in functions {
             let name = &func.id;
@@ -356,7 +358,7 @@ impl Heap {
                     of: call.this_ref,
                     name: call.method_name,
                 };
-                return Err(Exception::TypeErrorNotCallable(callee));
+                Err(Exception::TypeErrorNotCallable(callee))
             }
         }
     }
