@@ -38,9 +38,10 @@ Definitions:
 
 Notes:
 
-- NOT can be implemented as `xori rd, rs1, -1`
-- a pseudoinstruction `seqz`: `sltiu rd, rs1, 1`, computes if _rs1_ is 0.
-- a pseudoinstruction `li rd, imm`: `lui rd, imm[31:12]; addi rd, rd, imm[11:0]`
+- **not** _rd_, _rs1_ can be implemented as `xori rd, rs1, -1`
+- a pseudoinstruction **seqz**: `sltiu rd, rs1, 1`, computes if _rs1_ is 0.
+- a pseudoinstruction **li** _rd_, _imm_: `lui rd, imm[31:12]; addi rd, rd, imm[11:0]`
+- **nop** is usually defined as `addi x0, x0, 0`
 
 TODO: what happens on integer overflow?
 
