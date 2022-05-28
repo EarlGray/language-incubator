@@ -5,8 +5,9 @@
 The user-visible architectural state is:
 
 - Value of `x0`/`zero` is always 0; writes do not change it.
-- 31 registers `x1` .. `x31`;
-- the `pc` register
+- 31 read/write data registers `x1` .. `x31`;
+- `pc`: the _program counter_ register pointing to the currently executing
+  instruction.
 
 Instructions must be stored naturally aligned in little-endian byte order.
 
@@ -16,8 +17,7 @@ Instructions must be stored naturally aligned in little-endian byte order.
 RV32I specification contains 47 instructions:
 
 - [computational instructions](rv32i/computational.md) (21 instructions)
-- [memory access instructions](rv32i/memoryaccess.md) (8 instructions)
-- memory access ordering
+- [memory access instructions](rv32i/memoryaccess.md) (10 instructions)
 - control flow instructions
 - system instructions
 
