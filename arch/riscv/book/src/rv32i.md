@@ -18,7 +18,7 @@ RV32I specification contains 47 instructions:
 
 - [computational instructions](rv32i/computational.md) (21 instructions)
 - [memory access instructions](rv32i/memoryaccess.md) (10 instructions)
-- control flow instructions
+- [control flow instructions](rv32i/controlflow.md) (8 instructions)
 - system instructions
 
 

@@ -5,14 +5,15 @@ registers. Memory access instruction exchange 8/16/32-bit values ("bytes"/
 "halfs"/"words") between registers and RAM locations.
 
 There are 5 _load_ ("RAM to register") instructions and 3 _store_
-("register to RAM") instructions. They using byte addresses in RAM encoded
+("register to RAM") instructions. They use byte addresses in RAM encoded
 as the value in register _rs1_ added with 12-bit sign-extended immediate.
+
+2 _fence_ instructions serialize concurrent accesses to RAM from different
+hardware threads.
 
 Misaligned RAM access is allowed, but can be non-atomic and/or much slower.
 
 ## Load instructions
-
-All in [I-type format](../riscv/encoding.md#i-type-encoding).
 
 | instr                     | description              | "C" |
 |---------------------------|--------------------------|-----|
@@ -24,8 +25,6 @@ All in [I-type format](../riscv/encoding.md#i-type-encoding).
 
 
 ## Store instructions
-
-All in [S-type format](../riscv/encoding.md#s-type-encoding).
 
 | instr                      | description  | "C" |
 |----------------------------|--------------|-----|

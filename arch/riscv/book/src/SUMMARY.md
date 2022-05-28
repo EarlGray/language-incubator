@@ -8,5 +8,5 @@
 - [The base set: RV32I](rv32i.md)
   + [Computational Instructions](rv32i/computational.md)
   + [Memory Access Instructions](rv32i/memoryaccess.md)
-  + [Control Flow Instructions]()
+  + [Control Flow Instructions](rv32i/controlflow.md)
   + [System Instructions]()
