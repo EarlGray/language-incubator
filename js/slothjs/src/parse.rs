@@ -45,7 +45,7 @@ trait ParseFrom: Sized {
 
 /// `SourceNode` is how `ParseFrom::parse_from` sees AST nodes.
 pub trait SourceNode: Sized + Copy {
-    type Error;
+    type Error: fmt::Debug;
 
     fn to_error(self) -> Self::Error;
 
