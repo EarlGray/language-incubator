@@ -46,6 +46,11 @@ impl Exception {
     pub fn instance_required(arg: &Interpreted, of: &str) -> Exception {
         Exception::TypeErrorInstanceRequired(arg.clone(), of.to_string())
     }
+
+    pub fn invalid_ast<E: std::fmt::Debug>(e: E) -> Self {
+        let err = format!("{:?}", e);
+        Exception::SyntaxError(ParseError::InvalidJSON{ err })
+    }
 }
 
 pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
