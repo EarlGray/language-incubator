@@ -6,11 +6,11 @@ use serde_json::json;
 use crate::{
     Heap,
     Interpreted,
+    Interpretable,
     JSON,
     JSValue,
     Program,
 };
-use crate::interpret::Interpretable;
 use crate::object;
 use crate::error::{Exception, ParseError};
 
@@ -40,10 +40,10 @@ fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exceptio
     let json = serde_json::from_str(out)
         .map_err(|err| {
             let err = ParseError::InvalidJSON{ err: err.to_string() };
-            Exception::SyntaxError(err)
+            Exception::SyntaxTreeError(err)
         })?;
     let program = Program::parse_from(&json)
-        .map_err(|e| Exception::SyntaxError(e))?;
+        .map_err(|e| Exception::SyntaxTreeError(e))?;
     program.interpret(heap)
 }
 

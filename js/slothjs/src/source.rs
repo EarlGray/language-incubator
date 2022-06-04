@@ -75,7 +75,7 @@ pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
         let loc_ref = (heap.get(scoperef))
             .get_value(CALLER_LOCATION)
             .and_then(|v| v.to_ref().ok())
-            .ok_or(Exception::SyntaxError(ParseError::ObjectWithout {
+            .ok_or(Exception::SyntaxTreeError(ParseError::ObjectWithout {
                 attr: CALLER_LOCATION,
                 value: JSON::Null,
             }))?;

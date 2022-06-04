@@ -19,9 +19,10 @@ pub enum ParseError<V> {
 
 #[derive(Debug, PartialEq)]
 pub enum Exception {
-    SyntaxError(ParseError<JSON>),
+    SyntaxTreeError(ParseError<JSON>),
     SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),
+
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(Identifier),
     TypeErrorSetReadonly(Interpreted, String),
@@ -49,7 +50,7 @@ impl Exception {
 
     pub fn invalid_ast<E: std::fmt::Debug>(e: E) -> Self {
         let err = format!("{:?}", e);
-        Exception::SyntaxError(ParseError::InvalidJSON{ err })
+        Exception::SyntaxTreeError(ParseError::InvalidJSON{ err })
     }
 }
 
