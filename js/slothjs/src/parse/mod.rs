@@ -1,3 +1,8 @@
+mod heapnode;
+mod jsonnode;
+
+pub use self::heapnode::HeapNode;
+
 use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
@@ -5,10 +10,8 @@ use std::rc::Rc;
 use crate::ast::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
-use crate::object::JSON;
 use crate::source;
 use crate::{
-    Heap,
     JSRef,
     JSValue,
 };
@@ -39,316 +42,71 @@ impl ParserContext {
 /// would do just fine. On the other hand, it feels like a good idea to have all of these
 /// to conform to one interface.
 trait ParseFrom: Sized {
-    fn parse_from<S: SourceNode>(source: S, ctx: &mut ParserContext)
-        -> ParseResult<Self, S::Error>;
+    fn parse_from<S>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S::Error>
+    where
+        S: SourceNode;
 }
 
 /// `SourceNode` is how `ParseFrom::parse_from` sees AST nodes.
-pub trait SourceNode: Sized + Copy {
+pub trait SourceNode: Sized {
     type Error: fmt::Debug;
 
-    fn to_error(self) -> Self::Error;
+    /// En error happened at this node.
+    fn to_error(&self) -> Self::Error;
 
     /// Try to get source mapping for `self`.
-    fn get_location(self) -> Option<source::Location>;
+    fn get_location(&self) -> Option<source::Location>;
 
     /// Make the node into a literal.
-    fn get_literal(self, property: &'static str) -> ParseResult<Literal, Self::Error>;
+    fn get_literal(&self, property: &str) -> ParseResult<Literal, Self::Error>;
 
-    /// Get a child node with this name; it's a ParseError if it does not exist.
-    fn get_node(self, property: &'static str) -> ParseResult<Self, Self::Error>;
+    /// Get the boolean value of a child node with name `property`.
+    /// It's a ParseError if it does not exist or does not have a boolean meaning.
+    fn get_bool(&self, property: &str) -> ParseResult<bool, Self::Error>;
+
+    /// Get the string value of a child node with name `property`.
+    /// It's a ParseError if it does not exist or does not have a string meaning.
+    fn get_str(&self, property: &str) -> ParseResult<String, Self::Error>;
+
+    /// Check that the value of `property` is a string equal to `value`.
+    fn expect_str(&self, property: &str, value: &'static str) -> ParseResult<(), Self::Error> {
+        let got = self.get_str(property)?;
+        match got == value {
+            true => Ok(()),
+            false => Err(ParseError::UnexpectedValue {
+                want: value,
+                value: self.to_error(),
+            }),
+        }
+    }
 
     /// Get a child node with this name; if it does not exist, return None.
     /// Then transform it through `action`, propagating its Result out.
-    fn map_node<T, F>(
-        self,
-        property: &'static str,
-        mut action: F,
-    ) -> ParseResult<Option<T>, Self::Error>
+    /// A child node exis
+    fn map_node<T, F>(&self, property: &str, action: F) -> ParseResult<T, Self::Error>
     where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T, Self::Error>;
+
+    fn map_opt_node<T, F>(&self, property: &str, action: F) -> ParseResult<Option<T>, Self::Error>
+    where
+        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
     {
-        match self.get_node(property) {
-            Ok(node) => action(node).map(|result| Some(result)),
+        match self.map_node(property, action) {
+            Ok(stmt) => Ok(Some(stmt)),
             Err(ParseError::ObjectWithout { .. }) => Ok(None),
             Err(e) => Err(e),
         }
     }
 
-    /// Get the boolean value of a child node with name `property`.
-    /// It's a ParseError if it does not exist or does not have a boolean meaning.
-    fn get_bool(self, property: &'static str) -> ParseResult<bool, Self::Error>;
-
-    /// Get the string value of a child node with name `property`.
-    /// It's a ParseError if it does not exist or does not have a string meaning.
-    fn get_str(self, property: &'static str) -> ParseResult<String, Self::Error>;
-
     /// Map the array of children of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have an array meaning.
-    fn map_array<T, F>(self, property: &'static str, func: F) -> ParseResult<Vec<T>, Self::Error>
+    fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>, Self::Error>
     where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>;
-
-    /// Check that the value of `property` is a string equal to `value`.
-    fn expect_str(
-        self,
-        property: &'static str,
-        value: &'static str,
-    ) -> ParseResult<(), Self::Error>;
-}
-
-impl<'a> SourceNode for &'a JSON {
-    type Error = JSON;
-    //type Result<T> = ParseResult<T, Self::Error>;
-
-    fn to_error(self) -> Self::Error {
-        self.clone()
-    }
-
-    fn get_literal(self, property: &'static str) -> ParseResult<Literal, Self::Error> {
-        let node = (self.get(property)).ok_or_else(|| ParseError::ObjectWithout {
-            attr: property,
-            value: self.to_error(),
-        })?;
-        Ok(Literal(node.clone()))
-    }
-
-    fn get_location(self) -> Option<source::Location> {
-        // TODO: clone() can be costly
-        serde_json::from_value::<source::Location>(self.clone()).ok()
-    }
-
-    fn get_node(self, property: &'static str) -> ParseResult<Self, Self::Error> {
-        self.get(property).ok_or_else(|| ParseError::ObjectWithout {
-            attr: property,
-            value: self.to_error(),
-        })
-    }
-
-    fn map_node<T, F>(
-        self,
-        property: &'static str,
-        mut action: F,
-    ) -> ParseResult<Option<T>, Self::Error>
-    where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>,
-    {
-        let result = match self.get(property) {
-            Some(child) if !child.is_null() => Some(action(child)?),
-            _ => None,
-        };
-        Ok(result)
-    }
-
-    fn get_bool(self, property: &'static str) -> ParseResult<bool, Self::Error> {
-        let jbool = self.get_node(property)?;
-        jbool.as_bool().ok_or_else(|| ParseError::ShouldBeBool {
-            value: jbool.to_error(),
-        })
-    }
-
-    fn get_str(self, property: &'static str) -> ParseResult<String, Self::Error> {
-        let jstr = self.get_node(property)?;
-        let s = jstr.as_str().ok_or_else(|| ParseError::ShouldBeString {
-            value: jstr.to_error(),
-        })?;
-        Ok(s.to_string())
-    }
-
-    fn map_array<T, F>(self, property: &'static str, func: F) -> ParseResult<Vec<T>, Self::Error>
-    where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>,
-    {
-        let jarray = (self.get(property)).ok_or_else(|| ParseError::ObjectWithout {
-            attr: property,
-            value: self.to_error(),
-        })?;
-        let array = (jarray.as_array()).ok_or_else(|| ParseError::ShouldBeArray {
-            value: JSON::Null.to_error(),
-        })?;
-        array.iter().map(func).collect()
-    }
-
-    fn expect_str(
-        self,
-        property: &'static str,
-        value: &'static str,
-    ) -> ParseResult<(), Self::Error> {
-        let jstr = self.get_node(property)?;
-        let got = jstr.as_str().ok_or_else(|| ParseError::ShouldBeString {
-            value: jstr.to_error(),
-        })?;
-        if got != value {
-            return Err(ParseError::UnexpectedValue {
-                want: value,
-                value: jstr.to_error(),
-            });
-        }
-        Ok(())
-    }
-}
-
-/// `HeapNode` contains a heap reference and a `JSRef` to an AST subtree in it.
-/// It implements [`SourceNode`] for on-heap AST trees.
-#[derive(Clone, Copy)]
-pub struct HeapNode<'a> {
-    pub heap: &'a Heap,
-    pub node: JSRef,
-}
-
-impl<'a> fmt::Debug for HeapNode<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HeapNode{{ {:?} }}", self.node)
-    }
-}
-
-impl<'a> SourceNode for HeapNode<'a> {
-    type Error = Self;
-
-    fn to_error(self) -> Self::Error {
-        self
-    }
-
-    fn get_literal(self, property: &'static str) -> ParseResult<Literal, Self::Error> {
-        let HeapNode { heap, node } = self;
-        let child =
-            (heap.get(node))
-                .get_value(property)
-                .ok_or_else(|| ParseError::ObjectWithout {
-                    attr: property,
-                    value: self.to_error(),
-                })?;
-        let json = child.to_json(heap).unwrap();
-        Ok(Literal(json))
-    }
-
-    fn get_location(self) -> Option<source::Location> {
-        None // TODO
-    }
-
-    fn get_node(self, property: &'static str) -> ParseResult<Self, Self::Error> {
-        let value = (self.heap.get(self.node))
-            .get_value(property)
-            .ok_or_else(|| ParseError::ObjectWithout {
-                attr: property,
-                value: self.to_error(),
-            })?;
-        let href = value.to_ref().map_err(|_| ParseError::UnexpectedValue {
-            want: "an object",
-            value: self.to_error(),
-        })?;
-        Ok(HeapNode {
-            heap: self.heap,
-            node: href,
-        })
-    }
-
-    /*
-    fn map_node<T, F>(
-        self,
-        _property: &'static str,
-        _action: F,
-    ) -> ParseResult<Option<T>, Self::Error>
-    where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>,
-    {
-        todo!()
-    }
-    */
-
-    fn get_bool(self, property: &'static str) -> ParseResult<bool, Self::Error> {
-        let value = (self.heap.get(self.node))
-            .get_value(property)
-            .ok_or_else(|| ParseError::ObjectWithout {
-                attr: property,
-                value: self.to_error(),
-            })?;
-        match value {
-            JSValue::Bool(b) => Ok(b),
-            _ => Err(ParseError::ShouldBeString {
-                value: self.to_error(),
-            }),
-        }
-    }
-
-    fn get_str(self, property: &'static str) -> ParseResult<String, Self::Error> {
-        let value = (self.heap.get(self.node))
-            .get_value(property)
-            .ok_or_else(|| ParseError::ObjectWithout {
-                attr: property,
-                value: self.to_error(),
-            })?;
-        match value {
-            JSValue::String(s) => Ok(s),
-            _ => Err(ParseError::ShouldBeString {
-                value: self.to_error(),
-            }),
-        }
-    }
-
-    fn map_array<T, F>(
-        self,
-        property: &'static str,
-        mut func: F,
-    ) -> ParseResult<Vec<T>, Self::Error>
-    where
-        F: FnMut(Self) -> ParseResult<T, Self::Error>,
-    {
-        let value = (self.heap.get(self.node))
-            .get_value(property)
-            .ok_or_else(|| ParseError::ObjectWithout {
-                attr: property,
-                value: self.to_error(),
-            })?;
-        let arrref = value.to_ref().map_err(|_| ParseError::ShouldBeArray {
-            value: self.to_error(),
-        })?;
-        let array =
-            (self.heap.get(arrref))
-                .as_array()
-                .ok_or_else(|| ParseError::ShouldBeArray {
-                    value: self.to_error(),
-                })?;
-        (array.storage.iter())
-            .map(|child| {
-                let childref = child.to_ref().map_err(|_| ParseError::UnexpectedValue {
-                    want: "objects",
-                    value: self.to_error(),
-                })?;
-                func(HeapNode {
-                    heap: self.heap,
-                    node: childref,
-                })
-            })
-            .collect()
-    }
-
-    fn expect_str(
-        self,
-        property: &'static str,
-        want: &'static str,
-    ) -> ParseResult<(), Self::Error> {
-        let value = (self.heap.get(self.node).get_value(property)).ok_or_else(|| {
-            ParseError::ObjectWithout {
-                attr: property,
-                value: self.to_error(),
-            }
-        })?;
-        match value {
-            JSValue::String(s) if want == s.as_str() => Ok(()),
-            JSValue::String(_) => Err(ParseError::UnexpectedValue {
-                want,
-                value: self.to_error(),
-            }),
-            _ => Err(ParseError::ShouldBeString {
-                value: self.to_error(),
-            }),
-        }
-    }
+        F: FnMut(&Self) -> ParseResult<T, Self::Error>;
 }
 
 impl Program {
-    pub fn parse_from<S: SourceNode>(source: S) -> ParseResult<Program, S::Error> {
+    pub fn parse_from<S: SourceNode>(source: &S) -> ParseResult<Program, S::Error> {
         source.expect_str("type", "Program")?;
 
         let mut ctx = ParserContext::new();
@@ -369,7 +127,7 @@ impl Program {
 
 impl ParseFrom for Statement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let loc = source.get_location().map(Box::new);
@@ -420,7 +178,7 @@ impl ParseFrom for Statement {
 
 impl ParseFrom for BlockStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt, ctx))?;
@@ -430,18 +188,20 @@ impl ParseFrom for BlockStatement {
 
 impl ParseFrom for IfStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "IfStatement")?;
 
-        let jtest = source.get_node("test")?;
-        let test = Expression::parse_from(jtest, ctx)?;
-
-        let jthen = source.get_node("consequent")?;
-        let consequent = Statement::parse_from(jthen, ctx)?;
-
-        let alternate = source.map_node("alternate", |jelse| Statement::parse_from(jelse, ctx))?;
+        let test = source.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+        let consequent =
+            source.map_node("consequent", |jthen| Statement::parse_from(jthen, ctx))?;
+        let alternate =
+            match source.map_node("alternate", |jelse| Statement::parse_from(jelse, ctx)) {
+                Ok(stmt) => Some(stmt),
+                Err(ParseError::ObjectWithout { .. }) => None,
+                Err(e) => return Err(e),
+            };
 
         Ok(IfStatement {
             test,
@@ -453,16 +213,17 @@ impl ParseFrom for IfStatement {
 
 impl ParseFrom for SwitchStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "SwitchStatement")?;
 
-        let jdiscriminant = source.get_node("discriminant")?;
-        let discriminant = Expression::parse_from(jdiscriminant, ctx)?;
+        let discriminant = source.map_node("discriminant", |jdiscriminant| {
+            Expression::parse_from(jdiscriminant, ctx)
+        })?;
 
         let cases = source.map_array("cases", |jcase| {
-            let test = jcase.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+            let test = jcase.map_opt_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
 
             let consequent =
                 jcase.map_array("consequent", |jstmt| Statement::parse_from(jstmt, ctx))?;
@@ -478,7 +239,7 @@ impl ParseFrom for SwitchStatement {
 
 impl ParseFrom for ForStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let for_ok = source.expect_str("type", "ForStatement");
@@ -487,7 +248,7 @@ impl ParseFrom for ForStatement {
         for_ok.or(while_ok).or(dowhile_ok)?;
 
         let init = source
-            .map_node("init", |jinit| {
+            .map_opt_node("init", |jinit| {
                 if let Ok(var) = VariableDeclaration::parse_from(jinit, ctx) {
                     let stmt = Stmt::Variable(var);
                     Ok(Statement { stmt, loc: None })
@@ -495,7 +256,10 @@ impl ParseFrom for ForStatement {
                     let stmt = Stmt::Expr(ExpressionStatement { expression: expr });
                     Ok(Statement { stmt, loc: None })
                 } else {
-                    panic!("jinit is not Expression | VariableDeclaration")
+                    Err(ParseError::UnexpectedValue {
+                        want: "variable or expression",
+                        value: jinit.to_error(),
+                    })
                 }
             })?
             .unwrap_or(Statement {
@@ -503,11 +267,11 @@ impl ParseFrom for ForStatement {
                 loc: None,
             });
 
-        let test = source.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
-        let update = source.map_node("update", |jupdate| Expression::parse_from(jupdate, ctx))?;
+        let test = source.map_opt_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+        let update =
+            source.map_opt_node("update", |jupdate| Expression::parse_from(jupdate, ctx))?;
 
-        let jbody = source.get_node("body")?;
-        let body = Statement::parse_from(jbody, ctx)?;
+        let body = source.map_node("body", |jbody| Statement::parse_from(jbody, ctx))?;
         Ok(ForStatement {
             init,
             test,
@@ -519,121 +283,107 @@ impl ParseFrom for ForStatement {
 
 impl ParseFrom for ForInStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ForInStatement")?;
 
-        let jleft = source.get_node("left")?;
-        let left = if let Ok(vardecl) = VariableDeclaration::parse_from(jleft, ctx) {
-            ForInTarget::Var(vardecl)
-        } else if let Ok(expr) = Expression::parse_from(jleft, ctx) {
-            ForInTarget::Expr(expr)
-        } else {
-            return Err(ParseError::UnexpectedValue {
-                want: "VariableDeclaration | Pattern",
-                value: jleft.to_error(),
-            });
-        };
-
-        let jright = source.get_node("right")?;
-        let right = Expression::parse_from(jright, ctx)?;
-
-        let jbody = source.get_node("body")?;
-        let body = Statement::parse_from(jbody, ctx)?;
-
+        let left = source.map_node("left", |jleft| {
+            if let Ok(vardecl) = VariableDeclaration::parse_from(jleft, ctx) {
+                Ok(ForInTarget::Var(vardecl))
+            } else if let Ok(expr) = Expression::parse_from(jleft, ctx) {
+                Ok(ForInTarget::Expr(expr))
+            } else {
+                Err(ParseError::UnexpectedValue {
+                    want: "VariableDeclaration | Pattern",
+                    value: jleft.to_error(),
+                })
+            }
+        })?;
+        let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
+        let body = source.map_node("body", |jbody| Statement::parse_from(jbody, ctx))?;
         Ok(ForInStatement { left, right, body })
     }
 }
 
 impl ParseFrom for BreakStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "BreakStatement")?;
 
-        let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
+        let label = source.map_opt_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
         Ok(BreakStatement(label))
     }
 }
 
 impl ParseFrom for ContinueStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ContinueStatement")?;
 
-        let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
+        let label = source.map_opt_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
         Ok(ContinueStatement(label))
     }
 }
 
 impl ParseFrom for LabelStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "LabeledStatement")?;
 
-        let jlabel = source.get_node("label")?;
-        let label = Identifier::parse_from(jlabel, ctx)?;
-
-        let jbody = source.get_node("body")?;
-        let body = Statement::parse_from(jbody, ctx)?;
-
+        let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
+        let body = source.map_node("body", |jbody| Statement::parse_from(jbody, ctx))?;
         Ok(LabelStatement(label, body))
     }
 }
 
 impl ParseFrom for ReturnStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ReturnStatement")?;
 
         let argument =
-            source.map_node("argument", |jobject| Expression::parse_from(jobject, ctx))?;
+            source.map_opt_node("argument", |jobject| Expression::parse_from(jobject, ctx))?;
         Ok(ReturnStatement(argument))
     }
 }
 
 impl ParseFrom for ThrowStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ThrowStatement")?;
 
-        let jargument = source.get_node("argument")?;
-        let argument = Expression::parse_from(jargument, ctx)?;
+        let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
         Ok(ThrowStatement(argument))
     }
 }
 
 impl ParseFrom for TryStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "TryStatement")?;
 
-        let jblock = source.get_node("block")?;
-        let block = BlockStatement::parse_from(jblock, ctx)?;
+        let block = source.map_node("block", |jblock| BlockStatement::parse_from(jblock, ctx))?;
 
-        let handler = source.map_node("handler", |jhandler| {
-            let jparam = jhandler.get_node("param")?;
-            let param = Identifier::parse_from(jparam, ctx)?;
-
-            let jbody = jhandler.get_node("body")?;
-            let body = BlockStatement::parse_from(jbody, ctx)?;
-
+        let handler = source.map_opt_node("handler", |jhandler| {
+            let param = jhandler.map_node("param", |jparam| Identifier::parse_from(jparam, ctx))?;
+            let body = jhandler.map_node("body", |jbody| BlockStatement::parse_from(jbody, ctx))?;
             Ok(CatchClause { param, body })
         })?;
 
-        let finalizer = source.map_node("finalizer", |jobject| {
+        let finalizer = source.map_opt_node("finalizer", |jobject| {
             BlockStatement::parse_from(jobject, ctx)
         })?;
 
@@ -647,7 +397,7 @@ impl ParseFrom for TryStatement {
 
 impl ParseFrom for VariableDeclaration {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "VariableDeclaration")?;
@@ -659,17 +409,16 @@ impl ParseFrom for VariableDeclaration {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "var | let | const",
-                    value: source.get_node("kind")?.to_error(),
+                    value: source.map_node("kind", |node| Ok(node.to_error()))?,
                 })
             }
         };
         let declarations = source.map_array("declarations", |decl| {
             decl.expect_str("type", "VariableDeclarator")?;
 
-            let jid = decl.get_node("id")?;
-            let name = Identifier::parse_from(jid, ctx)?;
+            let name = decl.map_node("id", |jid| Identifier::parse_from(jid, ctx))?;
 
-            let init = decl.map_node("init", |jinit| {
+            let init = decl.map_opt_node("init", |jinit| {
                 let expr = Expression::parse_from(jinit, ctx)?;
                 Ok(Box::new(expr))
             })?;
@@ -684,16 +433,17 @@ impl ParseFrom for VariableDeclaration {
 
 impl ParseFrom for FunctionDeclaration {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "FunctionDeclaration")?;
 
         let function = FunctionExpression::parse_from(source, ctx)?;
-        let id = (function.func.id.clone()).ok_or_else(|| ParseError::ObjectWithout {
-            attr: "id",
-            value: source.to_error(),
-        })?;
+        let id = function
+            .func
+            .id
+            .clone()
+            .ok_or_else(|| ParseError::no_attr("id", source.to_error()))?;
         let funcdecl = FunctionDeclaration { id, function };
         ctx.declared_functions.push(funcdecl.clone());
         Ok(funcdecl)
@@ -702,20 +452,20 @@ impl ParseFrom for FunctionDeclaration {
 
 impl ParseFrom for ExpressionStatement {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ExpressionStatement")?;
 
-        let jexpr = source.get_node("expression")?;
-        let expression = Expression::parse_from(jexpr, ctx)?;
+        let expression =
+            source.map_node("expression", |jexpr| Expression::parse_from(jexpr, ctx))?;
         Ok(ExpressionStatement { expression })
     }
 }
 
 impl ParseFrom for Expression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let loc = source.get_location().map(Box::new);
@@ -737,23 +487,19 @@ impl ParseFrom for Expression {
                 Expr::BinaryOp(Box::new(expr))
             }
             "CallExpression" => {
-                let jcallee = source.get_node("callee")?;
-                let callee = Expression::parse_from(jcallee, ctx)?;
-
+                let callee =
+                    source.map_node("callee", |jcallee| Expression::parse_from(jcallee, ctx))?;
                 let arguments =
                     source.map_array("arguments", |jarg| Expression::parse_from(jarg, ctx))?;
                 Expr::Call(Box::new(CallExpression(callee, arguments)))
             }
             "ConditionalExpression" => {
-                let jtest = source.get_node("test")?;
-                let condexpr = Expression::parse_from(jtest, ctx)?;
-
-                let jthen = source.get_node("consequent")?;
-                let thenexpr = Expression::parse_from(jthen, ctx)?;
-
-                let jelse = source.get_node("alternate")?;
-                let elseexpr = Expression::parse_from(jelse, ctx)?;
-
+                let condexpr =
+                    source.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
+                let thenexpr =
+                    source.map_node("consequent", |jthen| Expression::parse_from(jthen, ctx))?;
+                let elseexpr =
+                    source.map_node("alternate", |jelse| Expression::parse_from(jelse, ctx))?;
                 let expr = ConditionalExpression {
                     condexpr,
                     thenexpr,
@@ -780,18 +526,15 @@ impl ParseFrom for Expression {
             "MemberExpression" => {
                 let computed = source.get_bool("computed")?;
 
-                let jobject = source.get_node("object")?;
-                let object = Expression::parse_from(jobject, ctx)?;
-
-                let jproperty = source.get_node("property")?;
-                let property = Expression::parse_from(jproperty, ctx)?;
+                let object = source.map_node("object", |jobj| Expression::parse_from(jobj, ctx))?;
+                let property =
+                    source.map_node("property", |jprop| Expression::parse_from(jprop, ctx))?;
                 let expr = MemberExpression(object, property, computed);
                 Expr::Member(Box::new(expr))
             }
             "NewExpression" => {
-                let jcallee = source.get_node("callee")?;
-                let callee = Expression::parse_from(jcallee, ctx)?;
-
+                let callee =
+                    source.map_node("callee", |jcallee| Expression::parse_from(jcallee, ctx))?;
                 let arguments =
                     source.map_array("arguments", |jarg| Expression::parse_from(jarg, ctx))?;
                 let expr = NewExpression(callee, arguments);
@@ -826,7 +569,7 @@ impl ParseFrom for Expression {
 
 impl ParseFrom for Identifier {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let name = source.get_str("name")?;
@@ -838,7 +581,7 @@ impl ParseFrom for Identifier {
 
 impl ParseFrom for UnaryExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let jop = source.get_str("operator")?;
@@ -858,21 +601,17 @@ impl ParseFrom for UnaryExpression {
             }
         };
 
-        let jargument = source.get_node("argument")?;
-        let argument = Expression::parse_from(jargument, ctx)?;
-
+        let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
         Ok(UnaryExpression(op, Box::new(argument)))
     }
 }
 
 impl ParseFrom for UpdateExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jargument = source.get_node("argument")?;
-        let argument = Expression::parse_from(jargument, ctx)?;
-
+        let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
         let prefix = source.get_bool("prefix")?;
         let operator = source.get_str("operator")?;
 
@@ -892,7 +631,7 @@ impl ParseFrom for UpdateExpression {
 
 impl ParseFrom for SequenceExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         let exprs = source.map_array("expressions", |jexpr| Expression::parse_from(jexpr, ctx))?;
@@ -902,14 +641,11 @@ impl ParseFrom for SequenceExpression {
 
 impl ParseFrom for BinaryExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jleft = source.get_node("left")?;
-        let left = Expression::parse_from(jleft, ctx)?;
-
-        let jright = source.get_node("right")?;
-        let right = Expression::parse_from(jright, ctx)?;
+        let left = source.map_node("left", |jleft| Expression::parse_from(jleft, ctx))?;
+        let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
 
         let opstr = source.get_str("operator")?;
         let op = match opstr.as_str() {
@@ -937,7 +673,7 @@ impl ParseFrom for BinaryExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "one of: + - * / % == === != < > <= >= instanceof | ^ & << >> >>>",
-                    value: source.get_node("operator")?.to_error(),
+                    value: source.map_node("operator", |jop| Ok(jop.to_error()))?,
                 })
             }
         };
@@ -947,15 +683,9 @@ impl ParseFrom for BinaryExpression {
 
 impl ParseFrom for LogicalExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jleft = source.get_node("left")?;
-        let left = Expression::parse_from(jleft, ctx)?;
-
-        let jright = source.get_node("right")?;
-        let right = Expression::parse_from(jright, ctx)?;
-
         let opstr = source.get_str("operator")?;
         let op = match opstr.as_str() {
             "&&" => BoolOp::And,
@@ -963,25 +693,22 @@ impl ParseFrom for LogicalExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "&& or ||",
-                    value: source.get_node("operator")?.to_error(),
+                    value: source.map_node("operator", |jop| Ok(jop.to_error()))?,
                 })
             }
         };
+        let left = source.map_node("left", |jleft| Expression::parse_from(jleft, ctx))?;
+        let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
+
         Ok(LogicalExpression(left, op, right))
     }
 }
 
 impl ParseFrom for AssignmentExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
-        let jright = source.get_node("right")?;
-        let right = Expression::parse_from(jright, ctx)?;
-
-        let jleft = source.get_node("left")?;
-        let left = Expression::parse_from(jleft, ctx)?;
-
         let jop = source.get_str("operator")?;
         let modop = match jop.as_str() {
             "=" => None,
@@ -999,17 +726,21 @@ impl ParseFrom for AssignmentExpression {
             _ => {
                 return Err(ParseError::UnexpectedValue {
                     want: "one of: = += -= *= /= %= <<= >>= >>>= |= ^= &=",
-                    value: source.get_node("operator")?.to_error(),
+                    value: source.map_node("operator", |jop| Ok(jop.to_error()))?,
                 })
             }
         };
+
+        let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
+        let left = source.map_node("left", |jleft| Expression::parse_from(jleft, ctx))?;
+
         Ok(AssignmentExpression(left, AssignOp(modop), right))
     }
 }
 
 impl ParseFrom for ObjectExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
         source.expect_str("type", "ObjectExpression")?;
@@ -1017,8 +748,7 @@ impl ParseFrom for ObjectExpression {
         let properties = source.map_array("properties", |jprop| {
             jprop.expect_str("type", "Property")?;
 
-            let jkey = jprop.get_node("key")?;
-            let keyexpr = Expression::parse_from(jkey, ctx)?;
+            let keyexpr = jprop.map_node("key", |jkey| Expression::parse_from(jkey, ctx))?;
             let key = if jprop.get_bool("computed")? {
                 ObjectKey::Computed(keyexpr)
             } else {
@@ -1037,8 +767,7 @@ impl ParseFrom for ObjectExpression {
                 }
             };
 
-            let jvalue = jprop.get_node("value")?;
-            let value = Expression::parse_from(jvalue, ctx)?;
+            let value = jprop.map_node("value", |jval| Expression::parse_from(jval, ctx))?;
 
             Ok((key, value))
         })?;
@@ -1049,20 +778,25 @@ impl ParseFrom for ObjectExpression {
 
 impl ParseFrom for FunctionExpression {
     fn parse_from<S: SourceNode>(
-        source: S,
+        source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self, S::Error> {
+        /*
         let id: Option<Identifier> = (source.get_node("id"))
             .and_then(|jid| Identifier::parse_from(jid, ctx))
             .ok();
+            */
+        let id: Option<Identifier> =
+            source.map_opt_node("id", |jid| Identifier::parse_from(jid, ctx))?;
 
         let mut inner_ctx = ParserContext::new();
         let params = source.map_array("params", |jparam| {
             Identifier::parse_from(jparam, &mut inner_ctx)
         })?;
 
-        let jbody = source.get_node("body")?;
-        let body = BlockStatement::parse_from(jbody, &mut inner_ctx)?;
+        let body = source.map_node("body", |jbody| {
+            BlockStatement::parse_from(jbody, &mut inner_ctx)
+        })?;
 
         let ParserContext {
             used_variables: mut free_variables,

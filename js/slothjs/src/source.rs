@@ -75,10 +75,12 @@ pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
         let loc_ref = (heap.get(scoperef))
             .get_value(CALLER_LOCATION)
             .and_then(|v| v.to_ref().ok())
-            .ok_or(Exception::SyntaxTreeError(ParseError::ObjectWithout {
-                attr: CALLER_LOCATION,
-                value: JSON::Null,
-            }))?;
+            .ok_or_else(|| {
+                Exception::SyntaxTreeError(ParseError::ObjectWithout {
+                    attr: CALLER_LOCATION.to_string(),
+                    value: JSON::Null,
+                })
+            })?;
         if let Ok(loc) = Location::from_saved(heap.get(loc_ref), heap) {
             eprintln!("   {:?}", loc);
         } else {

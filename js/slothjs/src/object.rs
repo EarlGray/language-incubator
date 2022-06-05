@@ -502,10 +502,9 @@ impl JSObject {
             }
         }
 
-        self.properties.get(name)
-            .map(|prop| match &prop.content {
-                Content::Value(value) => value.clone(),
-            })
+        self.properties.get(name).map(|prop| match &prop.content {
+            Content::Value(value) => value.clone(),
+        })
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.
@@ -957,8 +956,9 @@ impl Interpreted {
                     Some(_) => unreachable!(),
                     None => return Err(Exception::TypeErrorNotCallable(self.clone())),
                 };
-                let func_value = (heap.get(of).get_value(name))
-                    .ok_or_else(|| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
+                let func_value = (heap.get(of).get_value(name)).ok_or_else(|| {
+                    Exception::TypeErrorNotCallable(Interpreted::member(of, name))
+                })?;
                 let func_ref = (func_value.to_ref())
                     .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
                 Ok((func_ref, *this_ref, name))

@@ -57,8 +57,8 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> Result<Interpret
 }
 
 fn object_object_create(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let proto = (call.arguments.get(0))
-        .ok_or(Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
+    let proto =
+        (call.arguments.get(0)).ok_or(Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
     let protoref =
         (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
 
@@ -139,9 +139,8 @@ fn define_property(
     descref: JSRef,
     heap: &mut Heap,
 ) -> Result<(), Exception> {
-    let get_value = |object: &JSObject, name: &str| {
-        object.get_value(name).unwrap_or(JSValue::Undefined)
-    };
+    let get_value =
+        |object: &JSObject, name: &str| object.get_value(name).unwrap_or(JSValue::Undefined);
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
 
     let descriptor = heap.get(descref);

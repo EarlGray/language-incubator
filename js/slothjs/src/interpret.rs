@@ -200,7 +200,11 @@ impl Interpretable for ForInStatement {
         let mut objref = iteratee;
         while objref != Heap::NULL {
             let object = heap.get(objref);
-            let mut keys = object.properties.keys().cloned().collect::<HashSet<String>>();
+            let mut keys = object
+                .properties
+                .keys()
+                .cloned()
+                .collect::<HashSet<String>>();
             if let Some(array) = object.as_array() {
                 let indices = 0..array.storage.len();
                 keys.extend(indices.map(|i| i.to_string()));

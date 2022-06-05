@@ -12,9 +12,18 @@ pub enum ParseError<V> {
     ShouldBeString { value: V },
     ShouldBeArray { value: V },
     //ShouldBeObject{ value: V },
-    ObjectWithout { attr: &'static str, value: V },
+    ObjectWithout { attr: String, value: V },
     UnexpectedValue { want: &'static str, value: V },
     UnknownType { value: V },
+}
+
+impl<V> ParseError<V> {
+    pub fn no_attr(attr: &str, at: V) -> ParseError<V> {
+        ParseError::ObjectWithout {
+            attr: attr.to_string(),
+            value: at,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -50,7 +59,7 @@ impl Exception {
 
     pub fn invalid_ast<E: std::fmt::Debug>(e: E) -> Self {
         let err = format!("{:?}", e);
-        Exception::SyntaxTreeError(ParseError::InvalidJSON{ err })
+        Exception::SyntaxTreeError(ParseError::InvalidJSON { err })
     }
 }
 

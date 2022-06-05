@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use serde_json::json;
 
 use crate::{
+    Exception,
     Heap,
     Interpreted,
     Interpretable,
@@ -12,7 +13,6 @@ use crate::{
     Program,
 };
 use crate::object;
-use crate::error::{Exception, ParseError};
 
 const NODE: &str = if cfg!(target_os = "windows") { "node.exe" } else { "node" };
 const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
@@ -37,11 +37,8 @@ fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exceptio
 
     let out = std::str::from_utf8(&output.stdout)
         .unwrap_or("");
-    let json = serde_json::from_str(out)
-        .map_err(|err| {
-            let err = ParseError::InvalidJSON{ err: err.to_string() };
-            Exception::SyntaxTreeError(err)
-        })?;
+    let json: JSON = serde_json::from_str(out)
+        .map_err(|e| Exception::invalid_ast(e))?;
     let program = Program::parse_from(&json)
         .map_err(|e| Exception::SyntaxTreeError(e))?;
     program.interpret(heap)

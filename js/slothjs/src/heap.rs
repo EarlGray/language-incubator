@@ -61,7 +61,7 @@ impl JSRef {
         }
     }
 
-    /// # Safety 
+    /// # Safety
     /// This should only be used for debugging
     pub unsafe fn from_index(index: usize) -> JSRef {
         JSRef(index)
@@ -69,6 +69,7 @@ impl JSRef {
 }
 
 /// Runtime heap
+#[derive(Debug)]
 pub struct Heap {
     objects: Vec<JSObject>,
     pub loc: Option<Box<source::Location>>,

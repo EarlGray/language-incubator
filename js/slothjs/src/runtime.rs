@@ -4,15 +4,13 @@ use std::io::prelude::*;
 use std::str::FromStr;
 
 use crate::{
+    error,
     Exception,
+    Heap,
     Interpretable,
     JSRef,
     JSValue,
-    Heap,
     Program,
-
-    error,
-    parse::SourceNode,
 };
 
 #[derive(Debug)]
@@ -30,12 +28,12 @@ pub enum EvalError {
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            EvalError::Exception(exc) =>
-                match exc {
-                    Exception::SyntaxTreeError(error::ParseError::InvalidJSON{ err }) =>
-                        writeln!(f, "syntax error:\n{}", err),
-                    _ => write!(f, "sljs error: {:?}", exc),
+            EvalError::Exception(exc) => match exc {
+                Exception::SyntaxTreeError(error::ParseError::InvalidJSON { err }) => {
+                    writeln!(f, "syntax error:\n{}", err)
                 }
+                _ => write!(f, "sljs error: {:?}", exc),
+            },
             EvalError::Serialization(e) => writeln!(f, "serializaiton error:\n{}", e),
             EvalError::Io(e) => writeln!(f, "{}", e),
         }
@@ -43,15 +41,21 @@ impl fmt::Display for EvalError {
 }
 
 impl From<Exception> for EvalError {
-    fn from(exc: Exception) -> Self { EvalError::Exception(exc) }
+    fn from(exc: Exception) -> Self {
+        EvalError::Exception(exc)
+    }
 }
 
 impl From<serde_json::Error> for EvalError {
-    fn from(err: serde_json::Error) -> Self { EvalError::Serialization(err) }
+    fn from(err: serde_json::Error) -> Self {
+        EvalError::Serialization(err)
+    }
 }
 
 impl From<io::Error> for EvalError {
-    fn from(err: io::Error) -> Self { EvalError::Io(err) }
+    fn from(err: io::Error) -> Self {
+        EvalError::Io(err)
+    }
 }
 
 impl From<std::string::FromUtf8Error> for EvalError {
@@ -62,15 +66,10 @@ impl From<std::string::FromUtf8Error> for EvalError {
 
 pub type EvalResult<T> = Result<T, EvalError>;
 
-
 pub trait Parser: Sized {
-    type Output: SourceNode;
-
     fn load(heap: &mut Heap) -> EvalResult<Self>;
-    fn parse(&mut self, input: &str, heap: &mut Heap) -> EvalResult<Self::Output>;
+    fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program>;
 }
-
-
 
 pub struct Runtime<P> {
     pub heap: Heap,
@@ -81,14 +80,11 @@ impl<P: Parser> Runtime<P> {
     pub fn load() -> EvalResult<Self> {
         let mut heap = Heap::new();
         let parser = P::load(&mut heap)?;
-        Ok(Runtime{ heap, parser })
+        Ok(Runtime { heap, parser })
     }
 
     pub fn evaluate(&mut self, input: &str) -> EvalResult<JSValue> {
-        let estree = self.parser.parse(input, &mut self.heap)?;
-
-        let program = Program::parse_from(estree)
-            .map_err(Exception::invalid_ast)?;
+        let program = self.parser.parse(input, &mut self.heap)?;
 
         let result = program.interpret(&mut self.heap)?;
         let value = result.to_value(&self.heap)?;
@@ -96,7 +92,9 @@ impl<P: Parser> Runtime<P> {
     }
 
     pub fn string_from(&mut self, value: JSValue) -> String {
-        value.to_string(&mut self.heap).expect("JSValue.to_string()")
+        value
+            .to_string(&mut self.heap)
+            .expect("JSValue.to_string()")
     }
 
     fn dbg(&mut self, refstr: &str) {
@@ -122,7 +120,7 @@ impl<P: Parser> Runtime<P> {
         Ok(())
     }
 
-    fn repl_main(&mut self) -> io::Result<()> {
+    pub fn repl_main(&mut self) -> io::Result<()> {
         let stdin = io::stdin();
         let mut input_iter = stdin.lock().lines();
 
@@ -154,4 +152,3 @@ impl<P: Parser> Runtime<P> {
         Ok(())
     }
 }
-
