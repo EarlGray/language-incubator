@@ -1,71 +1,16 @@
-use std::io::Write;
-use std::process::{Command, Stdio};
-
 use serde_json::json;
 
 use crate::{
     Exception,
-    Heap,
-    Interpreted,
-    Interpretable,
-    JSON,
     JSValue,
-    Program,
 };
+use crate::runtime::{Runtime, NodejsParser, EvalError};
 use crate::object;
 
-const NODE: &str = if cfg!(target_os = "windows") { "node.exe" } else { "node" };
-const ESPARSE: &str = "./node_modules/esprima/bin/esparse.js";
-
-fn run_interpreter(input: &str, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let mut child = Command::new(NODE)
-        .args([ESPARSE /*, "--loc" */])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("cannot run: node index.js");
-
-    let stdin = child.stdin.as_mut()
-        .expect("failed to open stdin");
-    stdin.write_all(input.as_bytes())
-        .expect("failed to write stdin");
-    std::mem::drop(stdin);  // flush
-
-    let output = child.wait_with_output()
-        .expect("failed to read stdout");
-    assert!(output.status.success());
-
-    let out = std::str::from_utf8(&output.stdout)
-        .unwrap_or("");
-    let json: JSON = serde_json::from_str(out)
-        .map_err(|e| Exception::invalid_ast(e))?;
-    let program = Program::parse_from(&json)
-        .map_err(|e| Exception::SyntaxTreeError(e))?;
-    program.interpret(heap)
-}
-
-fn interpret(input: &str, heap: &mut Heap) -> Result<JSValue, Exception> {
-    let result = run_interpreter(input, heap)?;
-    result.to_value(heap)
-}
-
-fn eval(input: &str) -> JSON {
-    let mut heap = Heap::new();
-    match interpret(input, &mut heap) {
-        Ok(value) => value.to_json(&heap).unwrap(),
-        Err(e) => {
-            let msg = format!("{:?}", e);
-            json!({"error": msg})
-        }
-    }
-}
-
 fn evalbool(input: &str) -> bool {
-    let mut heap = Heap::new();
-    match interpret(input, &mut heap) {
-        Ok(value) => value.boolify(&heap),
-        Err(e) => panic!("{:?}", e),
-    }
+    let mut js = Runtime::<NodejsParser>::load().unwrap();
+    let result = js.evaluate(input).unwrap();
+    result.boolify(&js.heap)
 }
 
 /// Runs interpretation of the first argument (a string literal),
@@ -73,13 +18,11 @@ fn evalbool(input: &str) -> bool {
 /// understands).
 macro_rules! assert_eval {
     ($js:literal, $json:tt) => {
-        let mut heap = Heap::new();
+        let mut js = Runtime::<NodejsParser>::load().expect("Runtime::load");
         let expected = json!($json);
-        match interpret($js, &mut heap) {
+        match js.evaluate($js) {
             Ok(result) => {
-                let result = result.to_json(&heap)
-                    .expect("JSValue::to_json()");
-                assert_eq!( result, expected )
+                assert_eq!( js.json_from(result), expected )
             }
             Err(exc) => {
                 panic!("\n     want value: {}\n  got exception: {:?}", expected, exc)
@@ -99,9 +42,9 @@ macro_rules! assert_eval {
 // ```
 macro_rules! assert_exception {
     ($js:literal, $exc:path) => {
-        let mut heap = Heap::new();
-        match interpret($js, &mut heap) {
-            Err($exc(_)) => (),
+        let mut js = Runtime::<NodejsParser>::load().expect("Runtime::load");
+        match js.evaluate($js) {
+            Err(EvalError::Exception($exc(_))) => (),
             other => {
                 panic!("\n   want {}\n   got: {:?}\n", stringify!($exc), other)
             }
@@ -124,13 +67,10 @@ fn test_literals() {
 
     assert_eval!("var a = {one:1, two:2}; a", {"one": 1.0, "two": 2.0});
 
-    assert_eq!(
-        eval("var x = 'one'; var o = {[x]: 1}; o.one"),
-        JSON::from(1.0)
-    );
+    assert_eval!("var x = 'one'; var o = {[x]: 1}; o.one", 1.0);
 
-    assert_eq!( eval("var undefined = 5; undefined"), JSON::Null );
-    assert!( evalbool("var NaN = 5; NaN != NaN") );
+    assert_eval!( "var undefined = 5; undefined", null );
+    assert_eval!( "var NaN = 5; NaN != NaN", true );
 }
 
 #[test]
@@ -336,18 +276,12 @@ fn test_binary_logical() {
 
 #[test]
 fn test_member_expression() {
-    assert_eq!( eval("['zero', 'one', 'two'][2]"),      JSON::from("two"));
-    assert_eq!( eval("var o = {one: 1}; o.one"),        JSON::from(1.0));
-    assert_eq!( eval("var a = {}; a.one = 1; a"),       json!({"one": 1.0}));
-    assert_eq!( eval("var o = {'o e': 1}; o['o e']"),   JSON::from(1.0));
-    assert_eq!(
-        eval("var x = 'one'; var o = {[x]: 1}; o"),
-        json!({"one": 1.0})
-    );
-    assert_eq!(
-        eval("var a = {}; a.sub = {}; a.sub.one = 1; a"),
-        json!({"sub": {"one": 1.0}})
-    );
+    assert_eval!( "['zero', 'one', 'two'][2]",      "two" );
+    assert_eval!( "var o = {one: 1}; o.one",        1.0 );
+    assert_eval!( "var a = {}; a.one = 1; a",       {"one": 1.0});
+    assert_eval!( "var o = {'o e': 1}; o['o e']",   1.0);
+    assert_eval!( "var x = 'one'; var o = {[x]: 1}; o", {"one": 1.0});
+    assert_eval!( "var a = {}; a.sub = {}; a.sub.one = 1; a", {"sub": {"one": 1.0}});
     assert_exception!(
         "var a = {}; a.sub.one = 1", Exception::ReferenceNotAnObject
     );
@@ -456,11 +390,11 @@ fn test_sequence() {
 
 #[test]
 fn test_blocks() {
-    assert_eq!( eval(r#"
+    assert_eval!(r#"
         var a = 1, b = 2;
         { a = 10; b = 20 };
         a + b
-    "#), JSON::from(30.0));
+    "#, 30.0);
 }
 
 #[test]
@@ -469,14 +403,8 @@ fn test_conditionals() {
     assert!( !evalbool("0 ? true : false"));
     assert!( evalbool("({} ? true : false)") );
 
-    assert_eq!(
-        eval("var a; if (a = 1) a = 2; else a = 3; a"),
-        JSON::from(2.0)
-    );
-    assert_eq!(
-        eval("var a = 1; if (null) { a = 2; }; a"),
-        JSON::from(1.0)
-    );
+    assert_eval!( "var a; if (a = 1) a = 2; else a = 3; a", 2.0 );
+    assert_eval!( "var a = 1; if (null) { a = 2; }; a",     1.0 );
 }
 
 #[test]
@@ -719,10 +647,10 @@ fn test_exceptions() {
 
 #[test]
 fn test_unary_operations() {
-    assert_eq!( eval("+1"),                 JSON::from(1.0) );
-    assert_eq!( eval("+'1'"),               JSON::from(1.0) );
-    assert_eq!( eval("+false"),             JSON::from(0.0) );
-    assert_eq!( eval("+null"),              JSON::from(0.0) );
+    assert_eval!( "+1",                 1.0 );
+    assert_eval!( "+'1'",               1.0 );
+    assert_eval!( "+false",             0.0 );
+    assert_eval!( "+null",              0.0 );
     assert!( evalbool("var v = +{}; v != v") );         // NaN
     assert!( evalbool("var v = +[1, 2]; v != v") );
     assert!( evalbool("var v = +'false'; v != v") );
@@ -730,7 +658,7 @@ fn test_unary_operations() {
     assert_eval!( "var a = [1]; +a",         1.0 );
     assert_eval!( "var a = +[1, 2]; a != a",  true);
 
-    assert_eq!( eval("-'1'"),               JSON::from(-1.0) );
+    assert_eval!( "-'1'",               (-1.0));
 
     assert!( evalbool("!false") );
     assert!( !evalbool("!true") );
@@ -756,22 +684,22 @@ fn test_unary_operations() {
     assert_eval!("typeof (function(){})",   "function");
     assert_eval!("typeof parseInt",         "function");
 
-    assert_eq!( eval("~-1"),                JSON::from(0.0));
-    assert_eq!( eval("~-2"),                JSON::from(1.0));
-    assert_eq!( eval("~2"),                 JSON::from(-3.0));
-    assert_eq!( eval("~2"),                 JSON::from(-3.0));
-    assert_eq!( eval("~NaN"),               JSON::from(-1.0));
-    assert_eq!( eval("~{}"),                JSON::from(-1.0));
-    assert_eq!( eval("~~''"),                JSON::from(0.0));
-    assert_eq!( eval("~~'whut'"),            JSON::from(0.0));
+    assert_eval!( "~-1",                0.0 );
+    assert_eval!( "~-2",                1.0 );
+    assert_eval!( "~2",                 (-3.0));
+    assert_eval!( "~2",                 (-3.0));
+    assert_eval!( "~NaN",               (-1.0));
+    assert_eval!( "~{}",                (-1.0));
+    assert_eval!( "~~''",               0.0 );
+    assert_eval!( "~~'whut'",           0.0 );
 
-    assert_eq!( eval("typeof void 'nope'"), JSON::from("undefined") );
-    assert_eq!( eval("typeof void {}"),     JSON::from("undefined") );
+    assert_eval!( "typeof void 'nope'", "undefined" );
+    assert_eval!( "typeof void {}",     "undefined" );
 
-    assert_eq!( eval("var a = {one: 1}; delete a.one; a"),   json!({}) );
+    assert_eval!( "var a = {one: 1}; delete a.one; a",   {} );
     assert!( evalbool("var a = {one: 1}; delete a.one") );
     assert!( evalbool("var a = {one: 1}; delete a['one']") );
-    assert_eq!( eval("var a = {one: 1}; delete a.two; a"),   json!({"one": 1.0}) );
+    assert_eval!( "var a = {one: 1}; delete a.two; a",   {"one": 1.0} );
     assert!( evalbool("var a = {one: 1}; delete a.two") );
     assert_eval!( "delete undefined",     false ); // global.undefined is not configurable
     assert_eval!( "var a = 1; delete a",  false); // vars are not configurable
@@ -1084,9 +1012,9 @@ fn test_builtin_object() {
 
 #[test]
 fn test_builtin_function() {
-    assert_eq!(
-        eval("Object.getOwnPropertyDescriptor(global, 'Function')"),
-        json!({"writable": true, "enumerable": false, "configurable": true,  "value": {}})
+    assert_eval!(
+        "Object.getOwnPropertyDescriptor(global, 'Function')",
+        {"writable": true, "enumerable": false, "configurable": true,  "value": {}}
     );
     //assert_eval!("var sqr = Function('x', 'return x * x'); sqr(12)",  144.0);
 
@@ -1255,18 +1183,12 @@ fn test_objects() {
     assert_eval!( "var a = {v: 1}; a.v = 2; a.v",   2.0);
     assert_eval!( "var a = {}; a.one = 1; a",       {"one": 1.0});
 
-    assert_eq!(
-        eval("var a = {}, b = {}; a.b = b; b.one = 1; a"),
-        json!({"b": {"one": 1.0}})
+    assert_eval!(
+        "var a = {}, b = {}; a.b = b; b.one = 1; a",
+        {"b": {"one": 1.0}}
     );
-    assert_eq!(
-        eval("var a = {b: 2}; var b = a.b; b = 1; a.b"),
-        JSON::from(2.0)
-    );
-    assert_eq!(
-        eval("var a = {b: {}}; var b = a.b; b.one = 1; a.b.one"),
-        JSON::from(1.0)
-    );
+    assert_eval!( "var a = {b: 2}; var b = a.b; b = 1; a.b", 2.0 );
+    assert_eval!( "var a = {b: {}}; var b = a.b; b.one = 1; a.b.one", 1.0 );
 
     assert_exception!( "a.one = 1", Exception::ReferenceNotFound );
 

@@ -8,10 +8,13 @@ use crate::{
     Exception,
     Heap,
     Interpretable,
+    JSON,
     JSRef,
     JSValue,
     Program,
 };
+
+pub use crate::parse::NodejsParser;
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -91,10 +94,12 @@ impl<P: Parser> Runtime<P> {
         Ok(value)
     }
 
+    pub fn json_from(&mut self, value: JSValue) -> JSON {
+        value.to_json(&self.heap).expect("JSValue.to_json()")
+    }
+
     pub fn string_from(&mut self, value: JSValue) -> String {
-        value
-            .to_string(&mut self.heap)
-            .expect("JSValue.to_string()")
+        value .to_string(&mut self.heap) .expect("JSValue.to_string()")
     }
 
     fn dbg(&mut self, refstr: &str) {

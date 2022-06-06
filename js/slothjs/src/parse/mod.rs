@@ -2,6 +2,7 @@ mod heapnode;
 mod jsonnode;
 
 pub use self::heapnode::HeapNode;
+pub use self::jsonnode::NodejsParser;
 
 use std::collections::HashSet;
 use std::fmt;
