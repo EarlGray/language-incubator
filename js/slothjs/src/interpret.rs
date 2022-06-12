@@ -177,8 +177,6 @@ impl ForInStatement {}
 
 impl Interpretable for ForInStatement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        use std::collections::HashSet;
-
         let iteratee = self.right.interpret(heap)?;
         let iteratee = iteratee.to_value(heap)?.objectify(heap);
 

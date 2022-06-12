@@ -1,12 +1,9 @@
 mod heapnode;
 mod jsonnode;
 
-pub use self::heapnode::HeapNode;
+use crate::prelude::*;
 
-use std::collections::HashSet;
-
-use crate::ast::*;
-use crate::prelude::*; // yes, EVERYTHING.
+use crate::ast::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
 use crate::source;
@@ -14,6 +11,8 @@ use crate::{
     JSRef,
     JSValue,
 };
+
+pub use self::heapnode::HeapNode;
 
 type ParseResult<T, S> = Result<T, ParseError<S>>;
 

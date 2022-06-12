@@ -7,10 +7,11 @@ default-run = "sljs-node"
 
 [features]
 default = ["std"]
-std = []
+std = ["serde/std"]
 
 [dependencies]
-atty = "0.2"        # TODO: make this binary-only somehow
+atty = "0.2"
 bitflags = "1.2.1"
+hashbrown = "0.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

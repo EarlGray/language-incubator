@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-
 use bitflags::bitflags;
 use serde_json::json;
+
+use crate::prelude::*;
 
 use crate::ast;
 use crate::error::Exception;
@@ -15,7 +15,6 @@ use crate::heap::{
     Heap,
     JSRef,
 };
-use crate::prelude::*;
 
 pub type JSON = serde_json::Value;
 
