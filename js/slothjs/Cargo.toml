@@ -5,6 +5,10 @@ authors = ["Dmytro S <me@dmytrish.net>"]
 edition = "2018"
 default-run = "sljs-node"
 
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
 atty = "0.2"        # TODO: make this binary-only somehow
 bitflags = "1.2.1"

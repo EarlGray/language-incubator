@@ -5,6 +5,7 @@ use serde::{
 
 use crate::error::ParseError;
 use crate::object::Content;
+use crate::prelude::*;
 use crate::{
     Exception,
     Heap,
@@ -66,32 +67,57 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
     Ok(())
 }
 
-pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
-    let loc = heap.loc.clone();
-    eprintln!("{:?}", loc);
+// TODO: `struct Callstack` and `impl Display for Callstack`.
+struct Callstack<'heap> {
+    heap: &'heap Heap,
+}
 
-    let mut scoperef = heap.local_scope().unwrap_or(Heap::NULL);
-    while scoperef != Heap::NULL {
-        let loc_ref = (heap.get(scoperef))
-            .get_value(CALLER_LOCATION)
-            .and_then(|v| v.to_ref().ok())
-            .ok_or_else(|| {
-                Exception::SyntaxTreeError(ParseError::ObjectWithout {
-                    attr: CALLER_LOCATION.to_string(),
-                    value: JSON::Null,
+impl<'heap> fmt::Display for Callstack<'heap> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let loc = self.heap.loc.clone();
+        writeln!(f, "{:?}", loc)?;
+
+        let mut scoperef = self.heap.local_scope().unwrap_or(Heap::NULL);
+        while scoperef != Heap::NULL {
+            let loc_ref = (self.heap.get(scoperef))
+                .get_value(CALLER_LOCATION)
+                .and_then(|v| v.to_ref().ok())
+                .ok_or_else(|| {
+                    Exception::SyntaxTreeError(ParseError::ObjectWithout {
+                        attr: CALLER_LOCATION.to_string(),
+                        value: JSON::Null,
+                    })
                 })
-            })?;
-        if let Ok(loc) = Location::from_saved(heap.get(loc_ref), heap) {
-            eprintln!("   {:?}", loc);
-        } else {
-            eprintln!("   ???");
+                .map_err(|_| fmt::Error)?;
+            if let Ok(loc) = Location::from_saved(self.heap.get(loc_ref), self.heap) {
+                writeln!(f, "   {:?}", loc)?;
+            } else {
+                writeln!(f, "   ???")?;
+            }
+
+            scoperef = match self.heap.get(scoperef).get_value(Heap::SAVED_SCOPE) {
+                Some(v) => v.to_ref().unwrap_or(Heap::NULL),
+                None => Heap::NULL,
+            };
         }
 
-        scoperef = match heap.get(scoperef).get_value(Heap::SAVED_SCOPE) {
-            Some(v) => v.to_ref().unwrap_or(Heap::NULL),
-            None => Heap::NULL,
-        };
+        Ok(())
     }
+}
 
-    Ok(())
+#[cfg(feature = "std")]
+pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
+    use std::io::Write;
+
+    let callstack = Callstack { heap };
+    let mut stderr = std::io::stderr();
+    write!(&mut stderr, "{}", callstack).map_err(|e| {
+        let msg = format!("{}", e);
+        Exception::UserThrown(JSValue::from(msg))
+    })
+}
+
+#[cfg(not(feature = "std"))]
+pub fn print_callstack(_heap: &Heap) -> Result<(), Exception> {
+    unimplemented!()
 }

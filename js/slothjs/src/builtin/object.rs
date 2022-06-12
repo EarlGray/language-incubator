@@ -3,6 +3,7 @@ use crate::object::{
     Content,
     JSValue,
 };
+use crate::prelude::*;
 use crate::{
     CallContext,
     Exception,
@@ -44,6 +45,7 @@ fn object_proto_toString(_call: CallContext, _heap: &mut Heap) -> Result<Interpr
     Ok(Interpreted::from("[object Object]"))
 }
 
+#[cfg(feature = "std")]
 fn object_proto_dbg(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     dbg!(call.this_ref);
     dbg!(heap.get(call.this_ref));
@@ -246,7 +248,9 @@ pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut object_proto = JSObject::new();
     object_proto.proto = Heap::NULL;
 
+    #[cfg(feature = "std")]
     object_proto.set_system("dbg", Content::from_func(object_proto_dbg, heap))?;
+
     object_proto.set_hidden(
         "hasOwnProperty",
         Content::from_func(object_proto_hasOwnProperty, heap),

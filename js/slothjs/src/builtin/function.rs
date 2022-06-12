@@ -1,4 +1,3 @@
-/// The implementation of the Function object.
 use crate::error::Exception;
 use crate::function::CallContext;
 use crate::heap::{
@@ -10,6 +9,8 @@ use crate::object::{
     Interpreted,
     JSObject,
 };
+/// The implementation of the Function object.
+use crate::prelude::*;
 
 fn function_constructor(_call: CallContext, _heap: &mut Heap) -> Result<Interpreted, Exception> {
     todo!()

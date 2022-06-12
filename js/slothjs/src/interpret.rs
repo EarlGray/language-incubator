@@ -1,5 +1,6 @@
-use crate::ast::*; // yes, EVERYTHING
+use crate::prelude::*;
 
+use crate::ast::*; // yes, EVERYTHING
 use crate::error::Exception;
 use crate::function::{
     CallContext,

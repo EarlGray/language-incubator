@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::str::FromStr;
 
 use bitflags::bitflags;
 use serde_json::json;
@@ -17,6 +15,7 @@ use crate::heap::{
     Heap,
     JSRef,
 };
+use crate::prelude::*;
 
 pub type JSON = serde_json::Value;
 
@@ -60,7 +59,7 @@ impl JSValue {
         }
     }
 
-    /// to_string() makes a human-readable string representation of the value:
+    /// `to_string()` makes a human-readable string representation of the value:
     /// ```
     /// # use serde_json::json;
     /// # use slothjs::{JSValue, Heap};
@@ -428,6 +427,7 @@ impl JSObject {
     /// Wrap the given string into String
     fn from_string(value: String) -> JSObject {
         let mut properties = HashMap::new();
+        // TODO: String.prototype.length
         properties.insert(
             String::from("length"),
             Property {

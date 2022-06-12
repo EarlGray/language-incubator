@@ -1,6 +1,3 @@
-use std::fmt;
-use std::rc::Rc;
-
 use crate::ast;
 use crate::error::Exception;
 use crate::heap::{
@@ -15,6 +12,7 @@ use crate::object::{
     JSValue,
     ObjectValue,
 };
+use crate::prelude::*;
 use crate::source;
 
 pub struct CallContext {

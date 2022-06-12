@@ -1,20 +1,23 @@
-use std::fmt;
+mod esprima;
+mod nodejs;
+
 use std::io;
 use std::io::prelude::*;
-use std::str::FromStr;
 
+use crate::prelude::*;
 use crate::{
     error,
     Exception,
     Heap,
     Interpretable,
-    JSON,
     JSRef,
     JSValue,
     Program,
+    JSON,
 };
 
-pub use crate::parse::NodejsParser;
+pub use self::esprima::EsprimaParser;
+pub use self::nodejs::NodejsParser;
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -99,7 +102,9 @@ impl<P: Parser> Runtime<P> {
     }
 
     pub fn string_from(&mut self, value: JSValue) -> String {
-        value .to_string(&mut self.heap) .expect("JSValue.to_string()")
+        value
+            .to_string(&mut self.heap)
+            .expect("JSValue.to_string()")
     }
 
     fn dbg(&mut self, refstr: &str) {

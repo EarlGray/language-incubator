@@ -4,6 +4,7 @@ use crate::object::{
     JSValue,
     JSON,
 };
+use crate::prelude::*;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError<V> {
@@ -57,7 +58,7 @@ impl Exception {
         Exception::TypeErrorInstanceRequired(arg.clone(), of.to_string())
     }
 
-    pub fn invalid_ast<E: std::fmt::Debug>(e: E) -> Self {
+    pub fn invalid_ast<E: fmt::Debug>(e: E) -> Self {
         let err = format!("{:?}", e);
         Exception::SyntaxTreeError(ParseError::InvalidJSON { err })
     }

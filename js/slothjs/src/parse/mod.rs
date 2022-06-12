@@ -2,13 +2,11 @@ mod heapnode;
 mod jsonnode;
 
 pub use self::heapnode::HeapNode;
-pub use self::jsonnode::NodejsParser;
 
 use std::collections::HashSet;
-use std::fmt;
-use std::rc::Rc;
 
-use crate::ast::*; // yes, EVERYTHING.
+use crate::ast::*;
+use crate::prelude::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
 use crate::source;

@@ -15,13 +15,15 @@
 //! to execute the Esprima parser. It uses `$TMPDIR/sljs/` to unpack
 //! its helper files.
 
-use std::io;
 use std::fmt;
+use std::io;
 
 use atty::Stream;
 
-use slothjs::runtime::{NodejsParser, Runtime};
-
+use slothjs::runtime::{
+    NodejsParser,
+    Runtime,
+};
 
 fn die<E: fmt::Debug>(msg: &str, err: E, errcode: i32) -> ! {
     eprintln!("{}: {:?}", msg, err);

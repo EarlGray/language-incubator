@@ -11,6 +11,7 @@ use crate::object::{
     JSValue,
     ObjectValue,
 };
+use crate::prelude::*;
 
 fn array_object_constructor(
     _call: CallContext,

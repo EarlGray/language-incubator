@@ -4,6 +4,7 @@ use crate::object::{
     Interpreted,
     ObjectValue,
 };
+use crate::prelude::*;
 use crate::{
     Exception,
     Heap,

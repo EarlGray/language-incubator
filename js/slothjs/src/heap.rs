@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use crate::ast::{
     FunctionDeclaration,
     Identifier,
@@ -17,6 +15,7 @@ use crate::object::{
     ObjectValue,
     JSON,
 };
+use crate::prelude::*;
 use crate::source;
 
 /// A heap reference: a Heap index.

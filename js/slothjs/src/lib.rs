@@ -164,6 +164,10 @@
 //! - garbage collection;
 //! - any kind of meaningful performance optimization;
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 pub mod ast;
 mod builtin;
 pub mod error;
@@ -172,8 +176,12 @@ pub mod heap;
 pub mod interpret;
 pub mod object;
 mod parse;
-pub mod runtime;
+mod prelude;
 pub mod source;
+
+#[cfg(feature = "std")]
+pub mod runtime;
+
 #[cfg(test)]
 #[rustfmt::skip]
 mod test;

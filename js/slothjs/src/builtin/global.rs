@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::error::Exception;
 use crate::function::CallContext;
 use crate::heap::Heap;
@@ -9,6 +7,7 @@ use crate::object::{
     JSObject,
     JSValue,
 };
+use crate::prelude::*;
 
 /*
  *  parseInt

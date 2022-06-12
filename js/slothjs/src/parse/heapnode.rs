@@ -1,6 +1,8 @@
-use super::*;
+use crate::prelude::*;
 use crate::source;
 use crate::Heap;
+
+use super::*;
 
 /// `HeapNode` contains a heap reference and a `JSRef` to an AST subtree in it.
 /// It implements [`SourceNode`] for on-heap AST trees.
@@ -16,7 +18,7 @@ impl HeapNode {
         F: FnMut(&HeapNode) -> T,
     {
         let mut tmp = Heap::new();
-        std::mem::swap(heap, &mut tmp);
+        core::mem::swap(heap, &mut tmp);
         let heapptr = Rc::new(tmp);
         let heapnode = HeapNode {
             heap: heapptr,
@@ -26,7 +28,7 @@ impl HeapNode {
         let result = action(&heapnode);
 
         tmp = Rc::try_unwrap(heapnode.heap).expect("only one reference left");
-        std::mem::swap(heap, &mut tmp);
+        core::mem::swap(heap, &mut tmp);
         result
     }
 
