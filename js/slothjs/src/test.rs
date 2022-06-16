@@ -303,20 +303,28 @@ fn test_assignment() {
     assert_eval!("var a = 6; a &= 9; a",    0.0);
     assert_eval!("var a = 6; a ^= 9; a",    15.0);
     assert_eval!("var a = 3; a |= 6; a",    7.0);
-    //assert_eq!( eval("var a = 3; a **= a; a"),            JSValue::from(27));
+    //assert_eval!("var a = 3; a **= a; a",   27.0);
 
     // Assignment of read-only variables:
     assert_eval!("undefined = 5; typeof undefined", "undefined");
     assert_eval!("undefined += 1; typeof undefined", "undefined");
+
+    assert_exception!("var var = 'var'",      Exception::SyntaxTreeError);
+
+    // TODO: destructuring assignment
+    //assert_eval!( "let obj = { key: 42 }; let { k } = obj; k", 42.0 );
 }
 
 #[test]
-fn test_scope() {
+fn test_global_scope() {
     assert_eval!( "a = 1; a",   1.0 );
     assert_exception!( "b", Exception::ReferenceNotFound );
     assert_exception!( "a = a + 1", Exception::ReferenceNotFound );
     assert_exception!( "a += 1", Exception::ReferenceNotFound );
+}
 
+#[test]
+fn test_function_scope() {
     assert_eval!("var a=1, b=a+1; b", 2.0);
 
     assert_eval!( "var a = false; { var a = true; } a",     true );
@@ -328,13 +336,6 @@ fn test_scope() {
 
     assert_eval!("var a; Object.getOwnPropertyDescriptor(this, 'a').configurable", false);
     assert_eval!("a = 1; Object.getOwnPropertyDescriptor(this, 'a').configurable", true);
-
-    // block scope
-    //assert_eval!( "var a = true; { let a = false; } a",     true );
-    //assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
-
-    // const variables
-    //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 
     // variable hoisting
     assert_eval!("(function() { return a; var a = 12; })()", null);
@@ -382,6 +383,47 @@ fn test_scope() {
         adder(3)(4)
     "#, Exception::ReferenceNotFound);
 }
+
+#[test]
+fn test_block_scope() {
+    /*
+    assert_eval!( "let a; a === undefined", true );
+    assert_eval!( "let a, b = '2', c; a = '1'; c = '3'; a + b + c", "123" );
+    assert_eval!( "var a = true; { let a = false; } a",     true );
+    assert_eval!( "let a = true; { let a = false; } a",     true );
+    assert_eval!( "let a = false; { a = true; } a",         true );
+    assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
+    assert_exception!("{ let a = 'should not leak'; }; a", Exception::ReferenceNotFound );
+
+    assert_exception!("let foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
+    assert_exception!("let foo; var foo;", Exception::SyntaxErrorAlreadyDeclared);
+    assert_exception!("var foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
+
+    assert_eval!(       "var let = true; let",  true);
+    assert_exception!(  "let let = 'let'; let", Exception::SyntaxTreeError);
+    assert_exception!(  "let var = 'var'; var", Exception::SyntaxTreeError);
+
+    assert_exception!("if (true) let a = 1", Exception::SyntaxTreeError); //valid only in a block
+    assert_exception!("var a; { a = b; let b = 2; }; a", Exception::ReferenceNotFound);
+
+    assert_eval!(r#"
+        // let-bindings used from a function are evaluated on call site.
+        let func = function() { return letvar; };
+        let letvar = true;
+        func()
+    "#, true);
+    assert_exception!("typeof x; let x = 54; x", Exception::ReferenceNotFound);
+    assert_exception!(  // "Cannot access 'a' before initialization"
+        "var a = 'a', b; { b = a; let a = 'A'; }; b",
+        Exception::ReferenceNotFound);
+    */
+
+    // TODO: let-bindings in for (let i=0; ...)
+
+    // const variables
+    //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
+}
+
 
 #[test]
 fn test_sequence() {

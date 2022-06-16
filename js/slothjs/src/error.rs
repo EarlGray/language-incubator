@@ -30,6 +30,7 @@ impl<V> ParseError<V> {
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxTreeError(ParseError<JSON>),
+    SyntaxErrorAlreadyDeclared(Identifier),
     SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),
 

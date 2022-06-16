@@ -408,7 +408,7 @@ impl ParseFrom for VariableDeclaration {
                 return Err(ParseError::UnexpectedValue {
                     want: "var | let | const",
                     value: source.map_node("kind", |node| Ok(node.to_error()))?,
-                })
+                })?;
             }
         };
         let declarations = source.map_array("declarations", |decl| {
