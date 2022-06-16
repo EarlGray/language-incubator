@@ -330,9 +330,43 @@ impl Interpretable for ThrowStatement {
     }
 }
 
-impl TryStatement {
-    //fn run_handler(&self, heap: &mut Heap) -> Result<Interpreted, Exception> 
+impl CatchClause {
+    fn interpret(&self, exc: &Exception, heap: &mut Heap) -> Result<Interpreted, Exception> {
+        let this_ref = heap.interpret_this()?.to_ref(heap)?;
+        let scope_ref = heap.local_scope().unwrap_or(Heap::GLOBAL);
 
+        heap.enter_new_scope(this_ref, scope_ref, |heap| {
+            let error_value: JSValue = match exc {
+                Exception::UserThrown(errval) => errval.clone(),
+                Exception::JumpBreak(_)
+                | Exception::JumpContinue(_)
+                | Exception::JumpReturn(_) => {
+                    panic!("Impossible to catch: {:?}", exc)
+                }
+                //Exception::ReferenceNotFound(ident) => { // TODO: ReferenceError
+                _ => {
+                    let message = format!("{:?}", exc);
+                    let errval = builtin::error::error_constructor(
+                        CallContext {
+                            this_ref,
+                            method_name: "ReferenceError".to_string(),
+                            arguments: vec![Interpreted::from(message)],
+                            loc: None, // TODO: get the location of the reference
+                        },
+                        heap,
+                    )?;
+                    errval.to_value(heap)?
+                }
+            };
+
+            heap.scope_mut()
+                .set_nonconf(self.param.as_str(), Content::Value(error_value))?;
+            self.body.interpret(heap)
+        })
+    }
+}
+
+impl TryStatement {
     fn run_finalizer(&self, heap: &mut Heap) -> Result<(), Exception> {
         if let Some(finalizer) = self.finalizer.as_ref() {
             finalizer.interpret(heap)?;
@@ -355,39 +389,7 @@ impl Interpretable for TryStatement {
             Err(exc) => {
                 let result = match &self.handler {
                     None => result,
-                    Some(catch) => {
-                        let this_ref = heap.interpret_this()?.to_ref(heap)?;
-                        let scope_ref = heap.local_scope().unwrap_or(Heap::GLOBAL);
-
-                        heap.enter_new_scope(this_ref, scope_ref, |heap| {
-                            let error_value: JSValue = match exc {
-                                Exception::UserThrown(errval) => errval.clone(),
-                                Exception::JumpBreak(_)
-                                | Exception::JumpContinue(_)
-                                | Exception::JumpReturn(_) => {
-                                    panic!("Impossible to catch: {:?}", exc)
-                                }
-                                //Exception::ReferenceNotFound(ident) => { // TODO: ReferenceError
-                                _ => {
-                                    let message = format!("{:?}", exc);
-                                    let errval = builtin::error::error_constructor(
-                                        CallContext {
-                                            this_ref,
-                                            method_name: "ReferenceError".to_string(),
-                                            arguments: vec![Interpreted::from(message)],
-                                            loc: None, // TODO: get the location of the reference
-                                        },
-                                        heap,
-                                    )?;
-                                    errval.to_value(heap)?
-                                }
-                            };
-
-                            heap.scope_mut()
-                                .set_nonconf(catch.param.as_str(), Content::Value(error_value))?;
-                            catch.body.interpret(heap)
-                        })
-                    }
+                    Some(catch) => catch.interpret(exc, heap),
                 };
                 self.run_finalizer(heap)?;
                 result
