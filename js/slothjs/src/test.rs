@@ -628,15 +628,16 @@ fn test_exceptions() {
         }
         trace
     "#, "bf1f2efbf4f");
-    /* TODO: let-variables and block scope
     assert_eval!(r#"
-        function throws() { throw true; }
         var a = 0;
-        try { throws(); a = false; }
-        catch(e) { a = e };
+        try {
+            throw true;
+            a = false;
+        } catch(e) {
+            a = e;
+        };
         a
     "#, true);
-    */
     // catch-variable is block scope:
     assert_eval!(r#"
         var e = true;

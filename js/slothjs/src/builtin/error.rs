@@ -1,26 +1,22 @@
-use crate::error::Exception;
-use crate::function::CallContext;
-use crate::heap::Heap;
-use crate::object::{
-    Content,
+use crate::{
+    function::CallContext,
+    object::Content,
+    Exception,
+    Heap,
     Interpreted,
     JSObject,
+    JSRef,
     JSValue,
 };
 
-fn error_constructor(call: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception> {
+pub fn error_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
     let message = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?
         .stringify(heap)?;
 
     let mut error_object = JSObject::new();
-
-    let error_proto = heap
-        .lookup_path(&["Error", "prototype"])
-        .expect("Error.prototype")
-        .to_ref(heap)?;
-    error_object.proto = error_proto;
+    error_object.proto = Heap::ERROR_PROTO;
 
     error_object.set_hidden("message", Content::from(message))?;
 
@@ -49,23 +45,20 @@ fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpr
     }))
 }
 
-pub fn init(heap: &mut Heap) -> Result<(), Exception> {
+pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut error_proto = JSObject::new();
     error_proto.set_hidden("name", Content::from("Error"))?;
     error_proto.set_hidden("message", Content::from(""))?;
     error_proto.set_hidden("toString", Content::from_func(error_proto_toString, heap))?;
 
-    let error_proto_ref = heap.alloc(error_proto);
+    *heap.get_mut(Heap::ERROR_PROTO) = error_proto;
 
     let mut the_error = JSObject::from_func(error_constructor);
-    the_error.set_system("prototype", Content::from(error_proto_ref))?;
+    the_error.set_system("prototype", Content::from(Heap::ERROR_PROTO))?;
 
     let the_error_ref = heap.alloc(the_error);
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Error", Content::from(the_error_ref))?;
-
-    heap.get_mut(error_proto_ref)
+    heap.get_mut(Heap::ERROR_PROTO)
         .set_hidden("constructor", Content::from(the_error_ref))?;
 
-    Ok(())
+    Ok(the_error_ref)
 }

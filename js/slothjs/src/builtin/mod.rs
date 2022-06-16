@@ -1,15 +1,17 @@
-mod array;
-mod boolean;
+pub mod array;
+pub mod boolean;
 mod console;
-mod error;
-mod function;
-mod global;
-mod object;
-mod string;
+pub mod error;
+pub mod function;
+pub mod global;
+pub mod object;
+pub mod string;
 
-use crate::error::Exception;
-use crate::heap::Heap;
-use crate::object::Content;
+use crate::{
+    object::Content,
+    Exception,
+    Heap,
+};
 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     global::init(heap)?;
@@ -34,7 +36,9 @@ pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     heap.get_mut(Heap::GLOBAL)
         .set_hidden("String", Content::from(the_string))?;
 
-    error::init(heap)?;
+    let the_error = error::init(heap)?;
+    heap.get_mut(Heap::GLOBAL)
+        .set_hidden("Error", Content::from(the_error))?;
 
     console::init(heap)?;
 
