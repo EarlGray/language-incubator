@@ -10,7 +10,6 @@ use crate::object::{
     Interpreted,
     JSObject,
     JSValue,
-    ObjectValue,
 };
 use crate::prelude::*;
 use crate::source;
@@ -20,23 +19,6 @@ pub struct CallContext {
     pub method_name: String,
     pub arguments: Vec<Interpreted>,
     pub loc: Option<Box<source::Location>>,
-}
-
-impl CallContext {
-    pub fn execute(self, func_ref: JSRef, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        // Yes, we do need a clone() to workaround borrow checker:
-        match &heap.get(func_ref).value {
-            ObjectValue::VMCall(vmcall) => vmcall.clone().call(self, heap),
-            ObjectValue::Closure(closure) => closure.clone().call(self, heap),
-            _ => {
-                let callee = Interpreted::Member {
-                    of: self.this_ref,
-                    name: self.method_name,
-                };
-                Err(Exception::TypeErrorNotCallable(callee))
-            }
-        }
-    }
 }
 
 pub type NativeFunction =

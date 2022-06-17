@@ -731,13 +731,12 @@ impl Interpretable for CallExpression {
         let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
 
         let method_name = name.to_string();
-        let call = CallContext {
+        heap.execute(func_ref, CallContext {
             this_ref,
             method_name,
             arguments,
             loc,
-        };
-        call.execute(func_ref, heap)
+        })
     }
 }
 
@@ -765,13 +764,12 @@ impl Interpretable for NewExpression {
         let object_ref = heap.alloc(object);
 
         // call its constructor
-        let call = CallContext {
+        let result = heap.execute(funcref, CallContext {
             this_ref: object_ref,
             method_name: "<constructor>".to_string(),
             arguments,
             loc,
-        };
-        let result = call.execute(funcref, heap)?;
+        })?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),
             _ => Ok(Interpreted::from(object_ref)),

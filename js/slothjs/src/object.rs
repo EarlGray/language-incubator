@@ -104,13 +104,12 @@ impl JSValue {
             JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
                 Some(to_string) => {
                     let funcref = to_string.to_ref(heap)?;
-                    let call = CallContext {
+                    let result = heap.execute(funcref, CallContext {
                         this_ref: *r,
                         method_name: "toString".to_string(),
                         arguments: vec![],
                         loc: None,
-                    };
-                    let result = call.execute(funcref, heap)?;
+                    })?;
                     Ok(result.to_value(heap)?.stringify(heap)?)
                 }
                 None => Ok("[object Object]".to_string()),

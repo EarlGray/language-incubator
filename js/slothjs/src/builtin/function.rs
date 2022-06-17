@@ -29,7 +29,7 @@ fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpr
     let funcref = call.this_ref;
     call.this_ref = bound_this;
 
-    call.execute(funcref, heap)
+    heap.execute(funcref, call)
 }
 
 fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
@@ -50,13 +50,12 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interprete
     };
 
     let funcref = call.this_ref;
-    CallContext {
+    heap.execute(funcref, CallContext {
         this_ref: bound_this,
         method_name: call.method_name,
         arguments: call_args,
         loc: heap.loc.clone(),
-    }
-    .execute(funcref, heap)
+    })
 }
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
