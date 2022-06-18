@@ -140,7 +140,8 @@ impl<P: Parser> Runtime<P> {
             io::stderr().flush()?;
 
             // get input
-            let input = match input_iter.next() {
+            let maybe_input = input_iter.next();
+            let input = match maybe_input {
                 None => break,
                 Some(input) => input?,
             };

@@ -20,18 +20,44 @@ type ParseResult<T> = Result<T, ParseError>;
 /// `ParserContext` collects lexical scope information to be used later.
 #[derive(Debug)]
 pub struct ParserContext {
-    pub used_variables: HashSet<Identifier>,
-    pub declared_variables: HashSet<Identifier>,
-    pub declared_functions: Vec<FunctionDeclaration>,
+    pub declared_bindings: HashSet<Identifier>, // let|const ...
+    pub declared_functions: Vec<FunctionDeclaration>, // function ...
+    pub declared_variables: HashSet<Identifier>, // var ...
+
+    pub used_identifiers: HashSet<Identifier>, // note: they are not free before they leave the scope
 }
 
 impl ParserContext {
     pub fn new() -> ParserContext {
         ParserContext {
-            used_variables: HashSet::new(),
+            used_identifiers: HashSet::new(),
+            declared_bindings: HashSet::new(),
             declared_variables: HashSet::new(),
             declared_functions: Vec::new(),
         }
+    }
+
+    fn remember_declaration(&mut self, kind: DeclarationKind, name: &Identifier)
+        -> Result<(), ParseError>
+    {
+        match kind {
+            DeclarationKind::Var => self.declared_variables.insert(name.clone()),
+            DeclarationKind::Let => {
+                /* TODO
+                if self.declared_bindings.contains(&name.0) {
+                    return Err(ParseResult::);
+                }
+                */
+                self.declared_bindings.insert(name.clone())
+            }
+            _ => todo!("VariableDeclaration::parse_from({:?})", kind),
+        };
+        Ok(())
+    }
+
+    fn swap_function_scope(&mut self, other: &mut Self) {
+        core::mem::swap(&mut self.declared_variables, &mut other.declared_variables);
+        core::mem::swap(&mut self.declared_functions, &mut other.declared_functions);
     }
 }
 
@@ -114,7 +140,7 @@ impl Program {
         let ParserContext {
             declared_variables: variables,
             declared_functions: functions,
-            ..
+            ..   // TODO: declared_bindings
         } = ctx;
         Ok(Program {
             body,
@@ -180,8 +206,33 @@ impl ParseFrom for BlockStatement {
         source: &S,
         ctx: &mut ParserContext,
     ) -> ParseResult<Self> {
-        let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt, ctx))?;
-        Ok(BlockStatement { body })
+        // inner_ctx accumulates used identifiers and declared bindings.
+        let mut inner_ctx = ParserContext::new();
+        inner_ctx.swap_function_scope(ctx);
+
+        let body = source.map_array("body", |jstmt| {
+            let result = Statement::parse_from(jstmt, &mut inner_ctx);
+            // TODO: were any newly declared bindings already used in this block?
+            result
+        })?;
+
+        inner_ctx.swap_function_scope(ctx);
+
+        let ParserContext {
+            declared_bindings: bindings,
+            used_identifiers: mut used_variables,
+            ..
+        } = inner_ctx;
+
+        for binding in bindings.iter() {
+            used_variables.remove(binding);
+        }
+
+        // add all remaining usages to the outer used_variables
+        ctx.used_identifiers.extend(used_variables);
+
+        // put declared bindings into BlockStatement; discard them from ParserContext
+        Ok(BlockStatement { body, bindings })
     }
 }
 
@@ -402,8 +453,8 @@ impl ParseFrom for VariableDeclaration {
         source.expect_str("type", "VariableDeclaration")?;
 
         let kind = match source.get_str("kind")?.as_str() {
-            "const" => todo!(), // DeclarationKind::Const,
-            "let" => todo!(),   // DeclarationKind::Let,
+            "const" => todo!("DeclarationKind::Const"),
+            "let" => DeclarationKind::Let,
             "var" => DeclarationKind::Var,
             _ => {
                 return Err(ParseError::UnexpectedValue {
@@ -422,7 +473,7 @@ impl ParseFrom for VariableDeclaration {
                 Ok(Box::new(expr))
             })?;
 
-            ctx.declared_variables.insert(name.clone());
+            ctx.remember_declaration(kind, &name)?;
             Ok(VariableDeclarator { name, init })
         })?;
 
@@ -437,12 +488,13 @@ impl ParseFrom for FunctionDeclaration {
     ) -> ParseResult<Self> {
         source.expect_str("type", "FunctionDeclaration")?;
 
+        // Reuse similar structure of FunctionExpression and FunctionDeclaration trees:
         let function = FunctionExpression::parse_from(source, ctx)?;
-        let id = function
-            .func
-            .id
-            .clone()
+
+        // id is mandatory in FunctionDeclaration:
+        let id = (function.func.id.clone())
             .ok_or_else(|| ParseError::no_attr("id", source.to_error()))?;
+
         let funcdecl = FunctionDeclaration { id, function };
         ctx.declared_functions.push(funcdecl.clone());
         Ok(funcdecl)
@@ -573,7 +625,7 @@ impl ParseFrom for Identifier {
     ) -> ParseResult<Self> {
         let name = source.get_str("name")?;
         let identifier = Identifier(name);
-        ctx.used_variables.insert(identifier.clone());
+        ctx.used_identifiers.insert(identifier.clone());
         Ok(identifier)
     }
 }
@@ -798,9 +850,10 @@ impl ParseFrom for FunctionExpression {
         })?;
 
         let ParserContext {
-            used_variables: mut free_variables,
+            used_identifiers: mut free_variables,
             declared_variables: variables,
             declared_functions: functions,
+            ..          // TODO: is it ok to ignore declared_bindings?
         } = inner_ctx;
 
         free_variables.remove(&Identifier::from("arguments"));
@@ -808,8 +861,7 @@ impl ParseFrom for FunctionExpression {
             free_variables.remove(var);
         }
 
-        ctx.used_variables
-            .extend(free_variables.clone().into_iter());
+        ctx.used_identifiers.extend(free_variables.iter().cloned());
 
         let func = Function {
             id,

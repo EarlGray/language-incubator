@@ -83,6 +83,7 @@ pub struct FunctionDeclaration {
 #[derive(Clone, Debug)]
 pub struct BlockStatement {
     pub body: Vec<Statement>,
+    pub bindings: HashSet<Identifier>,
 }
 
 // ==============================================
@@ -186,7 +187,7 @@ pub enum Expr {
     New(Box<NewExpression>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Literal(pub JSON);
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
@@ -265,7 +266,7 @@ pub type Pattern = Identifier;
 #[derive(Clone, Debug)]
 pub struct NewExpression(pub Expression, pub Vec<Expression>);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BinOp {
     Plus,
     Minus,
@@ -290,16 +291,16 @@ pub enum BinOp {
     InstanceOf,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BoolOp {
     And,
     Or,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssignOp(pub Option<BinOp>);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnOp {
     Exclamation,
     Minus,
@@ -310,7 +311,7 @@ pub enum UnOp {
     Delete,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdOp {
     Increment,
     Decrement,

@@ -338,9 +338,7 @@ impl CatchClause {
         heap.enter_new_scope(this_ref, scope_ref, |heap| {
             let error_value: JSValue = match exc {
                 Exception::UserThrown(errval) => errval.clone(),
-                Exception::JumpBreak(_)
-                | Exception::JumpContinue(_)
-                | Exception::JumpReturn(_) => {
+                Exception::JumpBreak(_) | Exception::JumpContinue(_) | Exception::JumpReturn(_) => {
                     panic!("Impossible to catch: {:?}", exc)
                 }
                 //Exception::ReferenceNotFound(ident) => { // TODO: ReferenceError
@@ -400,14 +398,10 @@ impl Interpretable for TryStatement {
 
 impl Interpretable for VariableDeclaration {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        for decl in self.declarations.iter() {
-            // compute and assign the initializer value:
-            let optinit = (decl.init.as_ref())
-                .map(|initexpr| initexpr.interpret(heap))
-                .transpose()?;
-            let name = &decl.name.0;
-            if let Some(init) = optinit {
-                let value = init.to_value(heap)?;
+        for decl in &self.declarations {
+            if let Some(initexpr) = decl.init.as_ref() {
+                let name = &decl.name.0;
+                let value = initexpr.interpret(heap)?.to_value(heap)?;
                 heap.scope_mut()
                     .update(name, value)
                     .or_else(crate::error::ignore_set_readonly)?;
@@ -458,11 +452,10 @@ impl Interpretable for Literal {
 impl Interpretable for Identifier {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let name = &self.0;
-        if let Some(place) = heap.lookup_var(name) {
-            Ok(place)
-        } else {
-            Ok(Interpreted::member(Heap::GLOBAL, name))
-        }
+        let place = heap
+            .lookup_var(name)
+            .unwrap_or_else(|| Interpreted::member(Heap::GLOBAL, name));
+        Ok(place)
     }
 }
 
@@ -731,12 +724,15 @@ impl Interpretable for CallExpression {
         let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
 
         let method_name = name.to_string();
-        heap.execute(func_ref, CallContext {
-            this_ref,
-            method_name,
-            arguments,
-            loc,
-        })
+        heap.execute(
+            func_ref,
+            CallContext {
+                this_ref,
+                method_name,
+                arguments,
+                loc,
+            },
+        )
     }
 }
 
@@ -764,12 +760,15 @@ impl Interpretable for NewExpression {
         let object_ref = heap.alloc(object);
 
         // call its constructor
-        let result = heap.execute(funcref, CallContext {
-            this_ref: object_ref,
-            method_name: "<constructor>".to_string(),
-            arguments,
-            loc,
-        })?;
+        let result = heap.execute(
+            funcref,
+            CallContext {
+                this_ref: object_ref,
+                method_name: "<constructor>".to_string(),
+                arguments,
+                loc,
+            },
+        )?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),
             _ => Ok(Interpreted::from(object_ref)),

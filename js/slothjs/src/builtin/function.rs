@@ -50,12 +50,15 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interprete
     };
 
     let funcref = call.this_ref;
-    heap.execute(funcref, CallContext {
-        this_ref: bound_this,
-        method_name: call.method_name,
-        arguments: call_args,
-        loc: heap.loc.clone(),
-    })
+    heap.execute(
+        funcref,
+        CallContext {
+            this_ref: bound_this,
+            method_name: call.method_name,
+            arguments: call_args,
+            loc: heap.loc.clone(),
+        },
+    )
 }
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {

@@ -382,6 +382,9 @@ fn test_function_scope() {
         function adder(y) { return function(x) { return x + y + obj.z; } };
         adder(3)(4)
     "#, Exception::ReferenceNotFound);
+
+    // eval
+    // TODO: eval can change function scope
 }
 
 #[test]
@@ -393,11 +396,18 @@ fn test_block_scope() {
     assert_eval!( "let a = true; { let a = false; } a",     true );
     assert_eval!( "let a = false; { a = true; } a",         true );
     assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
+
     assert_exception!("{ let a = 'should not leak'; }; a", Exception::ReferenceNotFound );
+    assert_exception!(r#"{
+        let a = 'a1';
+        { a = b;   /* ReferenceError: b is not initialized yet */ };
+        let b = 'b1';
+    }", Exception::ReferenceNotFound);
 
     assert_exception!("let foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
     assert_exception!("let foo; var foo;", Exception::SyntaxErrorAlreadyDeclared);
     assert_exception!("var foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
+    assert_exception!("function f() { var a; let a; }", Exception::SyntaxErrorAlreadyDeclared);
 
     assert_eval!(       "var let = true; let",  true);
     assert_exception!(  "let let = 'let'; let", Exception::SyntaxTreeError);
@@ -416,12 +426,18 @@ fn test_block_scope() {
     assert_exception!(  // "Cannot access 'a' before initialization"
         "var a = 'a', b; { b = a; let a = 'A'; }; b",
         Exception::ReferenceNotFound);
-    */
 
     // TODO: let-bindings in for (let i=0; ...)
+    // TODO: eval introduces its own block scope
 
     // const variables
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
+
+    // Closures capture let-bindings:
+    assert_eval!(
+        "let a=0; function inca( a += 1 }; function callinc(f) { f(); }; callinc(inca); a",
+        1.0);
+    */
 }
 
 
