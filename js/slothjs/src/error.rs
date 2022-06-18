@@ -7,19 +7,19 @@ use crate::object::{
 use crate::prelude::*;
 
 #[derive(Debug, PartialEq)]
-pub enum ParseError<V> {
+pub enum ParseError {
     InvalidJSON { err: String },
-    ShouldBeBool { value: V },
-    ShouldBeString { value: V },
-    ShouldBeArray { value: V },
-    //ShouldBeObject{ value: V },
-    ObjectWithout { attr: String, value: V },
-    UnexpectedValue { want: &'static str, value: V },
-    UnknownType { value: V },
+    ShouldBeBool { value: JSON },
+    ShouldBeString { value: JSON },
+    ShouldBeArray { value: JSON },
+    //ShouldBeObject{ value: JSON },
+    ObjectWithout { attr: String, value: JSON },
+    UnexpectedValue { want: &'static str, value: JSON },
+    UnknownType { value: JSON },
 }
 
-impl<V> ParseError<V> {
-    pub fn no_attr(attr: &str, at: V) -> ParseError<V> {
+impl ParseError {
+    pub fn no_attr(attr: &str, at: JSON) -> ParseError {
         ParseError::ObjectWithout {
             attr: attr.to_string(),
             value: at,
@@ -29,7 +29,7 @@ impl<V> ParseError<V> {
 
 #[derive(Debug, PartialEq)]
 pub enum Exception {
-    SyntaxTreeError(ParseError<JSON>),
+    SyntaxTreeError(ParseError),
     SyntaxErrorAlreadyDeclared(Identifier),
     SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),

@@ -33,15 +33,15 @@ impl SourceNode for JSON {
         serde_json::from_value::<source::Location>(jloc).ok()
     }
 
-    fn get_literal(&self, property: &str) -> ParseResult<Literal, Self::Error> {
+    fn get_literal(&self, property: &str) -> ParseResult<Literal> {
         let node =
-            (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.clone()))?;
+            (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         Ok(Literal(node.clone()))
     }
 
-    fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T, Self::Error>
+    fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T>,
     {
         let child = self
             .get(property)
@@ -52,7 +52,7 @@ impl SourceNode for JSON {
         action(child)
     }
 
-    fn get_bool(&self, property: &str) -> ParseResult<bool, Self::Error> {
+    fn get_bool(&self, property: &str) -> ParseResult<bool> {
         let child = self
             .get(property)
             .ok_or_else(|| ParseError::no_attr(property, self.clone()))?;
@@ -61,7 +61,7 @@ impl SourceNode for JSON {
         })
     }
 
-    fn get_str(&self, property: &str) -> ParseResult<String, Self::Error> {
+    fn get_str(&self, property: &str) -> ParseResult<String> {
         let child = self
             .get(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
@@ -71,9 +71,9 @@ impl SourceNode for JSON {
         Ok(s.to_string())
     }
 
-    fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>, Self::Error>
+    fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T>,
     {
         let jarray =
             (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;

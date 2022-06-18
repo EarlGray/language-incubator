@@ -8,13 +8,14 @@ use crate::ast::*; // yes, EVERYTHING.
 use crate::error::ParseError;
 use crate::source;
 use crate::{
+    JSON,
     JSRef,
     JSValue,
 };
 
 pub use self::heapnode::HeapNode;
 
-type ParseResult<T, S> = Result<T, ParseError<S>>;
+type ParseResult<T> = Result<T, ParseError>;
 
 /// `ParserContext` collects lexical scope information to be used later.
 #[derive(Debug)]
@@ -40,7 +41,7 @@ impl ParserContext {
 /// would do just fine. On the other hand, it feels like a good idea to have all of these
 /// to conform to one interface.
 trait ParseFrom: Sized {
-    fn parse_from<S>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self, S::Error>
+    fn parse_from<S>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self>
     where
         S: SourceNode;
 }
@@ -49,25 +50,25 @@ trait ParseFrom: Sized {
 pub trait SourceNode: Sized {
     type Error: fmt::Debug;
 
-    /// En error happened at this node.
-    fn to_error(&self) -> Self::Error;
+    /// Location of the node where an error happened.
+    fn to_error(&self) -> JSON;
 
     /// Try to get source mapping for `self`.
     fn get_location(&self) -> Option<source::Location>;
 
     /// Make the node into a literal.
-    fn get_literal(&self, property: &str) -> ParseResult<Literal, Self::Error>;
+    fn get_literal(&self, property: &str) -> ParseResult<Literal>;
 
     /// Get the boolean value of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have a boolean meaning.
-    fn get_bool(&self, property: &str) -> ParseResult<bool, Self::Error>;
+    fn get_bool(&self, property: &str) -> ParseResult<bool>;
 
     /// Get the string value of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have a string meaning.
-    fn get_str(&self, property: &str) -> ParseResult<String, Self::Error>;
+    fn get_str(&self, property: &str) -> ParseResult<String>;
 
     /// Check that the value of `property` is a string equal to `value`.
-    fn expect_str(&self, property: &str, value: &'static str) -> ParseResult<(), Self::Error> {
+    fn expect_str(&self, property: &str, value: &'static str) -> ParseResult<()> {
         let got = self.get_str(property)?;
         match got == value {
             true => Ok(()),
@@ -81,13 +82,13 @@ pub trait SourceNode: Sized {
     /// Get a child node with this name; if it does not exist, return None.
     /// Then transform it through `action`, propagating its Result out.
     /// A child node exis
-    fn map_node<T, F>(&self, property: &str, action: F) -> ParseResult<T, Self::Error>
+    fn map_node<T, F>(&self, property: &str, action: F) -> ParseResult<T>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>;
+        F: FnMut(&Self) -> ParseResult<T>;
 
-    fn map_opt_node<T, F>(&self, property: &str, action: F) -> ParseResult<Option<T>, Self::Error>
+    fn map_opt_node<T, F>(&self, property: &str, action: F) -> ParseResult<Option<T>>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T>,
     {
         match self.map_node(property, action) {
             Ok(stmt) => Ok(Some(stmt)),
@@ -98,13 +99,13 @@ pub trait SourceNode: Sized {
 
     /// Map the array of children of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have an array meaning.
-    fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>, Self::Error>
+    fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>;
+        F: FnMut(&Self) -> ParseResult<T>;
 }
 
 impl Program {
-    pub fn parse_from<S: SourceNode>(source: &S) -> ParseResult<Program, S::Error> {
+    pub fn parse_from<S: SourceNode>(source: &S) -> ParseResult<Program> {
         source.expect_str("type", "Program")?;
 
         let mut ctx = ParserContext::new();
@@ -127,7 +128,7 @@ impl ParseFrom for Statement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let loc = source.get_location().map(Box::new);
 
         let typ = source.get_str("type")?;
@@ -178,7 +179,7 @@ impl ParseFrom for BlockStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let body = source.map_array("body", |jstmt| Statement::parse_from(jstmt, ctx))?;
         Ok(BlockStatement { body })
     }
@@ -188,7 +189,7 @@ impl ParseFrom for IfStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "IfStatement")?;
 
         let test = source.map_node("test", |jtest| Expression::parse_from(jtest, ctx))?;
@@ -213,7 +214,7 @@ impl ParseFrom for SwitchStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "SwitchStatement")?;
 
         let discriminant = source.map_node("discriminant", |jdiscriminant| {
@@ -239,7 +240,7 @@ impl ParseFrom for ForStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let for_ok = source.expect_str("type", "ForStatement");
         let while_ok = source.expect_str("type", "WhileStatement");
         let dowhile_ok = source.expect_str("type", "DoWhileStatement");
@@ -283,7 +284,7 @@ impl ParseFrom for ForInStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ForInStatement")?;
 
         let left = source.map_node("left", |jleft| {
@@ -308,7 +309,7 @@ impl ParseFrom for BreakStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "BreakStatement")?;
 
         let label = source.map_opt_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
@@ -320,7 +321,7 @@ impl ParseFrom for ContinueStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ContinueStatement")?;
 
         let label = source.map_opt_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
@@ -332,7 +333,7 @@ impl ParseFrom for LabelStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "LabeledStatement")?;
 
         let label = source.map_node("label", |jlabel| Identifier::parse_from(jlabel, ctx))?;
@@ -345,7 +346,7 @@ impl ParseFrom for ReturnStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ReturnStatement")?;
 
         let argument =
@@ -358,7 +359,7 @@ impl ParseFrom for ThrowStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ThrowStatement")?;
 
         let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
@@ -370,7 +371,7 @@ impl ParseFrom for TryStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "TryStatement")?;
 
         let block = source.map_node("block", |jblock| BlockStatement::parse_from(jblock, ctx))?;
@@ -397,7 +398,7 @@ impl ParseFrom for VariableDeclaration {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "VariableDeclaration")?;
 
         let kind = match source.get_str("kind")?.as_str() {
@@ -433,7 +434,7 @@ impl ParseFrom for FunctionDeclaration {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "FunctionDeclaration")?;
 
         let function = FunctionExpression::parse_from(source, ctx)?;
@@ -452,7 +453,7 @@ impl ParseFrom for ExpressionStatement {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ExpressionStatement")?;
 
         let expression =
@@ -465,7 +466,7 @@ impl ParseFrom for Expression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let loc = source.get_location().map(Box::new);
 
         let expr_type = source.get_str("type")?;
@@ -569,7 +570,7 @@ impl ParseFrom for Identifier {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let name = source.get_str("name")?;
         let identifier = Identifier(name);
         ctx.used_variables.insert(identifier.clone());
@@ -581,7 +582,7 @@ impl ParseFrom for UnaryExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let jop = source.get_str("operator")?;
         let op = match jop.as_str() {
             "+" => UnOp::Plus,
@@ -608,7 +609,7 @@ impl ParseFrom for UpdateExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
         let prefix = source.get_bool("prefix")?;
         let operator = source.get_str("operator")?;
@@ -631,7 +632,7 @@ impl ParseFrom for SequenceExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let exprs = source.map_array("expressions", |jexpr| Expression::parse_from(jexpr, ctx))?;
         Ok(SequenceExpression(exprs))
     }
@@ -641,7 +642,7 @@ impl ParseFrom for BinaryExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let left = source.map_node("left", |jleft| Expression::parse_from(jleft, ctx))?;
         let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
 
@@ -683,7 +684,7 @@ impl ParseFrom for LogicalExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let opstr = source.get_str("operator")?;
         let op = match opstr.as_str() {
             "&&" => BoolOp::And,
@@ -706,7 +707,7 @@ impl ParseFrom for AssignmentExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         let jop = source.get_str("operator")?;
         let modop = match jop.as_str() {
             "=" => None,
@@ -740,7 +741,7 @@ impl ParseFrom for ObjectExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         source.expect_str("type", "ObjectExpression")?;
 
         let properties = source.map_array("properties", |jprop| {
@@ -778,7 +779,7 @@ impl ParseFrom for FunctionExpression {
     fn parse_from<S: SourceNode>(
         source: &S,
         ctx: &mut ParserContext,
-    ) -> ParseResult<Self, S::Error> {
+    ) -> ParseResult<Self> {
         /*
         let id: Option<Identifier> = (source.get_node("id"))
             .and_then(|jid| Identifier::parse_from(jid, ctx))

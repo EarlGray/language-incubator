@@ -49,15 +49,15 @@ impl fmt::Debug for HeapNode {
 impl SourceNode for HeapNode {
     type Error = Self;
 
-    fn to_error(&self) -> Self::Error {
-        self.clone()
+    fn to_error(&self) -> JSON {
+        self.heap.get(self.node).to_json(&self.heap).expect("HeapNode::to_error")
     }
 
     fn get_location(&self) -> Option<source::Location> {
         None // TODO
     }
 
-    fn get_literal(&self, property: &str) -> ParseResult<Literal, Self::Error> {
+    fn get_literal(&self, property: &str) -> ParseResult<Literal> {
         let child = (self.heap.get(self.node))
             .get_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
@@ -69,7 +69,7 @@ impl SourceNode for HeapNode {
         Ok(Literal(json))
     }
 
-    fn get_bool(&self, property: &str) -> ParseResult<bool, Self::Error> {
+    fn get_bool(&self, property: &str) -> ParseResult<bool> {
         let value = (self.heap.get(self.node))
             .get_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
@@ -81,7 +81,7 @@ impl SourceNode for HeapNode {
         }
     }
 
-    fn get_str(&self, property: &str) -> ParseResult<String, Self::Error> {
+    fn get_str(&self, property: &str) -> ParseResult<String> {
         let value = (self.heap.get(self.node))
             .get_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
@@ -93,9 +93,9 @@ impl SourceNode for HeapNode {
         }
     }
 
-    fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T, Self::Error>
+    fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T>,
     {
         let node = self.heap.get(self.node);
         match node.get_value(property) {
@@ -107,9 +107,9 @@ impl SourceNode for HeapNode {
         }
     }
 
-    fn map_array<T, F>(&self, property: &str, mut func: F) -> ParseResult<Vec<T>, Self::Error>
+    fn map_array<T, F>(&self, property: &str, mut func: F) -> ParseResult<Vec<T>>
     where
-        F: FnMut(&Self) -> ParseResult<T, Self::Error>,
+        F: FnMut(&Self) -> ParseResult<T>,
     {
         let value = (self.heap.get(self.node))
             .get_value(property)
