@@ -7,7 +7,7 @@ use crate::source;
 
 // ==============================================
 pub struct Program {
-    pub body: Vec<Statement>,           // TODO: Either<Statement, Directive>
+    pub body: BlockStatement,
     pub variables: HashSet<Identifier>, // The set of scope variables
     pub functions: Vec<FunctionDeclaration>,
 }

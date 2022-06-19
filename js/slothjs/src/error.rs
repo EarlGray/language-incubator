@@ -6,7 +6,7 @@ use crate::object::{
 };
 use crate::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     InvalidJSON { err: String },
     ShouldBeBool { value: JSON },

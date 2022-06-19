@@ -50,7 +50,10 @@ impl SourceNode for HeapNode {
     type Error = Self;
 
     fn to_error(&self) -> JSON {
-        self.heap.get(self.node).to_json(&self.heap).expect("HeapNode::to_error")
+        self.heap
+            .get(self.node)
+            .to_json(&self.heap)
+            .expect("HeapNode::to_error")
     }
 
     fn get_location(&self) -> Option<source::Location> {

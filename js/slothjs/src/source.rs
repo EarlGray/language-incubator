@@ -83,10 +83,7 @@ impl<'heap> fmt::Display for Callstack<'heap> {
                 .get_value(CALLER_LOCATION)
                 .and_then(|v| v.to_ref().ok())
                 .ok_or_else(|| {
-                    Exception::SyntaxTreeError(ParseError::ObjectWithout {
-                        attr: CALLER_LOCATION.to_string(),
-                        value: JSON::Null,
-                    })
+                    Exception::SyntaxTreeError(ParseError::no_attr(CALLER_LOCATION, JSON::Null))
                 })
                 .map_err(|_| fmt::Error)?;
             if let Ok(loc) = Location::from_saved(self.heap.get(loc_ref), self.heap) {

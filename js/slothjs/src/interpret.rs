@@ -28,11 +28,7 @@ impl Interpretable for Program {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         heap.declare(self.variables.iter(), self.functions.iter())?;
 
-        let mut result = Interpreted::VOID;
-        for stmt in self.body.iter() {
-            result = stmt.interpret(heap)?;
-        }
-        Ok(result)
+        self.body.interpret(heap)
     }
 }
 
@@ -65,10 +61,17 @@ impl Interpretable for Statement {
 
 impl Interpretable for BlockStatement {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        for stmt in self.body.iter() {
-            stmt.interpret(heap)?;
-        }
-        Ok(Interpreted::VOID)
+        let this_ref = heap.interpret_this();
+        let outer_scope = heap.local_scope().unwrap_or(Heap::GLOBAL);
+        heap.enter_new_scope(this_ref, outer_scope, |heap| {
+            heap.declare(self.bindings.iter(), vec![].iter())?;
+
+            let mut result = Interpreted::VOID;
+            for stmt in self.body.iter() {
+                result = stmt.interpret(heap)?;
+            }
+            Ok(result)
+        })
     }
 }
 
@@ -332,7 +335,7 @@ impl Interpretable for ThrowStatement {
 
 impl CatchClause {
     fn interpret(&self, exc: &Exception, heap: &mut Heap) -> Result<Interpreted, Exception> {
-        let this_ref = heap.interpret_this()?.to_ref(heap)?;
+        let this_ref = heap.interpret_this();
         let scope_ref = heap.local_scope().unwrap_or(Heap::GLOBAL);
 
         heap.enter_new_scope(this_ref, scope_ref, |heap| {
@@ -402,9 +405,14 @@ impl Interpretable for VariableDeclaration {
             if let Some(initexpr) = decl.init.as_ref() {
                 let name = &decl.name.0;
                 let value = initexpr.interpret(heap)?.to_value(heap)?;
-                heap.scope_mut()
-                    .update(name, value)
-                    .or_else(crate::error::ignore_set_readonly)?;
+                match heap.lookup_var(name) {
+                    Some(Interpreted::Member { of, name }) => {
+                        heap.get_mut(of)
+                            .update(&name, value)
+                            .or_else(crate::error::ignore_set_readonly)?;
+                    }
+                    _ => panic!("variable not declared: {}", name),
+                }
             }
         }
         Ok(Interpreted::VOID)
@@ -437,7 +445,7 @@ impl Interpretable for Expression {
             Expr::Sequence(expr) => expr.interpret(heap),
             Expr::Function(expr) => expr.interpret(heap),
             Expr::New(expr) => expr.interpret(heap),
-            Expr::This => heap.interpret_this(),
+            Expr::This => Ok(Interpreted::from(heap.interpret_this())),
         }
     }
 }
@@ -779,8 +787,8 @@ impl Interpretable for NewExpression {
 impl Interpretable for FunctionExpression {
     fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
         let closure = Closure {
-            function: self.func.clone(),
-            captured_scope: heap.local_scope().unwrap_or(Heap::NULL),
+            function: Rc::clone(&self.func),
+            captured_scope: heap.local_scope().unwrap_or(Heap::GLOBAL),
         };
 
         let function_object = JSObject::from_closure(closure);

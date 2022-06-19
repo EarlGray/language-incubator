@@ -45,11 +45,10 @@ impl JSRef {
     /// array_ref.expect_instance("Array", &heap).unwrap();
     /// ```
     pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> Result<(), Exception> {
-        let ctrval = (heap.scope())
-            .get_value(constructor)
+        let ctrval = heap
+            .lookup_var(constructor)
             .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from(constructor)))?;
-
-        let ctrref = ctrval.to_ref()?;
+        let ctrref = ctrval.to_ref(heap)?;
         match self.isinstance(ctrref, heap)? {
             true => Ok(()),
             false => {
@@ -163,12 +162,11 @@ impl Heap {
     }
 
     /// Find out what `this` currently is.
-    pub fn interpret_this(&mut self) -> Result<Interpreted, Exception> {
-        let this_ref = self
-            .lookup_var(Self::SCOPE_THIS)
+    pub fn interpret_this(&mut self) -> JSRef {
+        self.lookup_var(Self::SCOPE_THIS)
             .expect("no this in the current scope")
-            .to_ref(self)?;
-        Ok(Interpreted::from(this_ref))
+            .to_ref(self)
+            .expect("this must be JSValue::Ref")
     }
 
     pub(crate) fn is_scope(&self, objref: JSRef) -> bool {
@@ -221,38 +219,34 @@ impl Heap {
         Ok(())
     }
 
-    pub fn lookup_var(&mut self, name: &str) -> Option<Interpreted> {
+    pub fn lookup_var(&self, name: &str) -> Option<Interpreted> {
         if let Some(local_ref) = self.local_scope() {
-            // local scope lookup
             let local = self.get(local_ref);
-            if local.properties.contains_key(name) {
+            if local.get_value(name).is_some() {
                 return Some(Interpreted::member(local_ref, name));
             }
 
             // captured scopes lookup
-            let mut scope_ref = (local.properties)
-                .get(Self::CAPTURED_SCOPE)
-                .and_then(|prop| prop.to_ref())
-                .unwrap_or(Heap::NULL);
+            let mut scope_ref = match local.get_value(Self::CAPTURED_SCOPE) {
+                Some(JSValue::Ref(scope_ref)) => scope_ref,
+                _ => Heap::NULL,
+            };
             while scope_ref != Heap::NULL {
                 let scope = self.get(scope_ref);
-                if scope.properties.contains_key(name) {
+                if scope.get_value(name).is_some() {
                     return Some(Interpreted::member(scope_ref, name));
                 }
 
-                scope_ref = (scope.properties)
-                    .get(Self::CAPTURED_SCOPE)
-                    .and_then(|prop| prop.to_ref())
-                    .unwrap_or(Heap::NULL);
+                scope_ref = match scope.get_value(Self::CAPTURED_SCOPE) {
+                    Some(JSValue::Ref(scope_ref)) => scope_ref,
+                    _ => Heap::NULL,
+                };
             }
         }
 
-        // global scope lookup
-        if self.get(Heap::GLOBAL).properties.contains_key(name) {
-            Some(Interpreted::member(Heap::GLOBAL, name))
-        } else {
-            None
-        }
+        self.get(Heap::GLOBAL)
+            .get_value(name)
+            .map(|_| Interpreted::member(Heap::GLOBAL, name))
     }
 
     /// Lookup a property chain starting from the current scope, e.g.

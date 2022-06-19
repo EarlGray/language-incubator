@@ -389,8 +389,7 @@ fn test_function_scope() {
 
 #[test]
 fn test_block_scope() {
-    /*
-    assert_eval!( "let a; a === undefined", true );
+    assert_eval!( "let a; a", null );
     assert_eval!( "let a, b = '2', c; a = '1'; c = '3'; a + b + c", "123" );
     assert_eval!( "var a = true; { let a = false; } a",     true );
     assert_eval!( "let a = true; { let a = false; } a",     true );
@@ -398,23 +397,30 @@ fn test_block_scope() {
     assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
 
     assert_exception!("{ let a = 'should not leak'; }; a", Exception::ReferenceNotFound );
+    /*
+    assert_exception!("typeof x; let x = 54; x", Exception::ReferenceNotFound);
+    assert_exception!("var a; { a = b; let b = 2; }; a", Exception::ReferenceNotFound);
     assert_exception!(r#"{
         let a = 'a1';
         { a = b;   /* ReferenceError: b is not initialized yet */ };
         let b = 'b1';
-    }", Exception::ReferenceNotFound);
+    }"#, Exception::ReferenceNotFound);
+    assert_exception!(  // "Cannot access 'a' before initialization"
+        "var a = 'a', b; { b = a; let a = 'A'; }; b",
+        Exception::ReferenceNotFound);
+
 
     assert_exception!("let foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
     assert_exception!("let foo; var foo;", Exception::SyntaxErrorAlreadyDeclared);
     assert_exception!("var foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
     assert_exception!("function f() { var a; let a; }", Exception::SyntaxErrorAlreadyDeclared);
+    */
 
     assert_eval!(       "var let = true; let",  true);
     assert_exception!(  "let let = 'let'; let", Exception::SyntaxTreeError);
     assert_exception!(  "let var = 'var'; var", Exception::SyntaxTreeError);
 
     assert_exception!("if (true) let a = 1", Exception::SyntaxTreeError); //valid only in a block
-    assert_exception!("var a; { a = b; let b = 2; }; a", Exception::ReferenceNotFound);
 
     assert_eval!(r#"
         // let-bindings used from a function are evaluated on call site.
@@ -422,11 +428,6 @@ fn test_block_scope() {
         let letvar = true;
         func()
     "#, true);
-    assert_exception!("typeof x; let x = 54; x", Exception::ReferenceNotFound);
-    assert_exception!(  // "Cannot access 'a' before initialization"
-        "var a = 'a', b; { b = a; let a = 'A'; }; b",
-        Exception::ReferenceNotFound);
-
     // TODO: let-bindings in for (let i=0; ...)
     // TODO: eval introduces its own block scope
 
@@ -434,10 +435,22 @@ fn test_block_scope() {
     //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 
     // Closures capture let-bindings:
-    assert_eval!(
-        "let a=0; function inca( a += 1 }; function callinc(f) { f(); }; callinc(inca); a",
-        1.0);
+    /*
+    assert_eval!(r#"
+        let a=0; function inca() { a += 1 };
+        function callinc(f) { f(); }; callinc(inca);
+        a
+    "#, 1.0);
     */
+    assert_eval!(r#"
+        function f() {     // captures variables of the same name from different blocks
+            let a = 0; var c0 = {add: function(b) { a += b }, get: function() { return a }};
+            { let a = 0; var c1 = {add: function(b) { a += b }, get: function() { return a }}};
+            return [c0, c1];
+        }
+        cs = f(); cs[0].add(2); cs[1].add(5);
+        [cs[0].get(), cs[1].get()]
+    "#, [2.0, 5.0]);
 }
 
 
