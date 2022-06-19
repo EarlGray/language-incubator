@@ -103,7 +103,6 @@ impl JSValue {
             JSValue::Ref(r) if r == &Heap::NULL => Ok("null".to_string()),
             JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
                 Some(to_string) => {
-                    dbg!(&to_string);
                     let funcref = to_string.to_ref(heap)?;
                     let result = heap.execute(
                         funcref,
