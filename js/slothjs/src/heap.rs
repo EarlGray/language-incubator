@@ -4,11 +4,12 @@ use crate::ast::{
 };
 use crate::builtin;
 use crate::error::Exception;
-use crate::function::CallContext;
+use crate::function::{
+    CallContext,
+    NativeFunction,
+};
 use crate::interpret::Interpretable;
 use crate::object::{
-    Access,
-    Content,
     Interpreted,
     JSObject,
     JSValue,
@@ -24,7 +25,7 @@ pub struct JSRef(usize);
 
 impl JSRef {
     pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> Result<bool, Exception> {
-        let protoval = heap.get(constructor).get_value("prototype");
+        let protoval = heap.get(constructor).get_own_value("prototype");
         let protoval = protoval.ok_or_else(|| {
             let what = Interpreted::from(constructor);
             Exception::TypeErrorNotCallable(what)
@@ -125,6 +126,11 @@ impl Heap {
         JSRef(ind)
     }
 
+    pub fn alloc_func(&mut self, func: NativeFunction) -> JSRef {
+        let func_obj = JSObject::from_func(func);
+        self.alloc(func_obj)
+    }
+
     /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true)` calls.
     #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn smells_fresh(&self, objref: JSRef) -> bool {
@@ -147,7 +153,7 @@ impl Heap {
             let mut object = JSObject::new();
             for (key, jval) in jobj.iter() {
                 let value = self.object_from_json(jval);
-                object.set_property(key, Content::Value(value)).unwrap();
+                object.set_property(key, value).unwrap();
             }
             JSValue::Ref(self.alloc(object))
         } else if let Some(jarray) = json.as_array() {
@@ -170,12 +176,12 @@ impl Heap {
     }
 
     pub(crate) fn is_scope(&self, objref: JSRef) -> bool {
-        objref == Self::GLOBAL || self.get(objref).get_value(Heap::SAVED_SCOPE).is_some()
+        objref == Self::GLOBAL || self.get(objref).get_own_value(Heap::SAVED_SCOPE).is_some()
     }
 
     /// If there's a local scope, return a `JSRef` to it.
     pub(crate) fn local_scope(&self) -> Option<JSRef> {
-        match self.get(Heap::GLOBAL).get_value(Heap::LOCAL_SCOPE) {
+        match self.get(Heap::GLOBAL).get_own_value(Heap::LOCAL_SCOPE) {
             Some(JSValue::Ref(scope_ref)) => Some(scope_ref),
             _ => None,
         }
@@ -194,8 +200,7 @@ impl Heap {
     fn declare_variable(&mut self, var: &Identifier) -> Result<(), Exception> {
         let name = var.as_str();
         if !self.scope().properties.contains_key(name) {
-            let content = Content::Value(JSValue::Undefined);
-            self.scope_mut().set(name, content, Access::NONCONF)?;
+            self.scope_mut().set_nonconf(name, JSValue::Undefined)?;
         }
         Ok(())
     }
@@ -214,7 +219,7 @@ impl Heap {
 
             let closure = func.function.interpret(self)?;
             let closure = closure.to_value(self)?;
-            self.scope_mut().update(name.as_str(), closure)?;
+            self.scope_mut().set_property(name.as_str(), closure)?;
         }
         Ok(())
     }
@@ -222,22 +227,22 @@ impl Heap {
     pub fn lookup_var(&self, name: &str) -> Option<Interpreted> {
         if let Some(local_ref) = self.local_scope() {
             let local = self.get(local_ref);
-            if local.get_value(name).is_some() {
+            if local.get_own_value(name).is_some() {
                 return Some(Interpreted::member(local_ref, name));
             }
 
             // captured scopes lookup
-            let mut scope_ref = match local.get_value(Self::CAPTURED_SCOPE) {
+            let mut scope_ref = match local.get_own_value(Self::CAPTURED_SCOPE) {
                 Some(JSValue::Ref(scope_ref)) => scope_ref,
                 _ => Heap::NULL,
             };
             while scope_ref != Heap::NULL {
                 let scope = self.get(scope_ref);
-                if scope.get_value(name).is_some() {
+                if scope.get_own_value(name).is_some() {
                     return Some(Interpreted::member(scope_ref, name));
                 }
 
-                scope_ref = match scope.get_value(Self::CAPTURED_SCOPE) {
+                scope_ref = match scope.get_own_value(Self::CAPTURED_SCOPE) {
                     Some(JSValue::Ref(scope_ref)) => scope_ref,
                     _ => Heap::NULL,
                 };
@@ -245,7 +250,7 @@ impl Heap {
         }
 
         self.get(Heap::GLOBAL)
-            .get_value(name)
+            .get_own_value(name)
             .map(|_| Interpreted::member(Heap::GLOBAL, name))
     }
 
@@ -262,7 +267,7 @@ impl Heap {
         let mut scoperef = self.local_scope().unwrap_or(Heap::GLOBAL);
         while let Some((name, rest)) = names.split_first() {
             names = rest;
-            let nameval = self.get(scoperef).get_value(name).ok_or_else(|| {
+            let nameval = self.get(scoperef).get_own_value(name).ok_or_else(|| {
                 let what = Interpreted::from(scoperef);
                 Exception::TypeErrorGetProperty(what, name.to_string())
             })?;
@@ -283,7 +288,7 @@ impl Heap {
         self.push_scope(this_ref)?;
         if captured_scope != Heap::NULL {
             self.scope_mut()
-                .set_system(Self::CAPTURED_SCOPE, Content::from(captured_scope))?;
+                .set_system(Self::CAPTURED_SCOPE, captured_scope)?;
         }
         let result = action(self);
         self.pop_scope()?;
@@ -295,12 +300,12 @@ impl Heap {
 
         let mut scope_object = JSObject::new();
 
-        scope_object.set_system(Self::SAVED_SCOPE, Content::from(old_scope_ref))?;
-        scope_object.set_system(Self::SCOPE_THIS, Content::from(this_ref))?;
+        scope_object.set_system(Self::SAVED_SCOPE, old_scope_ref)?;
+        scope_object.set_system(Self::SCOPE_THIS, this_ref)?;
 
         let new_scope_ref = self.alloc(scope_object);
         self.get_mut(Heap::GLOBAL)
-            .update_even_nonwritable(Self::LOCAL_SCOPE, JSValue::Ref(new_scope_ref))?;
+            .set_even_nonwritable(Self::LOCAL_SCOPE, new_scope_ref)?;
         Ok(new_scope_ref)
     }
 
@@ -316,7 +321,7 @@ impl Heap {
         if saved_scope_ref == Heap::GLOBAL {
             global.properties.remove(Self::LOCAL_SCOPE);
         } else {
-            global.update_even_nonwritable(Self::LOCAL_SCOPE, JSValue::Ref(saved_scope_ref))?;
+            global.set_even_nonwritable(Self::LOCAL_SCOPE, saved_scope_ref)?;
         }
 
         Ok(())
@@ -327,7 +332,7 @@ impl Heap {
     pub fn lookup_protochain(&self, mut objref: JSRef, propname: &str) -> Option<Interpreted> {
         while objref != Heap::NULL {
             let object = self.get(objref);
-            if object.get_value(propname).is_some() {
+            if object.get_own_value(propname).is_some() {
                 return Some(Interpreted::member(objref, propname));
             }
 

@@ -16,6 +16,8 @@ pub enum ParseError {
     ObjectWithout { attr: String, value: JSON },
     UnexpectedValue { want: &'static str, value: JSON },
     UnknownType { value: JSON },
+    ReferencedBeforeDeclaration {},
+    BindingRedeclared {},
 }
 
 impl ParseError {
@@ -30,7 +32,6 @@ impl ParseError {
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxTreeError(ParseError),
-    SyntaxErrorAlreadyDeclared(Identifier),
     SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),
 
@@ -71,3 +72,5 @@ pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
         _ => Err(e),
     }
 }
+
+pub type JSResult<T> = Result<T, Exception>;

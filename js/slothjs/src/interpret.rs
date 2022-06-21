@@ -2,30 +2,28 @@ use crate::prelude::*;
 
 use crate::ast::*; // yes, EVERYTHING
 use crate::builtin;
-use crate::error::Exception;
-use crate::function::{
+use crate::{
+    function::Closure,
+    object::Access,
     CallContext,
-    Closure,
-};
-use crate::heap::Heap;
-use crate::object::{
-    Access,
-    Content,
+    Exception,
+    Heap,
     Interpreted,
     JSObject,
+    JSResult,
     JSValue,
 };
 
 // ==============================================
 
 pub trait Interpretable {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception>;
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 
 // ==============================================
 
 impl Interpretable for Program {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         heap.declare(self.variables.iter(), self.functions.iter())?;
 
         self.body.interpret(heap)
@@ -35,7 +33,7 @@ impl Interpretable for Program {
 // ==============================================
 
 impl Interpretable for Statement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         heap.loc = self.loc.clone();
         match &self.stmt {
             Stmt::Empty => Ok(Interpreted::VOID),
@@ -60,7 +58,7 @@ impl Interpretable for Statement {
 // ==============================================
 
 impl Interpretable for BlockStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let this_ref = heap.interpret_this();
         let outer_scope = heap.local_scope().unwrap_or(Heap::GLOBAL);
         heap.enter_new_scope(this_ref, outer_scope, |heap| {
@@ -76,7 +74,7 @@ impl Interpretable for BlockStatement {
 }
 
 impl Interpretable for IfStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let jbool = self.test.interpret(heap)?;
         let cond = jbool.to_value(heap)?;
         if cond.boolify(heap) {
@@ -90,7 +88,7 @@ impl Interpretable for IfStatement {
 }
 
 impl Interpretable for SwitchStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let matchee = self.discriminant.interpret(heap)?;
         let switchval = matchee.to_value(heap)?;
 
@@ -151,7 +149,7 @@ impl ForStatement {
         Ok(())
     }
 
-    fn should_iterate(&self, heap: &mut Heap) -> Result<bool, Exception> {
+    fn should_iterate(&self, heap: &mut Heap) -> JSResult<bool> {
         match self.test.as_ref() {
             None => Ok(true),
             Some(testexpr) => {
@@ -170,7 +168,7 @@ impl ForStatement {
 }
 
 impl Interpretable for ForStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         self.init.interpret(heap)?;
         self.do_loop(heap)?;
         Ok(Interpreted::VOID)
@@ -180,7 +178,7 @@ impl Interpretable for ForStatement {
 impl ForInStatement {}
 
 impl Interpretable for ForInStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let iteratee = self.right.interpret(heap)?;
         let iteratee = iteratee.to_value(heap)?.objectify(heap);
 
@@ -252,21 +250,21 @@ impl Interpretable for ForInStatement {
 }
 
 impl Interpretable for BreakStatement {
-    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
         let BreakStatement(maybe_label) = self;
         Err(Exception::JumpBreak(maybe_label.clone()))
     }
 }
 
 impl Interpretable for ContinueStatement {
-    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
         let ContinueStatement(maybe_label) = self;
         Err(Exception::JumpContinue(maybe_label.clone()))
     }
 }
 
 impl LabelStatement {
-    fn continue_loop(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn continue_loop(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let LabelStatement(label, body) = self;
         loop {
             // must be a loop to continue
@@ -290,7 +288,7 @@ impl LabelStatement {
 }
 
 impl Interpretable for LabelStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let LabelStatement(label, body) = self;
 
         let result = body.interpret(heap);
@@ -305,7 +303,7 @@ impl Interpretable for LabelStatement {
 }
 
 impl Interpretable for ExpressionStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let result = self.expression.interpret(heap)?;
         let value = result.to_value(heap)?;
         Ok(Interpreted::Value(value))
@@ -313,7 +311,7 @@ impl Interpretable for ExpressionStatement {
 }
 
 impl Interpretable for ReturnStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let ReturnStatement(argument) = self;
         let returned = match argument {
             None => Interpreted::VOID,
@@ -324,7 +322,7 @@ impl Interpretable for ReturnStatement {
 }
 
 impl Interpretable for ThrowStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let ThrowStatement(exc_expr) = self;
         let exc_value = exc_expr.interpret(heap)?;
         let exc_value = exc_value.to_value(heap)?;
@@ -334,7 +332,7 @@ impl Interpretable for ThrowStatement {
 }
 
 impl CatchClause {
-    fn interpret(&self, exc: &Exception, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, exc: &Exception, heap: &mut Heap) -> JSResult<Interpreted> {
         let this_ref = heap.interpret_this();
         let scope_ref = heap.local_scope().unwrap_or(Heap::GLOBAL);
 
@@ -361,7 +359,7 @@ impl CatchClause {
             };
 
             heap.scope_mut()
-                .set_nonconf(self.param.as_str(), Content::Value(error_value))?;
+                .set_nonconf(self.param.as_str(), error_value)?;
             self.body.interpret(heap)
         })
     }
@@ -377,7 +375,7 @@ impl TryStatement {
 }
 
 impl Interpretable for TryStatement {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let result = self.block.interpret(heap);
         match &result {
             Ok(_)
@@ -400,7 +398,7 @@ impl Interpretable for TryStatement {
 }
 
 impl Interpretable for VariableDeclaration {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         for decl in &self.declarations {
             if let Some(initexpr) = decl.init.as_ref() {
                 let name = &decl.name.0;
@@ -408,7 +406,7 @@ impl Interpretable for VariableDeclaration {
                 match heap.lookup_var(name) {
                     Some(Interpreted::Member { of, name }) => {
                         heap.get_mut(of)
-                            .update(&name, value)
+                            .set_property(&name, value)
                             .or_else(crate::error::ignore_set_readonly)?;
                     }
                     _ => panic!("variable not declared: {}", name),
@@ -420,14 +418,14 @@ impl Interpretable for VariableDeclaration {
 }
 
 impl Interpretable for FunctionDeclaration {
-    fn interpret(&self, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
         // no-op: the work in done in Closure::call()
         Ok(Interpreted::VOID)
     }
 }
 
 impl Interpretable for Expression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         heap.loc = self.loc.clone();
         match &self.expr {
             Expr::Literal(expr) => expr.interpret(heap),
@@ -451,14 +449,14 @@ impl Interpretable for Expression {
 }
 
 impl Interpretable for Literal {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let value = heap.object_from_json(&self.0);
         Ok(Interpreted::Value(value))
     }
 }
 
 impl Interpretable for Identifier {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let name = &self.0;
         let place = heap
             .lookup_var(name)
@@ -468,7 +466,7 @@ impl Interpretable for Identifier {
 }
 
 impl Interpretable for ConditionalExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let cond = self.condexpr.interpret(heap)?.to_value(heap)?;
         if cond.boolify(heap) {
             self.thenexpr.interpret(heap)
@@ -479,7 +477,7 @@ impl Interpretable for ConditionalExpression {
 }
 
 impl Interpretable for LogicalExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let LogicalExpression(lexpr, op, rexpr) = self;
         let lval = lexpr.interpret(heap)?.to_value(heap)?;
         let value = match (lval.boolify(heap), op) {
@@ -491,12 +489,7 @@ impl Interpretable for LogicalExpression {
 }
 
 impl BinOp {
-    fn compute(
-        &self,
-        lval: &JSValue,
-        rval: &JSValue,
-        heap: &mut Heap,
-    ) -> Result<JSValue, Exception> {
+    fn compute(&self, lval: &JSValue, rval: &JSValue, heap: &mut Heap) -> JSResult<JSValue> {
         Ok(match self {
             BinOp::EqEq => JSValue::from(JSValue::loose_eq(lval, rval, heap)),
             BinOp::NotEq => JSValue::from(!JSValue::loose_eq(lval, rval, heap)),
@@ -555,7 +548,7 @@ impl BinOp {
 }
 
 impl Interpretable for BinaryExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let BinaryExpression(lexpr, op, rexpr) = self;
         let lval = lexpr.interpret(heap)?.to_value(heap)?;
         let rval = rexpr.interpret(heap)?.to_value(heap)?;
@@ -565,7 +558,7 @@ impl Interpretable for BinaryExpression {
 }
 
 impl Interpretable for UnaryExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let UnaryExpression(op, argexpr) = self;
         let arg = argexpr.interpret(heap)?;
         let argvalue = || arg.to_value(heap);
@@ -592,7 +585,7 @@ impl Interpretable for UnaryExpression {
 }
 
 impl Interpretable for UpdateExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let UpdateExpression(op, prefix, argexpr) = self;
         let assignee = argexpr.interpret(heap)?;
 
@@ -613,7 +606,7 @@ impl Interpretable for UpdateExpression {
 }
 
 impl Interpretable for SequenceExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let SequenceExpression(exprs) = self;
 
         let mut value = JSValue::Undefined;
@@ -625,7 +618,7 @@ impl Interpretable for SequenceExpression {
 }
 
 impl Interpretable for MemberExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let MemberExpression(objexpr, propexpr, computed) = self;
 
         // compute the name of the property:
@@ -657,7 +650,7 @@ impl Interpretable for MemberExpression {
 }
 
 impl Interpretable for ObjectExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let mut object = JSObject::new();
 
         for (key, valexpr) in self.0.iter() {
@@ -670,7 +663,7 @@ impl Interpretable for ObjectExpression {
             };
             let valresult = valexpr.interpret(heap)?;
             let value = valresult.to_value(heap)?;
-            object.set_property(&keyname, Content::Value(value))?;
+            object.set_property(&keyname, value)?;
         }
 
         let object_ref = heap.alloc(object);
@@ -679,7 +672,7 @@ impl Interpretable for ObjectExpression {
 }
 
 impl Interpretable for ArrayExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let ArrayExpression(exprs) = self;
         let storage = (exprs.iter())
             .map(|expr| expr.interpret(heap)?.to_value(heap))
@@ -692,7 +685,7 @@ impl Interpretable for ArrayExpression {
 }
 
 impl Interpretable for AssignmentExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let AssignmentExpression(leftexpr, AssignOp(modop), valexpr) = self;
 
         let value = valexpr.interpret(heap)?;
@@ -720,7 +713,7 @@ impl Interpretable for AssignmentExpression {
 }
 
 impl Interpretable for CallExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let CallExpression(callee_expr, argument_exprs) = self;
         let loc = heap.loc.clone();
 
@@ -745,7 +738,7 @@ impl Interpretable for CallExpression {
 }
 
 impl Interpretable for NewExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let NewExpression(callee_expr, argument_exprs) = self;
 
         let loc = heap.loc.clone();
@@ -757,7 +750,7 @@ impl Interpretable for NewExpression {
         let callee = callee_expr.interpret(heap)?;
         let funcref = callee.to_ref(heap)?;
         let prototype_ref = (heap.get_mut(funcref))
-            .get_value("prototype")
+            .get_own_value("prototype")
             .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".to_string()))?
             .to_ref()?;
 
@@ -785,7 +778,7 @@ impl Interpretable for NewExpression {
 }
 
 impl Interpretable for FunctionExpression {
-    fn interpret(&self, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let closure = Closure {
             function: Rc::clone(&self.func),
             captured_scope: heap.local_scope().unwrap_or(Heap::GLOBAL),
@@ -796,9 +789,11 @@ impl Interpretable for FunctionExpression {
 
         let prototype_ref = heap.alloc(JSObject::new());
         heap.get_mut(function_ref)
-            .set("prototype", Content::from(prototype_ref), Access::WRITE)?;
+            .define_own_property("prototype", Access::WRITE)?;
+        heap.get_mut(function_ref)
+            .set_property("prototype", prototype_ref)?;
         heap.get_mut(prototype_ref)
-            .set_hidden("constructor", Content::from(function_ref))?;
+            .set_hidden("constructor", function_ref)?;
 
         Ok(Interpreted::from(function_ref))
     }

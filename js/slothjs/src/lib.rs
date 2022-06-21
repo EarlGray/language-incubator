@@ -187,7 +187,10 @@ pub mod runtime;
 mod test;
 
 pub use ast::Program;
-pub use error::Exception;
+pub use error::{
+    Exception,
+    JSResult,
+};
 pub use function::CallContext;
 pub use heap::{
     Heap,

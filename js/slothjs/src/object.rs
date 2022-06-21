@@ -4,16 +4,17 @@ use serde_json::json;
 use crate::prelude::*;
 
 use crate::ast;
-use crate::error::Exception;
 use crate::function::{
     CallContext,
     Closure,
     NativeFunction,
     VMCall,
 };
-use crate::heap::{
+use crate::{
+    Exception,
     Heap,
     JSRef,
+    JSResult,
 };
 
 pub type JSON = serde_json::Value;
@@ -36,7 +37,7 @@ impl JSValue {
 
     /// to_ref() tries to return the underlying object reference, if any.
     /// It's useful for checking if a value points to an object.
-    pub fn to_ref(&self) -> Result<JSRef, Exception> {
+    pub fn to_ref(&self) -> JSResult<JSRef> {
         match self {
             JSValue::Ref(objref) => Ok(*objref),
             _ => {
@@ -47,7 +48,7 @@ impl JSValue {
     }
 
     #[allow(dead_code)]
-    pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
+    pub fn to_json(&self, heap: &Heap) -> JSResult<JSON> {
         match self {
             JSValue::Undefined => Ok(JSON::Null),
             JSValue::Bool(b) => Ok(JSON::from(*b)),
@@ -83,7 +84,7 @@ impl JSValue {
     /// let example_array = heap.object_from_json(&json_array);
     /// assert_eq!( example_array.to_string(&mut heap).unwrap(), "[1, 2]" );
     /// ```
-    pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
+    pub fn to_string(&self, heap: &mut Heap) -> JSResult<String> {
         match self {
             JSValue::String(s) => Ok(JSON::from(s.as_str()).to_string()),
             JSValue::Ref(heapref) => heap.get(*heapref).clone().to_string(heap),
@@ -94,7 +95,7 @@ impl JSValue {
     /// stringify() makes everything into a string
     /// used for evaluation in a string context.
     /// It corresponds to .toString() in JavaScript
-    pub fn stringify(&self, heap: &mut Heap) -> Result<String, Exception> {
+    pub fn stringify(&self, heap: &mut Heap) -> JSResult<String> {
         match self {
             JSValue::Undefined => Ok("undefined".to_string()),
             JSValue::Bool(b) => Ok(b.to_string()),
@@ -248,7 +249,7 @@ impl JSValue {
 
     /// Addition operator:
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Addition>
-    pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> Result<JSValue, Exception> {
+    pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> JSResult<JSValue> {
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
             return Ok(JSValue::from(lstr.to_string() + rstr));
         }
@@ -262,7 +263,7 @@ impl JSValue {
 
     /// Subtraction operator:
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Subtraction>
-    pub fn minus(&self, other: &JSValue, heap: &Heap) -> Result<JSValue, Exception> {
+    pub fn minus(&self, other: &JSValue, heap: &Heap) -> JSResult<JSValue> {
         Ok(JSValue::numerically(self, other, heap, |a, b| a - b))
     }
 
@@ -472,7 +473,7 @@ impl JSObject {
 
     /// Tries to get JSValue of the own property `name`.
     /// This might call getters of the property.
-    pub fn get_value(&self, name: &str) -> Option<JSValue> {
+    pub fn get_own_value(&self, name: &str) -> Option<JSValue> {
         // indexing
         if let Ok(index) = usize::from_str(name) {
             match &self.value {
@@ -509,12 +510,13 @@ impl JSObject {
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.
+    /// ES5: [[Get]], None corresponds to `undefined`
     pub fn lookup_value(&self, name: &str, heap: &Heap) -> Option<JSValue> {
-        if let Some(value) = self.get_value(name) {
+        if let Some(value) = self.get_own_value(name) {
             return Some(value);
         }
         for protoref in self.protochain(heap) {
-            if let Some(value) = heap.get(protoref).get_value(name) {
+            if let Some(value) = heap.get(protoref).get_own_value(name) {
                 return Some(value);
             }
         }
@@ -572,25 +574,18 @@ impl JSObject {
         Ok(())
     }
 
-    /// If the own property `name` does not exist, create it with the given `content` and `access`.
-    /// Otherwise, if `name` is a number and `self` is an Array, assign the value of `content`
-    /// into the array.
-    /// Otherwise:
-    /// - if the existing own property is not configurable and the given `access` differs, fail.
-    /// - if the existing own property is not writable, fail
-    /// - replace `content` and `access` of the property.
-    pub fn set(&mut self, name: &str, content: Content, access: Access) -> Result<(), Exception> {
-        self.set_maybe_nonwritable(name, content, access, false)
+    pub fn define_own_property(&mut self, name: &str, access: Access) -> JSResult<()> {
+        let content = Content::from(JSValue::Undefined);
+        self.set_maybe_nonwritable(name, content, access, true)
     }
 
-    /// Just like `.set()`, but updates even readonly properties.
-    pub fn set_even_nonwritable(
-        &mut self,
-        name: &str,
-        content: Content,
-        access: Access,
-    ) -> Result<(), Exception> {
-        self.set_maybe_nonwritable(name, content, access, true)
+    /// - if own property `name` does not exist, create it with the given `content` and `access`.
+    /// - if `name` is a number and `self` is an Array, assign value of `content` into the array.
+    /// - if the existing own property is not configurable and the given `access` differs, fail.
+    /// - if the existing own property is not writable, fail
+    /// - else: replace `content` and `access` of the property.
+    fn set(&mut self, name: &str, content: Content, access: Access) -> Result<(), Exception> {
+        self.set_maybe_nonwritable(name, content, access, false)
     }
 
     /// If `name` is a number and `self` is an Array, just set the array elemnt to `value`.
@@ -598,44 +593,60 @@ impl JSObject {
     /// set to `Content::from(value)`.
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
-    pub fn update(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+    /// ES5: [[Put]] with strict error handing
+    pub fn set_property<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
         let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
         self.set(name, Content::from(value), access)
     }
 
-    /// Just like `.update()`, but updates even non-writable properties.
-    pub fn update_even_nonwritable(&mut self, name: &str, value: JSValue) -> Result<(), Exception> {
+    /// Just like `.set_property()`, but updates even non-writable properties.
+    pub fn set_even_nonwritable<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
         let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
-        self.set_even_nonwritable(name, Content::from(value), access)
+        self.set_maybe_nonwritable(name, Content::from(value), access, true)
     }
 
     // are these shortcuts a good idea?
-    pub fn set_property(&mut self, name: &str, content: Content) -> Result<(), Exception> {
-        self.set(name, content, Access::all())
+    /// A shortcut for define_own_property(Access::NONE) and assigning the value.
+    pub fn set_system<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
+        self.set(name, Content::from(value), Access::empty())
     }
 
-    pub fn set_system(&mut self, name: &str, content: Content) -> Result<(), Exception> {
-        self.set(name, content, Access::empty())
+    pub fn set_hidden<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
+        self.set(name, Content::from(value), Access::HIDDEN)
     }
 
-    pub fn set_hidden(&mut self, name: &str, content: Content) -> Result<(), Exception> {
-        self.set(name, content, Access::HIDDEN)
+    pub fn set_nonconf<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
+        self.set(name, Content::from(value), Access::NONCONF)
     }
 
-    pub fn set_nonconf(&mut self, name: &str, content: Content) -> Result<(), Exception> {
-        self.set(name, content, Access::NONCONF)
-    }
-
-    pub fn set_readonly(&mut self, name: &str, content: Content) -> Result<(), Exception> {
-        self.set(name, content, Access::READONLY)
+    pub fn set_readonly<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    where
+        Content: From<V>,
+    {
+        self.set(name, Content::from(value), Access::READONLY)
     }
 
     /// Create a `JSON` from this `JSObject`.
-    pub fn to_json(&self, heap: &Heap) -> Result<JSON, Exception> {
+    pub fn to_json(&self, heap: &Heap) -> JSResult<JSON> {
         if let Some(array) = self.as_array() {
             let jvals = (array.storage.iter())
                 .map(|v| v.to_json(heap))
@@ -656,7 +667,7 @@ impl JSObject {
     }
 
     /// Create a human-readable representation of contents of an Array or an Object.
-    pub fn to_string(&self, heap: &mut Heap) -> Result<String, Exception> {
+    pub fn to_string(&self, heap: &mut Heap) -> JSResult<String> {
         fn is_valid_identifier(s: &str) -> bool {
             let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
 
@@ -853,14 +864,8 @@ pub enum Content {
 }
 
 impl Content {
-    pub fn from_func(func: NativeFunction, heap: &mut Heap) -> Content {
-        let func_obj = JSObject::from_func(func);
-        let funcref = heap.alloc(func_obj);
-        Content::Value(JSValue::Ref(funcref))
-    }
-
     /// This might call getters of the property.
-    pub fn to_value(&self) -> Result<JSValue, Exception> {
+    pub fn to_value(&self) -> JSResult<JSValue> {
         match self {
             Self::Value(value) => Ok(value.clone()),
         }
@@ -907,7 +912,7 @@ impl Interpreted {
 
     /// If Interpreted::Value, unwrap;
     /// if Interpreted::Member{of, name}, [`JSObject::lookup_value`] of `name` in `of`.
-    pub fn to_value(&self, heap: &Heap) -> Result<JSValue, Exception> {
+    pub fn to_value(&self, heap: &Heap) -> JSResult<JSValue> {
         match self {
             Interpreted::Value(value) => Ok(value.clone()),
             Interpreted::Member { of, name } => {
@@ -923,7 +928,7 @@ impl Interpreted {
         }
     }
 
-    pub fn to_ref(&self, heap: &Heap) -> Result<JSRef, Exception> {
+    pub fn to_ref(&self, heap: &Heap) -> JSResult<JSRef> {
         match self {
             Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
@@ -943,7 +948,7 @@ impl Interpreted {
 
     pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> Result<(), Exception> {
         match self {
-            Interpreted::Member { of, name } => heap.get_mut(*of).update(name, value),
+            Interpreted::Member { of, name } => heap.get_mut(*of).set_property(name, value),
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
         }
     }
@@ -957,7 +962,7 @@ impl Interpreted {
                     Some(_) => unreachable!(),
                     None => return Err(Exception::TypeErrorNotCallable(self.clone())),
                 };
-                let func_value = (heap.get(of).get_value(name)).ok_or_else(|| {
+                let func_value = (heap.get(of).get_own_value(name)).ok_or_else(|| {
                     Exception::TypeErrorNotCallable(Interpreted::member(of, name))
                 })?;
                 let func_ref = (func_value.to_ref())

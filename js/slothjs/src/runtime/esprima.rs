@@ -33,7 +33,7 @@ impl runtime::Parser for EsprimaParser {
 
         let object: JSRef = heap.lookup_path(&["esprima"])?.to_ref(heap)?;
         let esparse = (heap.get(object))
-            .get_value("parse")
+            .get_own_value("parse")
             .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima.parse")))?
             .to_ref()?;
         Ok(EsprimaParser { object, esparse })

@@ -1,9 +1,6 @@
-use crate::object::{
-    Content,
-    ObjectValue,
-};
 use crate::prelude::*;
 use crate::{
+    object::ObjectValue,
     CallContext,
     Exception,
     Heap,
@@ -169,25 +166,22 @@ fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> Result<Interprete
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut string_proto = JSObject::new();
-    string_proto.set_hidden("valueOf", Content::from_func(string_proto_valueOf, heap))?;
-    string_proto.set_hidden("toString", Content::from_func(string_proto_valueOf, heap))?;
-    string_proto.set_hidden("charAt", Content::from_func(string_proto_charAt, heap))?;
-    string_proto.set_hidden(
-        "charCodeAt",
-        Content::from_func(string_proto_charCodeAt, heap),
-    )?;
-    string_proto.set_hidden("slice", Content::from_func(string_proto_slice, heap))?;
-    string_proto.set_hidden("substr", Content::from_func(string_proto_substr, heap))?;
-    string_proto.set_hidden("indexOf", Content::from_func(string_proto_indexOf, heap))?;
+    string_proto.set_hidden("valueOf", heap.alloc_func(string_proto_valueOf))?;
+    string_proto.set_hidden("toString", heap.alloc_func(string_proto_valueOf))?;
+    string_proto.set_hidden("charAt", heap.alloc_func(string_proto_charAt))?;
+    string_proto.set_hidden("charCodeAt", heap.alloc_func(string_proto_charCodeAt))?;
+    string_proto.set_hidden("slice", heap.alloc_func(string_proto_slice))?;
+    string_proto.set_hidden("substr", heap.alloc_func(string_proto_substr))?;
+    string_proto.set_hidden("indexOf", heap.alloc_func(string_proto_indexOf))?;
 
     *heap.get_mut(Heap::STRING_PROTO) = string_proto;
 
     let mut the_string = JSObject::from_func(string_constructor);
-    the_string.set_system("prototype", Content::from(Heap::STRING_PROTO))?;
+    the_string.set_system("prototype", Heap::STRING_PROTO)?;
 
     let the_string_ref = heap.alloc(the_string);
     heap.get_mut(Heap::STRING_PROTO)
-        .set_hidden("constructor", Content::from(the_string_ref))?;
+        .set_hidden("constructor", the_string_ref)?;
 
     Ok(the_string_ref)
 }

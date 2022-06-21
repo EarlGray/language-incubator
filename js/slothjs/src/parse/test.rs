@@ -56,3 +56,40 @@ fn test_parser_context() -> Result<(), ParseError> {
 
     Ok(())
 }
+
+#[test]
+fn test_redeclared() -> Result<(), ParseError> {
+    let json_ast = json!({
+        "type": "BlockStatement",
+        "body": [
+            {
+                "type": "VariableDeclaration",
+                "kind": "let",
+                "declarations": [
+                    {
+                        "type": "VariableDeclarator",
+                        "id": { "type": "Identifier", "name": "foo" },
+                        "init": null
+                    }
+                ]
+            },
+            {
+                "type": "VariableDeclaration",
+                "kind": "let",
+                "declarations": [
+                    {
+                        "type": "VariableDeclarator",
+                        "id": { "type": "Identifier", "name": "foo" },
+                        "init": null
+                    }
+                ]
+            }
+        ],
+    });
+
+    let mut ctx = ParserContext::new();
+    match BlockStatement::parse_from(&json_ast, &mut ctx) {
+        Err(ParseError::BindingRedeclared {}) => Ok(()),
+        other => panic!("want an error, got {:?}", other),
+    }
+}

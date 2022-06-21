@@ -1,6 +1,5 @@
 use crate::{
     function::CallContext,
-    object::Content,
     Exception,
     Heap,
     Interpreted,
@@ -18,7 +17,7 @@ pub fn error_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpret
     let mut error_object = JSObject::new();
     error_object.proto = Heap::ERROR_PROTO;
 
-    error_object.set_hidden("message", Content::from(message))?;
+    error_object.set_hidden("message", message)?;
 
     let objref = heap.alloc(error_object);
     Ok(Interpreted::from(objref))
@@ -47,18 +46,18 @@ fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpr
 
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut error_proto = JSObject::new();
-    error_proto.set_hidden("name", Content::from("Error"))?;
-    error_proto.set_hidden("message", Content::from(""))?;
-    error_proto.set_hidden("toString", Content::from_func(error_proto_toString, heap))?;
+    error_proto.set_hidden("name", "Error")?;
+    error_proto.set_hidden("message", "")?;
+    error_proto.set_hidden("toString", heap.alloc_func(error_proto_toString))?;
 
     *heap.get_mut(Heap::ERROR_PROTO) = error_proto;
 
     let mut the_error = JSObject::from_func(error_constructor);
-    the_error.set_system("prototype", Content::from(Heap::ERROR_PROTO))?;
+    the_error.set_system("prototype", Heap::ERROR_PROTO)?;
 
     let the_error_ref = heap.alloc(the_error);
     heap.get_mut(Heap::ERROR_PROTO)
-        .set_hidden("constructor", Content::from(the_error_ref))?;
+        .set_hidden("constructor", the_error_ref)?;
 
     Ok(the_error_ref)
 }

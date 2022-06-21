@@ -59,7 +59,7 @@ pub struct VariableDeclarator {
     pub init: Option<Box<Expression>>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DeclarationKind {
     Var,
     Let,

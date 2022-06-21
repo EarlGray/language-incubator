@@ -1,17 +1,14 @@
-use crate::error::Exception;
-use crate::function::CallContext;
-use crate::heap::{
+use crate::prelude::*;
+use crate::{
+    object::ObjectValue,
+    CallContext,
+    Exception,
     Heap,
-    JSRef,
-};
-use crate::object::{
-    Content,
     Interpreted,
     JSObject,
+    JSRef,
     JSValue,
-    ObjectValue,
 };
-use crate::prelude::*;
 
 fn array_object_constructor(
     _call: CallContext,
@@ -45,7 +42,7 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> Result<Interpreted, E
         ObjectValue::Array(array) => {
             array.storage.extend(arguments.into_iter());
             let length = array_object
-                .get_value("length")
+                .get_own_value("length")
                 .unwrap_or_else(|| JSValue::from(0));
             Ok(Interpreted::from(length))
         }
@@ -73,20 +70,20 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Ex
 pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
     let mut array_proto = JSObject::new();
 
-    array_proto.set_hidden("toString", Content::from_func(array_toString, heap))?;
-    array_proto.set_hidden("push", Content::from_func(array_proto_push, heap))?;
-    array_proto.set_hidden("pop", Content::from_func(array_proto_pop, heap))?;
+    array_proto.set_hidden("toString", heap.alloc_func(array_toString))?;
+    array_proto.set_hidden("push", heap.alloc_func(array_proto_push))?;
+    array_proto.set_hidden("pop", heap.alloc_func(array_proto_pop))?;
 
     *heap.get_mut(Heap::ARRAY_PROTO) = array_proto;
 
     let mut array_object = JSObject::from_func(array_object_constructor);
 
     // Array.prototype
-    array_object.set_system("prototype", Content::from(Heap::ARRAY_PROTO))?;
+    array_object.set_system("prototype", Heap::ARRAY_PROTO)?;
 
     let array_ref = heap.alloc(array_object);
     heap.get_mut(Heap::ARRAY_PROTO)
-        .set_system("constructor", Content::from(array_ref))?;
+        .set_system("constructor", array_ref)?;
 
     Ok(array_ref)
 }

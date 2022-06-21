@@ -44,24 +44,58 @@ impl ParserContext {
         kind: DeclarationKind,
         name: &Identifier,
     ) -> Result<(), ParseError> {
-        match kind {
-            DeclarationKind::Var => self.declared_variables.insert(name.clone()),
-            DeclarationKind::Let => {
-                /* TODO
-                if self.declared_bindings.contains(&name.0) {
-                    return Err(ParseResult::);
-                }
-                */
-                self.declared_bindings.insert(name.clone())
-            }
-            _ => todo!("VariableDeclaration::parse_from({:?})", kind),
+        let in_bindings = self.declared_bindings.contains(name);
+        let in_variables = self.declared_variables.contains(name);
+        match (kind, in_bindings, in_variables) {
+            (DeclarationKind::Var, false, _) => self.declared_variables.insert(name.clone()),
+            (DeclarationKind::Let, false, _) => self.declared_bindings.insert(name.clone()),
+            _ => return Err(ParseError::BindingRedeclared {}),
         };
         Ok(())
     }
 
-    fn swap_function_scope(&mut self, other: &mut Self) {
-        core::mem::swap(&mut self.declared_variables, &mut other.declared_variables);
-        core::mem::swap(&mut self.declared_functions, &mut other.declared_functions);
+    fn enter_block_scope<T, F>(&mut self, mut action: F) -> ParseResult<(T, HashSet<Identifier>)>
+    where
+        F: FnMut(&mut ParserContext) -> ParseResult<T>,
+    {
+        // inner_ctx accumulates used identifiers and declared bindings.
+        let mut inner_ctx = ParserContext::new();
+        core::mem::swap(
+            &mut self.declared_variables,
+            &mut inner_ctx.declared_variables,
+        );
+        core::mem::swap(
+            &mut self.declared_functions,
+            &mut inner_ctx.declared_functions,
+        );
+
+        let result = action(&mut inner_ctx);
+
+        core::mem::swap(
+            &mut self.declared_variables,
+            &mut inner_ctx.declared_variables,
+        );
+        core::mem::swap(
+            &mut self.declared_functions,
+            &mut inner_ctx.declared_functions,
+        );
+
+        let ParserContext {
+            declared_bindings: bindings,
+            used_identifiers: mut used_variables,
+            ..
+        } = inner_ctx;
+
+        for binding in bindings.iter() {
+            used_variables.remove(binding);
+        }
+
+        // add all remaining usages to the outer used_variables
+        self.used_identifiers.extend(used_variables);
+
+        // put declared bindings into BlockStatement; discard them from ParserContext
+        let result = result?;
+        Ok((result, bindings))
     }
 }
 
@@ -144,7 +178,7 @@ impl Program {
         let ParserContext {
             declared_variables: variables,
             declared_functions: functions,
-            ..   // TODO: declared_bindings
+            ..
         } = ctx;
         Ok(Program {
             body,
@@ -204,32 +238,10 @@ impl ParseFrom for Statement {
 
 impl ParseFrom for BlockStatement {
     fn parse_from<S: SourceNode>(source: &S, ctx: &mut ParserContext) -> ParseResult<Self> {
-        // inner_ctx accumulates used identifiers and declared bindings.
-        let mut inner_ctx = ParserContext::new();
-        inner_ctx.swap_function_scope(ctx);
-
-        let body = source.map_array("body", |jstmt| {
-            let result = Statement::parse_from(jstmt, &mut inner_ctx);
-            // TODO: were any newly declared bindings already used in this block?
-            result
+        let (body, bindings) = ctx.enter_block_scope(|ctx| {
+            source.map_array("body", |jstmt| Statement::parse_from(jstmt, ctx))
         })?;
 
-        inner_ctx.swap_function_scope(ctx);
-
-        let ParserContext {
-            declared_bindings: bindings,
-            used_identifiers: mut used_variables,
-            ..
-        } = inner_ctx;
-
-        for binding in bindings.iter() {
-            used_variables.remove(binding);
-        }
-
-        // add all remaining usages to the outer used_variables
-        ctx.used_identifiers.extend(used_variables);
-
-        // put declared bindings into BlockStatement; discard them from ParserContext
         Ok(BlockStatement { body, bindings })
     }
 }

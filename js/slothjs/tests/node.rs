@@ -1,3 +1,6 @@
+#[rustfmt::skip]
+mod test {
+
 use serde_json::json;
 
 use slothjs::{
@@ -1405,3 +1408,4 @@ fn test_arrays() {
     */
 }
 
+}

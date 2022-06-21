@@ -62,7 +62,7 @@ impl SourceNode for HeapNode {
 
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {
         let child = (self.heap.get(self.node))
-            .get_value(property)
+            .get_own_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         let json = child
             .to_json(&self.heap)
@@ -74,7 +74,7 @@ impl SourceNode for HeapNode {
 
     fn get_bool(&self, property: &str) -> ParseResult<bool> {
         let value = (self.heap.get(self.node))
-            .get_value(property)
+            .get_own_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         match value {
             JSValue::Bool(b) => Ok(b),
@@ -86,7 +86,7 @@ impl SourceNode for HeapNode {
 
     fn get_str(&self, property: &str) -> ParseResult<String> {
         let value = (self.heap.get(self.node))
-            .get_value(property)
+            .get_own_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         match value {
             JSValue::String(s) => Ok(s),
@@ -101,7 +101,7 @@ impl SourceNode for HeapNode {
         F: FnMut(&Self) -> ParseResult<T>,
     {
         let node = self.heap.get(self.node);
-        match node.get_value(property) {
+        match node.get_own_value(property) {
             Some(JSValue::Ref(childref)) => {
                 let child = self.with_node(childref);
                 Ok(action(&child)?)
@@ -115,7 +115,7 @@ impl SourceNode for HeapNode {
         F: FnMut(&Self) -> ParseResult<T>,
     {
         let value = (self.heap.get(self.node))
-            .get_value(property)
+            .get_own_value(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         let arrref = value.to_ref().map_err(|_| ParseError::ShouldBeArray {
             value: self.to_error(),

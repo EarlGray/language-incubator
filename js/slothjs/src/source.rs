@@ -3,10 +3,9 @@ use serde::{
     Serialize,
 };
 
-use crate::error::ParseError;
-use crate::object::Content;
 use crate::prelude::*;
 use crate::{
+    error::ParseError,
     Exception,
     Heap,
     Interpreted,
@@ -61,8 +60,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
             JSValue::from(loc.end.column as f64),
         ];
         let loc_ref = heap.alloc(JSObject::from_array(array));
-        heap.scope_mut()
-            .set_system(CALLER_LOCATION, Content::from(loc_ref))?;
+        heap.scope_mut().set_system(CALLER_LOCATION, loc_ref)?;
     }
     Ok(())
 }
@@ -80,7 +78,7 @@ impl<'heap> fmt::Display for Callstack<'heap> {
         let mut scoperef = self.heap.local_scope().unwrap_or(Heap::NULL);
         while scoperef != Heap::NULL {
             let loc_ref = (self.heap.get(scoperef))
-                .get_value(CALLER_LOCATION)
+                .get_own_value(CALLER_LOCATION)
                 .and_then(|v| v.to_ref().ok())
                 .ok_or_else(|| {
                     Exception::SyntaxTreeError(ParseError::no_attr(CALLER_LOCATION, JSON::Null))
@@ -92,7 +90,7 @@ impl<'heap> fmt::Display for Callstack<'heap> {
                 writeln!(f, "   ???")?;
             }
 
-            scoperef = match self.heap.get(scoperef).get_value(Heap::SAVED_SCOPE) {
+            scoperef = match self.heap.get(scoperef).get_own_value(Heap::SAVED_SCOPE) {
                 Some(v) => v.to_ref().unwrap_or(Heap::NULL),
                 None => Heap::NULL,
             };

@@ -1,18 +1,17 @@
-use crate::ast;
-use crate::error::Exception;
-use crate::heap::{
+use crate::prelude::*;
+
+use crate::{
+    ast,
+    source,
+    Exception,
     Heap,
-    JSRef,
-};
-use crate::interpret::Interpretable;
-use crate::object::{
-    Content,
+    Interpretable,
     Interpreted,
     JSObject,
+    JSRef,
+    JSResult,
     JSValue,
 };
-use crate::prelude::*;
-use crate::source;
 
 pub struct CallContext {
     pub this_ref: JSRef,
@@ -21,8 +20,7 @@ pub struct CallContext {
     pub loc: Option<Box<source::Location>>,
 }
 
-pub type NativeFunction =
-    fn(ctx: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception>;
+pub type NativeFunction = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.
 #[derive(Clone)]
@@ -33,7 +31,7 @@ impl VMCall {
         VMCall(f)
     }
 
-    pub fn call(self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    pub fn call(self, call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         self.0(call, heap)
     }
     pub fn ptr(&self) -> usize {
@@ -54,23 +52,21 @@ pub struct Closure {
 }
 
 impl Closure {
-    pub fn call(&self, call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+    pub fn call(&self, call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         let result = heap.enter_new_scope(call.this_ref, self.captured_scope, |heap| {
             // `arguments`
             let argv = (call.arguments.iter())
                 .map(|v| v.to_value(heap))
                 .collect::<Result<Vec<JSValue>, Exception>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
-            heap.scope_mut()
-                .set_nonconf("arguments", Content::from(arguments_ref))?;
+            heap.scope_mut().set_nonconf("arguments", arguments_ref)?;
 
             // set each argument
             for (i, param) in self.function.params.iter().enumerate() {
                 let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
-                heap.scope_mut()
-                    .set_nonconf(param.as_str(), Content::Value(value))?;
+                heap.scope_mut().set_nonconf(param.as_str(), value)?;
             }
 
             let _ = source::save_caller(call.loc.clone(), heap);

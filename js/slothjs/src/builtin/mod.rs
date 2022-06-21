@@ -8,37 +8,34 @@ pub mod object;
 pub mod string;
 
 use crate::{
-    object::Content,
-    Exception,
     Heap,
+    JSResult,
 };
 
-pub fn init(heap: &mut Heap) -> Result<(), Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<()> {
     global::init(heap)?;
 
     let the_object = object::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Object", Content::from(the_object))?;
+        .set_hidden("Object", the_object)?;
 
     let the_function = function::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Function", Content::from(the_function))?;
+        .set_hidden("Function", the_function)?;
 
     let the_array = array::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Array", Content::from(the_array))?;
+    heap.get_mut(Heap::GLOBAL).set_hidden("Array", the_array)?;
 
     let the_boolean = boolean::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Boolean", Content::from(the_boolean))?;
+        .set_hidden("Boolean", the_boolean)?;
 
     let the_string = string::init(heap)?;
     heap.get_mut(Heap::GLOBAL)
-        .set_hidden("String", Content::from(the_string))?;
+        .set_hidden("String", the_string)?;
 
     let the_error = error::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Error", Content::from(the_error))?;
+    heap.get_mut(Heap::GLOBAL).set_hidden("Error", the_error)?;
 
     console::init(heap)?;
 

@@ -1,13 +1,12 @@
-use crate::error::Exception;
-use crate::function::CallContext;
-use crate::heap::Heap;
-use crate::object::{
-    Content,
+use crate::prelude::*;
+use crate::{
+    CallContext,
+    Exception,
+    Heap,
     Interpreted,
     JSObject,
     JSValue,
 };
-use crate::prelude::*;
 
 /*
  *  parseInt
@@ -64,14 +63,14 @@ fn global_parseFloat(call: CallContext, heap: &mut Heap) -> Result<Interpreted, 
 pub fn init(heap: &mut Heap) -> Result<(), Exception> {
     let mut global = JSObject::new();
 
-    global.set_system("NaN", Content::from(f64::NAN))?;
-    global.set_system("undefined", Content::from(JSValue::Undefined))?;
+    global.set_system("NaN", f64::NAN)?;
+    global.set_system("undefined", JSValue::Undefined)?;
 
-    global.set_hidden("global", Content::from(Heap::GLOBAL))?;
-    global.set_system(Heap::SCOPE_THIS, Content::from(Heap::GLOBAL))?;
+    global.set_hidden("global", Heap::GLOBAL)?;
+    global.set_system(Heap::SCOPE_THIS, Heap::GLOBAL)?;
 
-    global.set_hidden("parseInt", Content::from_func(parse_int, heap))?;
-    global.set_hidden("parseFloat", Content::from_func(global_parseFloat, heap))?;
+    global.set_hidden("parseInt", heap.alloc_func(parse_int))?;
+    global.set_hidden("parseFloat", heap.alloc_func(global_parseFloat))?;
 
     *heap.get_mut(Heap::GLOBAL) = global;
 
