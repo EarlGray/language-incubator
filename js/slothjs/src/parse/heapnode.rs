@@ -1,6 +1,9 @@
 use crate::prelude::*;
-use crate::source;
-use crate::Heap;
+use crate::{
+    source,
+    JSObject,
+    Heap,
+};
 
 use super::*;
 
@@ -38,6 +41,10 @@ impl HeapNode {
             node,
         }
     }
+
+    fn object(&self) -> &JSObject {
+        self.heap.get(self.node)
+    }
 }
 
 impl fmt::Debug for HeapNode {
@@ -57,7 +64,13 @@ impl SourceNode for HeapNode {
     }
 
     fn get_location(&self) -> Option<source::Location> {
-        None // TODO
+        self.map_opt_node("loc", |loc| {
+            let jloc = loc.object().to_json(&loc.heap).expect("json from loc");
+            serde_json::from_value::<source::Location>(jloc).map_err(|e| {
+                let err = format!("Can't get source::Location from JSON: {:?}", e);
+                ParseError::InvalidJSON { err }
+            })
+        }).unwrap_or(None)
     }
 
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {

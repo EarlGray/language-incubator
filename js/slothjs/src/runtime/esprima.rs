@@ -1,3 +1,4 @@
+use serde_json::json;
 use crate::{
     ast::Identifier,
     runtime::{
@@ -17,6 +18,7 @@ use crate::{
 pub struct EsprimaParser {
     object: JSRef,
     esparse: JSRef,
+    locflag: JSRef,
 }
 
 impl EsprimaParser {
@@ -36,7 +38,10 @@ impl runtime::Parser for EsprimaParser {
             .get_own_value("parse")
             .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima.parse")))?
             .to_ref()?;
-        Ok(EsprimaParser { object, esparse })
+
+        let locjson = json!({ "loc": true });
+        let locflag = heap.object_from_json(&locjson).to_ref()?;
+        Ok(EsprimaParser { object, esparse, locflag })
     }
 
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program> {
@@ -45,13 +50,13 @@ impl runtime::Parser for EsprimaParser {
             CallContext {
                 this_ref: self.object,
                 method_name: "parse".to_string(),
-                arguments: vec![Interpreted::from(input) /*{ loc: true },*/],
+                arguments: vec![Interpreted::from(input), Interpreted::from(self.locflag)],
                 loc: None,
             },
         )?;
         let node = estree.to_ref(heap)?;
 
-        let program = HeapNode::with(heap, node, |estree| Program::parse_from(estree))
+        let program = HeapNode::with(heap, node, Program::parse_from)
             .map_err(Exception::invalid_ast)?;
         Ok(program)
     }
