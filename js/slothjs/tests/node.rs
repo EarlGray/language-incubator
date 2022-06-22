@@ -1422,6 +1422,21 @@ fn test_arrays() {
         a.length
     "#, 1.0);
     */
+
+    // Array.prototype.indexOf()
+    /* TODO
+    assert_eval!("[].indexOf()", (-1.0));
+    assert_eval!("[undefined].indexOf()", 0.0);
+    assert_eval!("['a', 'b', 'c'].indexOf('b')", 1.0);
+    assert_eval!("['a', 'b', 'c'].indexOf('d')", (-1.0));
+
+    assert_eval!("['a', 'b', 'a'].indexOf('a', 1)", (2.0));  // second argument: fromIndex
+    assert_eval!("['a', 'b', 'a'].indexOf('a', -2)", (2.0)); // second argument: fromIndex from end
+    assert_eval!(r#"
+        let arraylike = {length: 3, 0: 'a', 1: 'b', 2: 'a'};
+        Array.prototype.indexOf.call(arraylike, 'a', 1)
+    "#, 2.0);
+    */
 }
 
 }
