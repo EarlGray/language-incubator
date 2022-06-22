@@ -1238,6 +1238,22 @@ fn test_builtin_string() {
     assert_eval!("'abcdefghi'.indexOf('ab', 3)", (-1.0));
     assert_eval!("'undefined'.indexOf()", 0.0);
 
+    // String.prototype.replace()
+    /*
+    assert_eval!("'test'.replace('t', 'T')", "Test");
+    assert_eval!("'test'.replace('es', '')", "tt");
+    assert_eval!("'test'.replace('', 'T')", "Ttest");
+    assert_eval!("'test'.replace('', 'T')", "Ttest");
+    assert_eval!("String.prototype.replace.call(202, '2', '3'", "302"); // it's generic over this
+    assert_eval!("'test'.replace('t', 1)", "1est"); // replaceValue.toString() is used
+    assert_eval!("'test'.replace('t', function() { return 1 })", "1est"); // replaceValue can be a function.
+    assert_eval!(r#"
+        "__test__".replace("t", function(match, offset, str) {
+            return '<'+match+','+offset+','+str+'>';
+        })
+    "#, "__t<t,2,__test__>est__");
+    */
+    //TODO: replace(RegExp, ...)
 }
 
 #[test]
