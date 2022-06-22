@@ -11,7 +11,6 @@ use crate::error::ParseError;
 use crate::source;
 use crate::{
     JSRef,
-    JSValue,
     JSON,
 };
 
@@ -227,7 +226,7 @@ impl ParseFrom for Statement {
             "TryStatement" => Stmt::Try(TryStatement::parse_from(source, ctx)?),
             "VariableDeclaration" => Stmt::Variable(VariableDeclaration::parse_from(source, ctx)?),
             _ => {
-                return Err(ParseError::UnknownType {
+                return Err(ParseError::UnknownNodeType {
                     value: source.to_error(),
                 })
             }
@@ -577,7 +576,7 @@ impl ParseFrom for Expression {
                 Expr::Update(Box::new(expr))
             }
             _ => {
-                return Err(ParseError::UnknownType {
+                return Err(ParseError::UnknownNodeType {
                     value: source.to_error(),
                 })
             }

@@ -65,7 +65,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
     Ok(())
 }
 
-// TODO: `struct Callstack` and `impl Display for Callstack`.
+/// Usage: `println!("{}", Callstack { heap} );`
 struct Callstack<'heap> {
     heap: &'heap Heap,
 }

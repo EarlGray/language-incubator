@@ -6,26 +6,33 @@ use crate::object::{
 };
 use crate::prelude::*;
 
+pub type JSResult<T> = Result<T, Exception>;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     InvalidJSON { err: String },
-    ShouldBeBool { value: JSON },
-    ShouldBeString { value: JSON },
-    ShouldBeArray { value: JSON },
-    //ShouldBeObject{ value: JSON },
     ObjectWithout { attr: String, value: JSON },
     UnexpectedValue { want: &'static str, value: JSON },
-    UnknownType { value: JSON },
+    UnknownNodeType { value: JSON },
     ReferencedBeforeDeclaration {},
     BindingRedeclared {},
 }
 
 impl ParseError {
-    pub fn no_attr(attr: &str, at: JSON) -> ParseError {
+    pub fn no_attr(attr: &str, at: JSON) -> Self {
         ParseError::ObjectWithout {
             attr: attr.to_string(),
             value: at,
         }
+    }
+
+    pub fn want(want: &'static str, got: JSON) -> Self {
+        Self::UnexpectedValue { want, value: got }
+    }
+
+    pub fn invalid_ast<E: fmt::Debug>(e: E) -> Self {
+        let err = format!("{:?}", e);
+        ParseError::InvalidJSON { err }
     }
 }
 
@@ -59,10 +66,11 @@ impl Exception {
     pub fn instance_required(arg: &Interpreted, of: &str) -> Exception {
         Exception::TypeErrorInstanceRequired(arg.clone(), of.to_string())
     }
+}
 
-    pub fn invalid_ast<E: fmt::Debug>(e: E) -> Self {
-        let err = format!("{:?}", e);
-        Exception::SyntaxTreeError(ParseError::InvalidJSON { err })
+impl From<ParseError> for Exception {
+    fn from(err: ParseError) -> Self {
+        Self::SyntaxTreeError(err)
     }
 }
 
@@ -72,5 +80,3 @@ pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
         _ => Err(e),
     }
 }
-
-pub type JSResult<T> = Result<T, Exception>;

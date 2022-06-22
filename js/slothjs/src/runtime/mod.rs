@@ -7,6 +7,7 @@ use std::io::prelude::*;
 use crate::prelude::*;
 use crate::{
     error,
+    source,
     Exception,
     Heap,
     Interpretable,
@@ -156,7 +157,12 @@ impl<P: Parser> Runtime<P> {
 
             match self.evaluate(&input) {
                 Ok(result) => println!("{}", self.string_from(result)),
-                Err(err) => eprintln!("{}", err),
+                Err(err) => {
+                    eprintln!("{}", err);
+                    if let Err(e) = source::print_callstack(&self.heap) {
+                        eprintln!("   Exception thrown while getting stack trace: {:?}", e);
+                    }
+                }
             }
         }
 

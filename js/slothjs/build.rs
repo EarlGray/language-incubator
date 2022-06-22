@@ -1,7 +1,9 @@
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::process::Command;
+use std::process as proc;
+
+use serde_json::Value as JSON;
 
 const ESPRIMA: &str = "./node_modules/esprima/dist/esprima.js";
 const ESJSON: &str = "./tmp/esprima.json";
@@ -28,28 +30,28 @@ fn main() -> Result<(), io::Error> {
     let esjson = Path::new(ESJSON);
 
     if let Some(outdir) = esjson.parent() {
-        fs::create_dir_all(outdir).unwrap();
+        fs::create_dir_all(outdir)?;
     }
 
-    let exitcode = Command::new(npm).arg("install").status().unwrap();
+    let exitcode = proc::Command::new(npm).arg("install").status()?;
     println!("npm install: {}", exitcode);
 
+    let status = proc::Command::new(npm)
+        .args(["exec", "esparse", "--", /*"--loc",*/ ESPRIMA])
+        .output()?;
+    println!("npm exec esparse: {}", status.status);
+
     if cfg!(target_os = "windows") {
-        let status = Command::new(npm)
-            .args(["exec", "esparse", "--", ESPRIMA])
-            .output()
-            .unwrap();
         // yes, Windows, I do hate you.
-        let json = decode_utf16(&status.stdout).unwrap();
-        fs::write(esjson, json).unwrap();
+        let jsonstr = decode_utf16(&status.stdout)?;
+        // TODO: minify here as well
+        fs::write(esjson, jsonstr)?;
     } else {
-        let esjson = fs::File::create(ESJSON)?;
-        let exitcode = Command::new(npm)
-            .args(["exec", "esparse", "--", ESPRIMA])
-            .stdout(esjson)
-            .status()
-            .unwrap();
-        println!("esparse: {}", exitcode);
+        // Streaming Stdio::piped() into serde_json::from_reader() is
+        // unexpectedly embarrassingly slow. Try BufReader?
+        let json: JSON = serde_json::from_slice(&status.stdout)?;
+        let jsonfile = fs::File::create(ESJSON)?;
+        serde_json::to_writer(jsonfile, &json)?;
     }
 
     Ok(())

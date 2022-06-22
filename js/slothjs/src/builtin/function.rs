@@ -21,10 +21,7 @@ fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpr
     }
     call.arguments.rotate_left(1); // [this, arg1, .. , argN] => [arg1, .. , argN, this]
     let this_arg = call.arguments.pop().unwrap();
-    let bound_this = this_arg
-        .to_ref(heap)
-        .or_else(|_| Ok(this_arg.to_value(heap)?.objectify(heap)))?;
-
+    let bound_this = this_arg.to_value(heap)?.objectify(heap); // Must wrap primitives too.
     let funcref = call.this_ref;
     call.this_ref = bound_this;
 

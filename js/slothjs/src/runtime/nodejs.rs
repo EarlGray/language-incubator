@@ -11,6 +11,7 @@ use crate::runtime::{
     EvalResult,
 };
 use crate::{
+    error::ParseError,
     Exception,
     Heap,
     Program,
@@ -56,8 +57,9 @@ impl NodejsParser {
         let stderr = String::from_utf8(esparse_output.stderr)?;
         let status = esparse_output.status;
         if !status.success() {
-            let serr = Exception::invalid_ast(stderr);
-            return Err(EvalError::from(serr));
+            return Err(EvalError::from(Exception::from(ParseError::invalid_ast(
+                stderr,
+            ))));
         }
         if !stderr.is_empty() {
             eprintln!("{}", stderr);
@@ -90,7 +92,7 @@ impl runtime::Parser for NodejsParser {
         let stdout = self.run_esprima(input)?;
         let json: JSON = serde_json::from_str(&stdout)?;
 
-        let program = Program::parse_from(&json).map_err(Exception::invalid_ast)?;
+        let program = Program::parse_from(&json).map_err(Exception::SyntaxTreeError)?;
         Ok(program)
     }
 }

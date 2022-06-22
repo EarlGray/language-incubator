@@ -56,18 +56,18 @@ impl SourceNode for JSON {
         let child = self
             .get(property)
             .ok_or_else(|| ParseError::no_attr(property, self.clone()))?;
-        child.as_bool().ok_or_else(|| ParseError::ShouldBeBool {
-            value: self.clone(),
-        })
+        child
+            .as_bool()
+            .ok_or_else(|| ParseError::want("bool", self.to_error()))
     }
 
     fn get_str(&self, property: &str) -> ParseResult<String> {
         let child = self
             .get(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        let s = child.as_str().ok_or_else(|| ParseError::ShouldBeString {
-            value: self.to_error(),
-        })?;
+        let s = child
+            .as_str()
+            .ok_or_else(|| ParseError::want("string", self.to_error()))?;
         Ok(s.to_string())
     }
 
@@ -77,9 +77,8 @@ impl SourceNode for JSON {
     {
         let jarray =
             (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        let array = (jarray.as_array()).ok_or_else(|| ParseError::ShouldBeArray {
-            value: JSON::Null.to_error(),
-        })?;
+        let array =
+            (jarray.as_array()).ok_or_else(|| ParseError::want("array", JSON::Null.to_error()))?;
         array.iter().map(func).collect()
     }
 }

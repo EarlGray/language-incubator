@@ -348,7 +348,7 @@ impl CatchClause {
                     let errval = builtin::error::error_constructor(
                         CallContext {
                             this_ref,
-                            method_name: "ReferenceError".to_string(),
+                            method_name: "Error".to_string(),
                             arguments: vec![Interpreted::from(message)],
                             loc: None, // TODO: get the location of the reference
                         },

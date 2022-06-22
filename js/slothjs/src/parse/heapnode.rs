@@ -1,8 +1,9 @@
 use crate::prelude::*;
 use crate::{
     source,
-    JSObject,
     Heap,
+    JSResult,
+    JSValue,
 };
 
 use super::*;
@@ -42,8 +43,13 @@ impl HeapNode {
         }
     }
 
-    fn object(&self) -> &JSObject {
-        self.heap.get(self.node)
+    fn property(&self, name: &str) -> ParseResult<JSValue> {
+        (self.heap.get(self.node).get_own_value(name))
+            .ok_or_else(|| ParseError::no_attr(name, self.to_error()))
+    }
+
+    fn to_json(&self) -> JSResult<JSON> {
+        self.heap.get(self.node).to_json(&self.heap)
     }
 }
 
@@ -57,55 +63,39 @@ impl SourceNode for HeapNode {
     type Error = Self;
 
     fn to_error(&self) -> JSON {
-        self.heap
-            .get(self.node)
-            .to_json(&self.heap)
-            .expect("HeapNode::to_error")
+        self.to_json().expect("HeapNode::to_error")
     }
 
     fn get_location(&self) -> Option<source::Location> {
         self.map_opt_node("loc", |loc| {
-            let jloc = loc.object().to_json(&loc.heap).expect("json from loc");
+            let jloc = loc.to_json().expect("json from loc");
             serde_json::from_value::<source::Location>(jloc).map_err(|e| {
                 let err = format!("Can't get source::Location from JSON: {:?}", e);
                 ParseError::InvalidJSON { err }
             })
-        }).unwrap_or(None)
+        })
+        .unwrap_or(None)
     }
 
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {
-        let child = (self.heap.get(self.node))
-            .get_own_value(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        let json = child
-            .to_json(&self.heap)
-            .map_err(|e| ParseError::InvalidJSON {
-                err: format!("{:?}", e),
-            })?;
+        let child = self.property(property)?;
+        let json = child.to_json(&self.heap).map_err(ParseError::invalid_ast)?;
         Ok(Literal(json))
     }
 
     fn get_bool(&self, property: &str) -> ParseResult<bool> {
-        let value = (self.heap.get(self.node))
-            .get_own_value(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
+        let value = self.property(property)?;
         match value {
             JSValue::Bool(b) => Ok(b),
-            _ => Err(ParseError::ShouldBeBool {
-                value: self.to_error(),
-            }),
+            _ => Err(ParseError::want("bool", self.to_error())),
         }
     }
 
     fn get_str(&self, property: &str) -> ParseResult<String> {
-        let value = (self.heap.get(self.node))
-            .get_own_value(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
+        let value = self.property(property)?;
         match value {
             JSValue::String(s) => Ok(s),
-            _ => Err(ParseError::ShouldBeString {
-                value: self.to_error(),
-            }),
+            _ => Err(ParseError::want("string", self.to_error())),
         }
     }
 
@@ -113,9 +103,8 @@ impl SourceNode for HeapNode {
     where
         F: FnMut(&Self) -> ParseResult<T>,
     {
-        let node = self.heap.get(self.node);
-        match node.get_own_value(property) {
-            Some(JSValue::Ref(childref)) => {
+        match self.property(property)? {
+            JSValue::Ref(childref) => {
                 let child = self.with_node(childref);
                 Ok(action(&child)?)
             }
@@ -127,29 +116,18 @@ impl SourceNode for HeapNode {
     where
         F: FnMut(&Self) -> ParseResult<T>,
     {
-        let value = (self.heap.get(self.node))
-            .get_own_value(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        let arrref = value.to_ref().map_err(|_| ParseError::ShouldBeArray {
-            value: self.to_error(),
-        })?;
-        let array =
-            (self.heap.get(arrref))
-                .as_array()
-                .ok_or_else(|| ParseError::ShouldBeArray {
-                    value: self.to_error(),
-                })?;
-        array
-            .storage
-            .iter()
-            .map(|child| {
-                let childref = child.to_ref().map_err(|_| ParseError::UnexpectedValue {
-                    want: "objects",
-                    value: self.to_error(),
-                })?;
-                let child = self.with_node(childref);
-                func(&child)
-            })
-            .collect()
+        let value = self.property(property)?;
+        let arrref = (value.to_ref()).map_err(|_| ParseError::want("array", self.to_error()))?;
+        let array = (self.heap.get(arrref).as_array())
+            .ok_or_else(|| ParseError::want("array", self.to_error()))?;
+        let mut result = vec![];
+        for item in &array.storage {
+            let childref =
+                (item.to_ref()).map_err(|_| ParseError::want("objects", self.to_error()))?;
+            let child = self.with_node(childref);
+            let r = func(&child)?;
+            result.push(r);
+        }
+        Ok(result)
     }
 }
