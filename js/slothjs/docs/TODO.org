@@ -64,7 +64,7 @@
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
 ** DONE [2021-01-23 Sat] array member calls: ~a[0]()~
-* Builtin objects [0/2]
+* Builtin objects
 ** builtin functions [1/4]
 *** DONE [2021-04-28 Wed] =parseFloat=
 *** TODO =parseInt=
@@ -170,8 +170,8 @@
 * DONE [2020-12-31 Thu] make it a library
 * DONE [2021-01-01 Fri] a repl executable
 * TODO move tests to =tests/=
-* MAYBE optimizations [0/5]
-** TODO Set up microbenchmarks
+* MAYBE optimizations [1/6]
+** DONE Set up microbenchmarks
    *Why*: because optimization is not possible without metrics.
    *How*: cargo bench?
 ** TODO Use a streaming json parser
