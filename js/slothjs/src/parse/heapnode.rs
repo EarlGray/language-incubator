@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::{
     source,
     Heap,
+    JSRef,
     JSResult,
     JSValue,
 };

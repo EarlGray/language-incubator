@@ -61,11 +61,6 @@ impl JSRef {
         }
     }
 
-    /// # Safety
-    /// This should only be used for debugging
-    pub unsafe fn from_index(index: usize) -> JSRef {
-        JSRef(index)
-    }
 }
 
 /// Runtime heap
@@ -119,6 +114,10 @@ impl Heap {
         self.objects
             .get_mut(objref.0)
             .unwrap_or_else(|| panic!("{:?} is invalid", objref))
+    }
+
+    pub fn get_index(&self, index: usize) -> Option<&JSObject> {
+        self.objects.get(index)
     }
 
     pub fn alloc(&mut self, object: JSObject) -> JSRef {

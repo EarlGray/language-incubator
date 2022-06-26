@@ -10,7 +10,6 @@ use crate::ast::*; // yes, EVERYTHING.
 use crate::error::ParseError;
 use crate::source;
 use crate::{
-    JSRef,
     JSON,
 };
 

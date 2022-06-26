@@ -11,7 +11,6 @@ use crate::{
     Exception,
     Heap,
     Interpretable,
-    JSRef,
     JSValue,
     Program,
     JSON,
@@ -110,9 +109,10 @@ impl<P: Parser> Runtime<P> {
 
     fn dbg(&mut self, refstr: &str) {
         if let Ok(refnum) = usize::from_str(refstr) {
-            let href = unsafe { JSRef::from_index(refnum) };
-            let object = self.heap.get(href);
-            dbg!(object);
+            match self.heap.get_index(refnum) {
+                Some(object) => { dbg!(object); }
+                None => { eprintln!("No object at #{}", refnum); }
+            };
         } else {
             // TODO: evaluate an expression to a reference
             eprintln!("Command error: expected a number");
