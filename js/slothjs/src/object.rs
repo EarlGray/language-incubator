@@ -36,7 +36,8 @@ impl JSValue {
     pub const NULL: JSValue = JSValue::Ref(Heap::NULL);
 
     /// to_ref() tries to return the underlying object reference, if any.
-    /// It's useful for checking if a value points to an object.
+    /// Throws Exception::ReferenceNotAnObject if it's not a reference.
+    /// Checking if a JSValue is a reference: `val.to_ref().is_ok()`.
     pub fn to_ref(&self) -> JSResult<JSRef> {
         match self {
             JSValue::Ref(objref) => Ok(*objref),
@@ -141,7 +142,7 @@ impl JSValue {
                         _ => None,                    // +[x, y, ..] == NaN
                     }
                 } else {
-                    object.to_primitive(heap).and_then(|v| v.numberify(heap))
+                    object.to_primitive().and_then(|v| v.numberify(heap))
                 }
             }
         }
@@ -217,8 +218,8 @@ impl JSValue {
             | (JSValue::Bool(_), JSValue::Bool(_)) => self == other,
             (JSValue::Ref(lref), JSValue::Ref(rref)) if lref == rref => true,
             (JSValue::Ref(lref), JSValue::Ref(rref)) => match (
-                heap.get(*lref).to_primitive(heap),
-                heap.get(*rref).to_primitive(heap),
+                heap.get(*lref).to_primitive(),
+                heap.get(*rref).to_primitive(),
             ) {
                 (Some(lval), Some(rval)) => (lval == rval),
                 _ => false,
@@ -445,7 +446,7 @@ impl JSObject {
     }
 
     /// It's roughly `Object.valueOf(self)`
-    pub fn to_primitive(&self, _heap: &Heap) -> Option<JSValue> {
+    pub fn to_primitive(&self) -> Option<JSValue> {
         use ObjectValue::*;
         match &self.value {
             Boolean(b) => Some(JSValue::Bool(*b)),
@@ -463,10 +464,18 @@ impl JSObject {
         }
     }
 
-    /// It `self` is an Array, give its underlying storage mutably.
+    /// If `self` is an Array, give its underlying storage mutably.
     pub fn as_array_mut(&mut self) -> Option<&mut JSArray> {
         match &mut self.value {
             ObjectValue::Array(array) => Some(array),
+            _ => None,
+        }
+    }
+
+    /// If `self` is a String, get it primitive value
+    pub fn as_str(&self) -> Option<&str> {
+        match &self.value {
+            ObjectValue::String(s) => Some(s.as_str()),
             _ => None,
         }
     }

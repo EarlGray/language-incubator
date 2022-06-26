@@ -7,18 +7,16 @@ use crate::{
     Interpreted,
     JSObject,
     JSRef,
+    JSResult,
     JSValue,
 };
 
-fn array_object_constructor(
-    _call: CallContext,
-    _heap: &mut Heap,
-) -> Result<Interpreted, Exception> {
+fn array_object_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
     todo!()
 }
 
 #[allow(non_snake_case)]
-fn array_toString(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let array_object = heap.get(call.this_ref);
     let array = array_object.as_array().ok_or_else(|| {
         Exception::TypeErrorInstanceRequired(Interpreted::from(call.this_ref), "Array".to_string())
@@ -33,7 +31,7 @@ fn array_toString(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exc
     Ok(Interpreted::from(s))
 }
 
-fn array_proto_push(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn array_proto_push(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let arguments = (call.arguments.into_iter())
         .map(|arg| arg.to_value(heap))
         .collect::<Result<Vec<JSValue>, Exception>>()?;
@@ -53,7 +51,7 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> Result<Interpreted, E
     }
 }
 
-fn array_proto_pop(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn array_proto_pop(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let array_object = heap.get_mut(call.this_ref);
     match &mut array_object.value {
         ObjectValue::Array(array) => {
@@ -67,9 +65,8 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Ex
     }
 }
 
-pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
     let mut array_proto = JSObject::new();
-
     array_proto.set_hidden("toString", heap.alloc_func(array_toString))?;
     array_proto.set_hidden("push", heap.alloc_func(array_proto_push))?;
     array_proto.set_hidden("pop", heap.alloc_func(array_proto_pop))?;

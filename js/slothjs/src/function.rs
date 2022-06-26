@@ -20,6 +20,23 @@ pub struct CallContext {
     pub loc: Option<Box<source::Location>>,
 }
 
+impl CallContext {
+    pub fn arg_value(&self, index: usize, heap: &mut Heap) -> JSResult<JSValue> {
+        self.arguments
+            .get(index)
+            .unwrap_or(&Interpreted::VOID)
+            .to_value(heap)
+    }
+
+    pub fn arg_as_number(&self, argnum: usize, heap: &Heap) -> Result<Option<i64>, Exception> {
+        let arg = match self.arguments.get(argnum) {
+            Some(arg) => arg.to_value(heap)?,
+            None => return Ok(None),
+        };
+        Ok(Some(arg.numberify(heap).unwrap_or(0.0) as i64))
+    }
+}
+
 pub type NativeFunction = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.

@@ -2,29 +2,30 @@ use crate::ast::{
     FunctionDeclaration,
     Identifier,
 };
-use crate::builtin;
-use crate::error::Exception;
 use crate::function::{
     CallContext,
     NativeFunction,
 };
-use crate::interpret::Interpretable;
-use crate::object::{
+use crate::prelude::*;
+use crate::{
+    builtin,
+    object::ObjectValue,
+    source,
+    Exception,
+    Interpretable,
     Interpreted,
     JSObject,
+    JSResult,
     JSValue,
-    ObjectValue,
     JSON,
 };
-use crate::prelude::*;
-use crate::source;
 
 /// A heap reference: a Heap index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JSRef(usize);
 
 impl JSRef {
-    pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> Result<bool, Exception> {
+    pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> JSResult<bool> {
         let protoval = heap.get(constructor).get_own_value("prototype");
         let protoval = protoval.ok_or_else(|| {
             let what = Interpreted::from(constructor);
@@ -263,7 +264,7 @@ impl Heap {
     ///     Interpreted::from(Heap::ARRAY_PROTO)
     /// );
     /// ```
-    pub fn lookup_path(&self, mut names: &[&str]) -> Result<Interpreted, Exception> {
+    pub fn lookup_path(&self, mut names: &[&str]) -> JSResult<Interpreted> {
         let mut scoperef = self.local_scope().unwrap_or(Heap::GLOBAL);
         while let Some((name, rest)) = names.split_first() {
             names = rest;
@@ -281,9 +282,9 @@ impl Heap {
         this_ref: JSRef,
         captured_scope: JSRef,
         mut action: F,
-    ) -> Result<T, Exception>
+    ) -> JSResult<T>
     where
-        F: FnMut(&mut Heap) -> Result<T, Exception>,
+        F: FnMut(&mut Heap) -> JSResult<T>,
     {
         self.push_scope(this_ref)?;
         if captured_scope != Heap::NULL {
@@ -295,7 +296,7 @@ impl Heap {
         result
     }
 
-    fn push_scope(&mut self, this_ref: JSRef) -> Result<JSRef, Exception> {
+    fn push_scope(&mut self, this_ref: JSRef) -> JSResult<JSRef> {
         let old_scope_ref = self.local_scope().unwrap_or(Heap::GLOBAL);
 
         let mut scope_object = JSObject::new();
@@ -343,11 +344,7 @@ impl Heap {
 
     /// Given a `func_ref` to a closure or a native call and a set of arguments,
     /// executes the function. `this_ref` is bound as `this`.
-    pub fn execute(
-        &mut self,
-        func_ref: JSRef,
-        call: CallContext,
-    ) -> Result<Interpreted, Exception> {
+    pub fn execute(&mut self, func_ref: JSRef, call: CallContext) -> JSResult<Interpreted> {
         // Yes, we do need a clone() to workaround borrow checker:
         match &self.get(func_ref).value {
             ObjectValue::VMCall(vmcall) => vmcall.clone().call(call, self),
@@ -362,7 +359,7 @@ impl Heap {
         }
     }
 
-    pub fn throw<T>(&self, exc: Exception) -> Result<T, Exception> {
+    pub fn throw<T>(&self, exc: Exception) -> JSResult<T> {
         // TODO: capture the stack
         //let _ = source::print_callstack(self);
         Err(exc)

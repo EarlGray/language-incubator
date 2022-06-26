@@ -63,8 +63,12 @@ pub enum Exception {
 }
 
 impl Exception {
-    pub fn instance_required(arg: &Interpreted, of: &str) -> Exception {
-        Exception::TypeErrorInstanceRequired(arg.clone(), of.to_string())
+    pub fn instance_required<V>(arg: V, of: &str) -> Exception
+    where
+        Interpreted: From<V>,
+    {
+        let arg = Interpreted::from(arg);
+        Exception::TypeErrorInstanceRequired(arg, of.to_string())
     }
 }
 

@@ -11,14 +11,8 @@ use crate::{
     JSValue,
 };
 
-fn object_reference(arg: &Interpreted, heap: &Heap) -> JSResult<JSRef> {
-    arg.to_ref(heap)
-        .or_else(|_| heap.throw(Exception::instance_required(arg, "Object")))
-}
-
 fn object_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let value = argument.to_value(heap)?;
+    let value = call.arg_value(0, heap)?;
     let object_ref = match value.objectify(heap) {
         Heap::NULL => heap.alloc(JSObject::new()),
         href => href,
@@ -28,10 +22,9 @@ fn object_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interprete
 
 #[allow(non_snake_case)]
 fn object_proto_hasOwnProperty(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let propname = argument.to_value(heap)?.stringify(heap)?;
-    let this_object = heap.get(call.this_ref);
-    let found = this_object.get_own_value(&propname).is_some(); // TODO: avoid calling getters, if any
+    let propname = call.arg_value(0, heap)?.stringify(heap)?;
+    // TODO: avoid calling getters, if any
+    let found = heap.get(call.this_ref).get_own_value(&propname).is_some();
     Ok(Interpreted::from(found))
 }
 
@@ -170,14 +163,9 @@ fn define_property(
 
 #[allow(non_snake_case)]
 fn object_object_defineProperty(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let objarg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = object_reference(objarg, heap)?;
-
-    let prop = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
-        .to_value(heap)?
-        .stringify(heap)?;
-
-    let descref = (call.arguments.get(2).unwrap_or(&Interpreted::VOID)).to_ref(heap)?;
+    let objref = call.arg_value(0, heap)?.to_ref()?;
+    let prop = call.arg_value(1, heap)?.stringify(heap)?;
+    let descref = call.arg_value(2, heap)?.to_ref()?;
 
     define_property(objref, prop, descref, heap)?;
     Ok(Interpreted::from(objref))
@@ -206,11 +194,8 @@ fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> Result
 
 #[allow(non_snake_case)]
 fn object_object_defineProperties(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = object_reference(obj_arg, heap)?;
-
-    let desc_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
-    let descs_ref = object_reference(desc_arg, heap)?;
+    let objref = call.arg_value(0, heap)?.to_ref()?;
+    let descs_ref = call.arg_value(1, heap)?.to_ref()?;
 
     define_properties(objref, descs_ref, heap)?;
     Ok(Interpreted::from(objref))
@@ -218,11 +203,10 @@ fn object_object_defineProperties(call: CallContext, heap: &mut Heap) -> JSResul
 
 #[allow(non_snake_case)]
 fn object_object_setPrototypeOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let obj_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let objref = object_reference(obj_arg, heap)?;
+    let objref = call.arg_value(0, heap)?.to_ref()?;
 
-    let proto_arg = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
-    if let Ok(protoref) = proto_arg.to_ref(heap) {
+    let proto_arg = call.arg_value(1, heap)?;
+    if let Ok(protoref) = proto_arg.to_ref() {
         let object = heap.get_mut(objref);
         object.proto = protoref;
     }

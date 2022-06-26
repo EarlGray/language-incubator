@@ -1,21 +1,20 @@
-use crate::error::Exception;
-use crate::function::CallContext;
-use crate::heap::{
+/// The implementation of the builtin Function object.
+use crate::prelude::*;
+use crate::{
+    function::CallContext,
+    Exception,
     Heap,
-    JSRef,
-};
-use crate::object::{
     Interpreted,
     JSObject,
+    JSRef,
+    JSResult,
 };
-/// The implementation of the Function object.
-use crate::prelude::*;
 
-fn function_constructor(_call: CallContext, _heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn function_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
     todo!()
 }
 
-fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     if call.arguments.is_empty() {
         call.arguments.push(Interpreted::VOID);
     }
@@ -28,9 +27,8 @@ fn function_proto_call(mut call: CallContext, heap: &mut Heap) -> Result<Interpr
     heap.execute(funcref, call)
 }
 
-fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let this_arg = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let bound_this = this_arg.to_ref(heap)?;
+fn function_proto_apply(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let bound_this = call.arg_value(0, heap)?.to_ref()?;
     let call_args = match call.arguments.get(1) {
         // TODO: convert from everything array-like.
         Some(object) => {
@@ -57,11 +55,9 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> Result<Interprete
     )
 }
 
-pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
     /* the Function.prototype */
     let mut function_proto = JSObject::new();
-    function_proto.proto = Heap::OBJECT_PROTO;
-
     function_proto.set_hidden("call", heap.alloc_func(function_proto_call))?;
     function_proto.set_hidden("apply", heap.alloc_func(function_proto_apply))?;
 

@@ -1,16 +1,16 @@
 use crate::prelude::*;
 use crate::{
-    object::ObjectValue,
     CallContext,
     Exception,
     Heap,
     Interpreted,
     JSObject,
     JSRef,
+    JSResult,
     JSValue,
 };
 
-fn string_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn string_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let arg = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?;
@@ -25,45 +25,25 @@ fn string_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted,
     Ok(Interpreted::VOID)
 }
 
-fn object_to_str(this_ref: JSRef, heap: &Heap) -> Result<&str, Exception> {
-    match &heap.get(this_ref).value {
-        ObjectValue::String(s) => Ok(s.as_str()),
-        _ => {
-            let what = Interpreted::from(this_ref);
-            let of = "String".to_string();
-            Err(Exception::TypeErrorInstanceRequired(what, of))
+impl Heap {
+    fn ref_to_string(&mut self, href: JSRef) -> JSResult<String> {
+        match self.get(href).to_primitive() {
+            Some(val) => val.stringify(self),
+            None => JSValue::from(href).stringify(self),
         }
     }
 }
 
-impl CallContext {
-    fn arg_as_index(&self, argnum: usize, heap: &Heap) -> Result<Option<i64>, Exception> {
-        let arg = match self.arguments.get(argnum) {
-            Some(arg) => arg.to_value(heap)?,
-            None => return Ok(None),
-        };
-        Ok(Some(arg.numberify(heap).unwrap_or(0.0) as i64))
-    }
-}
-
-impl Heap {
-    fn ref_to_string(&mut self, href: JSRef) -> Result<String, Exception> {
-        self.get(href)
-            .to_primitive(self)
-            .unwrap_or_else(|| JSValue::from(href))
-            .stringify(self)
-    }
+#[allow(non_snake_case)]
+fn string_proto_valueOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let strval = (heap.get(call.this_ref).as_str())
+        .ok_or_else(|| Exception::instance_required(call.this_ref, "String"))?;
+    Ok(Interpreted::from(strval))
 }
 
 #[allow(non_snake_case)]
-fn string_proto_valueOf(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let s = object_to_str(call.this_ref, heap)?;
-    Ok(Interpreted::from(s))
-}
-
-#[allow(non_snake_case)]
-fn string_proto_charAt(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let index = call.arg_as_index(0, heap)?.unwrap_or(0);
+fn string_proto_charAt(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let index = call.arg_as_number(0, heap)?.unwrap_or(0);
     let s = heap.ref_to_string(call.this_ref)?;
     let result = match s.chars().nth(index as usize) {
         Some(c) => c.to_string(),
@@ -73,8 +53,8 @@ fn string_proto_charAt(call: CallContext, heap: &mut Heap) -> Result<Interpreted
 }
 
 #[allow(non_snake_case)]
-fn string_proto_charCodeAt(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
-    let index = call.arg_as_index(0, heap)?.unwrap_or(0);
+fn string_proto_charCodeAt(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let index = call.arg_as_number(0, heap)?.unwrap_or(0);
     let s = heap.ref_to_string(call.this_ref)?;
     let result = match s.chars().nth(index as usize) {
         Some(c) => c as i64 as f64,
@@ -83,17 +63,17 @@ fn string_proto_charCodeAt(call: CallContext, heap: &mut Heap) -> Result<Interpr
     Ok(Interpreted::from(result))
 }
 
-fn string_proto_slice(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn string_proto_slice(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let s = heap.ref_to_string(call.this_ref)?;
     let strlen = s.chars().count() as i64;
 
-    let begin = match call.arg_as_index(0, heap)?.unwrap_or(0) {
+    let begin = match call.arg_as_number(0, heap)?.unwrap_or(0) {
         b if b > strlen => return Ok(Interpreted::from("")),
         b if b <= -strlen => 0,
         b if b < 0 => b + strlen,
         b => b,
     } as usize;
-    let end = match call.arg_as_index(1, heap)?.unwrap_or(strlen) {
+    let end = match call.arg_as_number(1, heap)?.unwrap_or(strlen) {
         e if e <= -strlen => return Ok(Interpreted::from("")),
         e if e < 0 => e + strlen,
         e if e > strlen => strlen,
@@ -107,16 +87,16 @@ fn string_proto_slice(call: CallContext, heap: &mut Heap) -> Result<Interpreted,
     Ok(Interpreted::from(substr))
 }
 
-fn string_proto_substr(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn string_proto_substr(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let s = heap.ref_to_string(call.this_ref)?;
     let strlen = s.chars().count() as i64;
-    let begin = match call.arg_as_index(0, heap)?.unwrap_or(0) {
+    let begin = match call.arg_as_number(0, heap)?.unwrap_or(0) {
         b if b > strlen => return Ok(Interpreted::from("")),
         b if b < -strlen => 0,
         b if b < 0 => b + strlen,
         b => b,
     } as usize;
-    let end = match call.arg_as_index(1, heap)? {
+    let end = match call.arg_as_number(1, heap)? {
         Some(len) if len <= 0 => begin as i64,
         Some(len) if begin as i64 + len < strlen => begin as i64 + len,
         _ => strlen,
@@ -127,18 +107,15 @@ fn string_proto_substr(call: CallContext, heap: &mut Heap) -> Result<Interpreted
 }
 
 #[allow(non_snake_case)]
-fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let NOT_FOUND = Interpreted::from(-1);
 
     let heystack = heap.ref_to_string(call.this_ref)?;
     let strlen = heystack.chars().count() as i64; // COSTLY
 
-    let needle = (call.arguments.get(0))
-        .unwrap_or(&Interpreted::from("undefined"))
-        .to_value(heap)?
-        .stringify(heap)?;
+    let needle = call.arg_value(0, heap)?.stringify(heap)?;
 
-    let char_start = match call.arg_as_index(1, heap)?.unwrap_or(0) {
+    let char_start = match call.arg_as_number(1, heap)?.unwrap_or(0) {
         b if b < 0 => 0,
         b if b > strlen && needle.is_empty() => return Ok(Interpreted::from(strlen)),
         b if b > strlen => return Ok(NOT_FOUND),
@@ -164,15 +141,15 @@ fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> Result<Interprete
     Ok(Interpreted::from(char_start + char_index as i64))
 }
 
-pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
     let mut string_proto = JSObject::new();
-    string_proto.set_hidden("valueOf", heap.alloc_func(string_proto_valueOf))?;
-    string_proto.set_hidden("toString", heap.alloc_func(string_proto_valueOf))?;
     string_proto.set_hidden("charAt", heap.alloc_func(string_proto_charAt))?;
     string_proto.set_hidden("charCodeAt", heap.alloc_func(string_proto_charCodeAt))?;
+    string_proto.set_hidden("indexOf", heap.alloc_func(string_proto_indexOf))?;
     string_proto.set_hidden("slice", heap.alloc_func(string_proto_slice))?;
     string_proto.set_hidden("substr", heap.alloc_func(string_proto_substr))?;
-    string_proto.set_hidden("indexOf", heap.alloc_func(string_proto_indexOf))?;
+    string_proto.set_hidden("toString", heap.alloc_func(string_proto_valueOf))?;
+    string_proto.set_hidden("valueOf", heap.alloc_func(string_proto_valueOf))?;
 
     *heap.get_mut(Heap::STRING_PROTO) = string_proto;
 
