@@ -1,0 +1,47 @@
+.error { color: red; }
+
+
+.cell {
+    margin-left: 1rem;
+    max-width: 100%;
+}
+.command {}
+
+.input {
+    font-family: monospace;
+    max-width: 80%;
+}
+.output {
+    font-family: monospace;
+    white-space: pre;
+    padding: 0 0 0 3rem;
+    margin: 0.5rem 0 1.5rem 0;
+}
+
+details.output > summary {
+    margin-bottom: 1em;
+}
+
+#hdr {}
+#hello {
+    margin-left: 1rem;
+    max-width: 40em;
+}
+
+#menu {
+    margin-left: 1rem;
+    font-family: monospace;
+}
+#menu > a {
+    margin-right: 1rem;
+    /*text-decoration: none;*/
+}
+
+#welcome {
+    padding: 0.5em 0 1.5em 1rem;
+}
+
+#app {
+    white-space: pre;
+    font-family: monospace;
+}
