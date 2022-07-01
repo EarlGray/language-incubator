@@ -28,7 +28,7 @@ impl CallContext {
             .to_value(heap)
     }
 
-    pub fn arg_as_number(&self, argnum: usize, heap: &Heap) -> Result<Option<i64>, Exception> {
+    pub fn arg_as_number(&self, argnum: usize, heap: &Heap) -> JSResult<Option<i64>> {
         let arg = match self.arguments.get(argnum) {
             Some(arg) => arg.to_value(heap)?,
             None => return Ok(None),
@@ -74,7 +74,7 @@ impl Closure {
             // `arguments`
             let argv = (call.arguments.iter())
                 .map(|v| v.to_value(heap))
-                .collect::<Result<Vec<JSValue>, Exception>>()?;
+                .collect::<JSResult<Vec<JSValue>>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
             heap.scope_mut().set_nonconf("arguments", arguments_ref)?;
 

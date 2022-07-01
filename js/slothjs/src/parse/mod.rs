@@ -9,9 +9,7 @@ use crate::ast::*; // yes, EVERYTHING.
 
 use crate::error::ParseError;
 use crate::source;
-use crate::{
-    JSON,
-};
+use crate::JSON;
 
 pub use self::heapnode::HeapNode;
 

@@ -110,8 +110,12 @@ impl<P: Parser> Runtime<P> {
     fn dbg(&mut self, refstr: &str) {
         if let Ok(refnum) = usize::from_str(refstr) {
             match self.heap.get_index(refnum) {
-                Some(object) => { dbg!(object); }
-                None => { eprintln!("No object at #{}", refnum); }
+                Some(object) => {
+                    dbg!(object);
+                }
+                None => {
+                    eprintln!("No object at #{}", refnum);
+                }
             };
         } else {
             // TODO: evaluate an expression to a reference

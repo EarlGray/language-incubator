@@ -46,7 +46,7 @@ impl JSRef {
     /// let array_ref = heap.alloc(JSObject::from_array(vec![]));
     /// array_ref.expect_instance("Array", &heap).unwrap();
     /// ```
-    pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> Result<(), Exception> {
+    pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> JSResult<()> {
         let ctrval = heap
             .lookup_var(constructor)
             .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from(constructor)))?;
@@ -60,7 +60,6 @@ impl JSRef {
             }
         }
     }
-
 }
 
 /// Runtime heap
@@ -197,7 +196,7 @@ impl Heap {
         self.get_mut(scope_ref)
     }
 
-    fn declare_variable(&mut self, var: &Identifier) -> Result<(), Exception> {
+    fn declare_variable(&mut self, var: &Identifier) -> JSResult<()> {
         let name = var.as_str();
         if !self.scope().properties.contains_key(name) {
             self.scope_mut().set_nonconf(name, JSValue::Undefined)?;
@@ -209,7 +208,7 @@ impl Heap {
         &mut self,
         variables: impl Iterator<Item = &'a Identifier>,
         functions: impl Iterator<Item = &'a FunctionDeclaration>,
-    ) -> Result<(), Exception> {
+    ) -> JSResult<()> {
         for var in variables {
             self.declare_variable(var)?;
         }
@@ -309,7 +308,7 @@ impl Heap {
         Ok(new_scope_ref)
     }
 
-    fn pop_scope(&mut self) -> Result<(), Exception> {
+    fn pop_scope(&mut self) -> JSResult<()> {
         let this_scope_ref = self.local_scope().expect(".pop_scope without local scope"); // yes, panic, this interpreter is broken.
         let this_scope_object = self.get(this_scope_ref);
         let saved_scope_ref = (this_scope_object.properties)

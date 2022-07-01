@@ -128,7 +128,7 @@ fn define_property(
     propname: String,
     descref: JSRef,
     heap: &mut Heap,
-) -> Result<(), Exception> {
+) -> JSResult<()> {
     let get_value =
         |object: &JSObject, name: &str| object.get_own_value(name).unwrap_or(JSValue::Undefined);
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
@@ -171,7 +171,7 @@ fn object_object_defineProperty(call: CallContext, heap: &mut Heap) -> JSResult<
     Ok(Interpreted::from(objref))
 }
 
-fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> Result<(), Exception> {
+fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> JSResult<()> {
     let mut pairs: Vec<(String, JSRef)> = (heap.get(descs_ref).properties.iter())
         .map(|(prop, desc)| {
             let descref = match desc.to_ref() {

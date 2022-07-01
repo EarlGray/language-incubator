@@ -545,7 +545,7 @@ impl JSObject {
         content: Content,
         access: Access,
         even_nonwritable: bool,
-    ) -> Result<(), Exception> {
+    ) -> JSResult<()> {
         if let Ok(index) = usize::from_str(name) {
             if let Some(array) = self.as_array_mut() {
                 // TODO: a[100500] will be interesting.
@@ -593,7 +593,7 @@ impl JSObject {
     /// - if the existing own property is not configurable and the given `access` differs, fail.
     /// - if the existing own property is not writable, fail
     /// - else: replace `content` and `access` of the property.
-    fn set(&mut self, name: &str, content: Content, access: Access) -> Result<(), Exception> {
+    fn set(&mut self, name: &str, content: Content, access: Access) -> JSResult<()> {
         self.set_maybe_nonwritable(name, content, access, false)
     }
 
@@ -603,7 +603,7 @@ impl JSObject {
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
     /// ES5: [[Put]] with strict error handing
-    pub fn set_property<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_property<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -614,7 +614,7 @@ impl JSObject {
     }
 
     /// Just like `.set_property()`, but updates even non-writable properties.
-    pub fn set_even_nonwritable<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_even_nonwritable<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -626,28 +626,28 @@ impl JSObject {
 
     // are these shortcuts a good idea?
     /// A shortcut for define_own_property(Access::NONE) and assigning the value.
-    pub fn set_system<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_system<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
         self.set(name, Content::from(value), Access::empty())
     }
 
-    pub fn set_hidden<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_hidden<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
         self.set(name, Content::from(value), Access::HIDDEN)
     }
 
-    pub fn set_nonconf<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_nonconf<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
         self.set(name, Content::from(value), Access::NONCONF)
     }
 
-    pub fn set_readonly<V>(&mut self, name: &str, value: V) -> Result<(), Exception>
+    pub fn set_readonly<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -659,7 +659,7 @@ impl JSObject {
         if let Some(array) = self.as_array() {
             let jvals = (array.storage.iter())
                 .map(|v| v.to_json(heap))
-                .collect::<Result<Vec<_>, Exception>>()?;
+                .collect::<JSResult<Vec<_>>>()?;
             return Ok(JSON::Array(jvals));
         }
 
@@ -955,7 +955,7 @@ impl Interpreted {
         }
     }
 
-    pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> Result<(), Exception> {
+    pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> JSResult<()> {
         match self {
             Interpreted::Member { of, name } => heap.get_mut(*of).set_property(name, value),
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
@@ -963,7 +963,7 @@ impl Interpreted {
     }
 
     /// Resolve self to: a callable JSRef, `this` JSRef and the method name.
-    pub fn resolve_call(&self, heap: &Heap) -> Result<(JSRef, JSRef, &str), Exception> {
+    pub fn resolve_call(&self, heap: &Heap) -> JSResult<(JSRef, JSRef, &str)> {
         match self {
             Interpreted::Member { of: this_ref, name } => {
                 let of = match heap.lookup_protochain(*this_ref, name) {
@@ -989,7 +989,7 @@ impl Interpreted {
     /// Corresponds to Javascript `delete` operator and all its weirdness.
     /// `Ok`/`Err` correspond to `true`/`false` from `delete`.
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete>
-    pub fn delete(&self, heap: &mut Heap) -> Result<(), Exception> {
+    pub fn delete(&self, heap: &mut Heap) -> JSResult<()> {
         match self {
             Interpreted::Member { of, name } => {
                 let object = heap.get_mut(*of);

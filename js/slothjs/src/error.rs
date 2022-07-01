@@ -78,7 +78,7 @@ impl From<ParseError> for Exception {
     }
 }
 
-pub fn ignore_set_readonly(e: Exception) -> Result<(), Exception> {
+pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
     match e {
         Exception::TypeErrorSetReadonly(_, _) => Ok(()),
         _ => Err(e),

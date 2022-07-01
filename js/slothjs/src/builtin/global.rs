@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use crate::{
     CallContext,
-    Exception,
     Heap,
     Interpreted,
     JSObject,
+    JSResult,
     JSValue,
 };
 
@@ -12,7 +12,7 @@ use crate::{
  *  parseInt
  */
 #[allow(clippy::manual_range_contains)]
-fn parse_int(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn parse_int(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
     if let JSValue::Number(_) = value {
@@ -47,7 +47,7 @@ fn parse_int(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exceptio
 }
 
 #[allow(non_snake_case)]
-fn global_parseFloat(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+fn global_parseFloat(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?.stringify(heap)?;
 
@@ -60,7 +60,7 @@ fn global_parseFloat(call: CallContext, heap: &mut Heap) -> Result<Interpreted, 
  *  init
  */
 
-pub fn init(heap: &mut Heap) -> Result<(), Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<()> {
     let mut global = JSObject::new();
 
     global.set_system("NaN", f64::NAN)?;

@@ -1,14 +1,14 @@
 use crate::{
     function::CallContext,
-    Exception,
     Heap,
     Interpreted,
     JSObject,
     JSRef,
+    JSResult,
     JSValue,
 };
 
-pub fn error_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpreted, Exception> {
+pub fn error_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let message = (call.arguments.get(0))
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?
@@ -24,7 +24,7 @@ pub fn error_constructor(call: CallContext, heap: &mut Heap) -> Result<Interpret
 }
 
 #[allow(non_snake_case)]
-fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpreted, Exception> {
+fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted> {
     call.this_ref.expect_instance("Error", heap)?;
 
     let name = (heap.get(call.this_ref))
@@ -44,7 +44,7 @@ fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> Result<Interpr
     }))
 }
 
-pub fn init(heap: &mut Heap) -> Result<JSRef, Exception> {
+pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
     let mut error_proto = JSObject::new();
     error_proto.set_hidden("name", "Error")?;
     error_proto.set_hidden("message", "")?;

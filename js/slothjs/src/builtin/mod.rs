@@ -1,6 +1,5 @@
 pub mod array;
 pub mod boolean;
-mod console;
 pub mod error;
 pub mod function;
 pub mod global;
@@ -36,8 +35,6 @@ pub fn init(heap: &mut Heap) -> JSResult<()> {
 
     let the_error = error::init(heap)?;
     heap.get_mut(Heap::GLOBAL).set_hidden("Error", the_error)?;
-
-    console::init(heap)?;
 
     Ok(())
 }

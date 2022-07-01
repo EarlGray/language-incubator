@@ -25,7 +25,7 @@ fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
 
     let reprs = (array.iter())
         .map(|val| val.stringify(heap))
-        .collect::<Result<Vec<_>, Exception>>()?;
+        .collect::<JSResult<Vec<_>>>()?;
 
     let s = reprs.join(",");
     Ok(Interpreted::from(s))
@@ -34,7 +34,7 @@ fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
 fn array_proto_push(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let arguments = (call.arguments.into_iter())
         .map(|arg| arg.to_value(heap))
-        .collect::<Result<Vec<JSValue>, Exception>>()?;
+        .collect::<JSResult<Vec<JSValue>>>()?;
     let array_object = heap.get_mut(call.this_ref);
     match &mut array_object.value {
         ObjectValue::Array(array) => {
