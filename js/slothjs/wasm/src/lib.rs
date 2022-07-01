@@ -1,4 +1,7 @@
+#![feature(local_key_cell_methods)]
+
 use core::fmt;
+use core::cell::RefCell;
 use slothjs::{
     Interpretable,
     JSON,
@@ -11,6 +14,10 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+thread_local! {
+    static HEAP: RefCell<Heap> = RefCell::new(Heap::new());
+}
 
 #[wasm_bindgen]
 extern {
@@ -28,7 +35,7 @@ fn jserror<E: fmt::Debug>(e: E) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn interpret(json_ast: &str) -> Result<JsValue, JsValue> {
+pub fn interpret_string(json_ast: &str) -> Result<JsValue, JsValue> {
     let json: JSON = serde_json::from_str(json_ast)
         .map_err(jserror)?;
     let program = Program::parse_from(&json)
@@ -39,5 +46,16 @@ pub fn interpret(json_ast: &str) -> Result<JsValue, JsValue> {
         .to_value(&heap).map_err(jserror)?
         // TODO: implement serde::Serializer directly for JSValue?
         .to_json(&heap).map_err(jserror)?;
+    JsValue::from_serde(&result).map_err(jserror)
+}
+
+#[wasm_bindgen]
+pub fn interpret(jsobject: &JsValue) -> Result<JsValue, JsValue> {
+    let json: JSON = jsobject.into_serde().map_err(jserror)?;
+    let program = Program::parse_from(&json).map_err(jserror)?;
+    let result = HEAP.with_borrow_mut(|heap| {
+        // TODO: implement serde::Serializer directly for JSValue?
+        program.interpret(heap)?.to_value(heap)?.to_json(heap)
+    }).map_err(jserror)?;
     JsValue::from_serde(&result).map_err(jserror)
 }

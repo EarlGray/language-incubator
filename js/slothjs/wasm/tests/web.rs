@@ -13,7 +13,7 @@ use slothjs_wasm;
 
 #[wasm_bindgen_test]
 fn test_eval() {
-    assert_eq!(Ok(JsValue::from(4)), slothjs_wasm::interpret(r#"{
+    assert_eq!(Ok(JsValue::from(4)), slothjs_wasm::interpret_string(r#"{
       "type": "Program",
       "body": [
         {

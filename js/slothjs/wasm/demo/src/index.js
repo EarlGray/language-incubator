@@ -8,7 +8,6 @@ class Sljs {
 
     interpret(expr) {
         let jexpr = this.esprima.parseScript(expr);
-        jexpr = JSON.stringify(jexpr);
         return this.sljs.interpret(jexpr);
     }
 }
