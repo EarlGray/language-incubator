@@ -17,6 +17,7 @@ use crate::{
 // ==============================================
 
 pub trait Interpretable {
+    /// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 

@@ -340,6 +340,11 @@ impl Heap {
         None
     }
 
+    /// A shortcut for `interpretable.evaluate(&mut heap)`.
+    pub fn evaluate<T: Interpretable>(&mut self, interpretable: &T) -> JSResult<JSValue> {
+        interpretable.interpret(self)?.to_value(self)
+    }
+
     /// Given a `func_ref` to a closure or a native call and a set of arguments,
     /// executes the function. `this_ref` is bound as `this`.
     pub fn execute(&mut self, func_ref: JSRef, call: CallContext) -> JSResult<Interpreted> {

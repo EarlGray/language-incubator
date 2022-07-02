@@ -1,3 +1,6 @@
+#[cfg(feature = "std")]
+use std::io;
+
 use crate::ast::Identifier;
 use crate::object::{
     Interpreted,
@@ -75,6 +78,15 @@ impl Exception {
 impl From<ParseError> for Exception {
     fn from(err: ParseError) -> Self {
         Self::SyntaxTreeError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<Exception> for io::Error {
+    fn from(exc: Exception) -> io::Error {
+        // TODO: impl Display for Exception
+        let msg = format!("{:?}", exc);
+        io::Error::new(io::ErrorKind::Other, msg)
     }
 }
 

@@ -519,7 +519,7 @@ impl JSObject {
     }
 
     /// Check own and all inherited properties for `name` and returns the first found value.
-    /// ES5: [[Get]], None corresponds to `undefined`
+    /// ES5: \[\[Get\]\], None corresponds to `undefined`
     pub fn lookup_value(&self, name: &str, heap: &Heap) -> Option<JSValue> {
         if let Some(value) = self.get_own_value(name) {
             return Some(value);
@@ -602,7 +602,7 @@ impl JSObject {
     /// set to `Content::from(value)`.
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
-    /// ES5: [[Put]] with strict error handing
+    /// ES5: \[\[Put\]\] with strict error handing
     pub fn set_property<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
@@ -625,7 +625,7 @@ impl JSObject {
     }
 
     // are these shortcuts a good idea?
-    /// A shortcut for define_own_property(Access::NONE) and assigning the value.
+    /// A shortcut for `define_own_property(Access::NONE)` and assigning the value.
     pub fn set_system<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
@@ -633,6 +633,7 @@ impl JSObject {
         self.set(name, Content::from(value), Access::empty())
     }
 
+    /// A shortcut for defining a non-enumerable property and setting its value.
     pub fn set_hidden<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
@@ -640,6 +641,7 @@ impl JSObject {
         self.set(name, Content::from(value), Access::HIDDEN)
     }
 
+    /// A shortcut for defining a non-configurable property and setting its value.
     pub fn set_nonconf<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
@@ -647,6 +649,7 @@ impl JSObject {
         self.set(name, Content::from(value), Access::NONCONF)
     }
 
+    /// A shortcut for defining a non-writable property and setting its value.
     pub fn set_readonly<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,

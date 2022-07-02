@@ -1,13 +1,53 @@
-//! slothjs - a naïve, primitive, savage Javascript interpreter library.
+//! slothjs - a naïve, primitive, savage JavaScript interpreter library.
 //!
-//! ## Usage and main data types
-//! slothjs does not contains a lexical Javascript parser: an AST tree must be supplied in
-//! [ESTree-compatible format](https://github.com/estree/estree/blob/master/es5.md). For example:
+//! ## Getting started
+//!
+//! slothjs does not contains a lexical JavaScript parser: it consumes an AST tree supplied in the
+//! [ESTree format](https://github.com/estree/estree/blob/master/es5.md).
+//!
+//! When compiled with `feature = ["std"]` (used by default), sljs provides [`runtime::Runtime`]
+//! abstraction that bundles an external JavaScript parser, a way to execute it and the interpreter
+//! itself.
+//!
+//! There are two [`runtime::Parser`]s at the moment, both using a JavaScript parser written in
+//! JavaScript called [Esprima](https://esprima.org/):
+//!
+//! - [`runtime::NodejsParser`]: it runs Esprima in an external nodejs runtime to parse input into
+//!   ESTree-structured JSON abstract syntax tree (AST), loaded and executed by the interpreter.
+//!
+//! - experimental [`runtime::EsprimaParser`]: it runs a JSON dump of Esprima's AST bundled within
+//!   the interpreter in the interpreter itself. It takes input and produces a AST directly on
+//!   the heap of the interpreter. It is obviously slow and unstable at the moment: many methods
+//!   of the builtin JavaScript objects like String/Object/Number/etc are not implemented yet.
+//!
 //! ```
-//! use slothjs::*;
+//! use slothjs::JSValue;
+//! use slothjs::runtime::{Runtime, EsprimaParser};
 //!
-//! // Javascript: "2 + 2"
-//! let source = r#"{
+//! let mut runtime = Runtime::<EsprimaParser>::load().expect("Runtime::load");
+//!
+//! runtime.evaluate("var x = 2, y = 2").expect("eval: var x, y");
+//! runtime.evaluate("function add(a, b) { return a + b }").expect("eval: add");
+//! let result: JSValue = runtime.evaluate("add(x, y)").expect("eval: x + y");
+//!
+//! assert_eq!(result, JSValue::from(4));
+//! ```
+//!
+//! ## A more detailed usage example
+//!
+//! If you don't use the default features (i.e. `features = ["std"]`), [`runtime::Runtime`] is not
+//! available. In that case you have to do the grunt work yourself:
+//!
+//! - supply an ESTree AST
+//! - parse it into a [`Program`]
+//! - execute the program on a [`Heap`].
+//!
+//! For example:
+//! ```
+//! use slothjs::{JSON, Heap};      // an alias for `serde_json::Value`
+//!
+//! // JavaScript: "2 + 2"
+//! let estree: JSON = serde_json::from_str(r#"{
 //!   "type": "Program",
 //!   "body": [
 //!     {
@@ -20,12 +60,12 @@
 //!       }
 //!     }
 //!   ]
-//! }"#;
-//! let estree: JSON = serde_json::from_str(source).expect("JSON error");
+//! }"#).expect("JSON");
 //! ```
 //!
-//! Access to ESTree nodes is provided by implementing the [`SourceNode`] trait;
-//! a reference implementation is provided for `slothjs::JSON` (an alias for `serde_json::Value`):
+//! [`Program::parse_from`] can parse any representation of ESTree that implements the
+//! [`SourceNode`] trait; a reference implementation is provided for `slothjs::JSON` (an alias for
+//! `serde_json::Value`):
 //! ```
 //! # use slothjs::*;
 //! # let source = r#"
@@ -35,8 +75,8 @@
 //! #       "left": { "type": "Literal", "value": 2 },
 //! #       "right": { "type": "Literal", "value": 2 } } } ] }
 //! # "#;
-//! # let estree: JSON = serde_json::from_str(source).expect("JSON error");
-//! let program = Program::parse_from(&estree).expect("ESTree error");
+//! # let estree: JSON = serde_json::from_str(source).expect("JSON");
+//! let program = Program::parse_from(&estree).expect("ESTree");
 //! ```
 //!
 //! To run a [`Program`], create a [`Heap`] (it's roughly a vector of
@@ -56,13 +96,14 @@
 //! // builtin objects like Object, String, etc, are initialized here:
 //! let mut heap = Heap::new();
 //!
-//! let result: Interpreted = match program.interpret(&mut heap) {
+//! let result: JSValue = match heap.evaluate(&program) {
 //!     Ok(result) => result,
 //!     Err(exc) => {
 //!         eprintln!("Exception: {:?}", exc);
 //!         return;
 //!     }
 //! };
+//! assert_eq!(result, JSValue::from(4));
 //! ```
 //!
 //! A value of type [`Interpreted`] is usually a wrapper for a [`JSValue`],
@@ -81,13 +122,12 @@
 //! # let estree: JSON = serde_json::from_str(source).expect("JSON error");
 //! # let program = Program::parse_from(&estree).expect("ESTree error");
 //! # let mut heap = Heap::new();
-//! # let result = program.interpret(&mut heap).expect("interpret()");
-//! let value = result.to_value(&heap).expect("JSValue");
-//! assert_eq!(value, JSValue::Number(4.0));
+//! let result: Interpreted = program.interpret(&mut heap).expect("interpret()");
+//! let value: JSValue = result.to_value(&heap).expect("JSValue");
+//! assert_eq!(value, JSValue::from(4));
 //!
 //! let output = value.to_string(&mut heap).unwrap();
-//! println!("Evaluation result: {}", &output);
-//!
+//! assert_eq!(&output, "4");
 //! ```
 //!
 //! ## More about objects
@@ -106,7 +146,7 @@
 //!
 //! ## Functions and closures
 //!
-//! An example of calling a Javascript closure from Rust using [`Heap::execute`]:
+//! An example of calling a JavaScript closure from Rust using [`Heap::execute`]:
 //!
 //! ```
 //! use slothjs::*;
@@ -154,8 +194,20 @@
 //! }).expect("call result");
 //!
 //! let result: JSValue = result.to_value(&heap).unwrap();
-//! assert_eq!(result, JSValue::Number(11.0));
+//! assert_eq!(result, JSValue::from(11.0));
 //! ```
+//!
+//! ## Errors and exceptions
+//!
+//! Most functions return a [`JSResult<T>`], an alias for `Result<T, Exception>`. An [`Exception`]
+//! can wrap:
+//!
+//! - [`Exception::UserThrown`] produced by a `throw` in JavaScript
+//! - [`Exception::SyntaxTreeError`] wrapping a [`error::ParseError`]
+//! - different kinds of builtin errors, e.g. [`Exception::ReferenceNotFound`], etc.
+//!
+//! [`runtime::EvalError`] is a wrapper over [`Exception`], serde (de)serialization errors, I/O
+//! errors when executing an external parser.
 //!
 //! ## What it can do?
 //! See [src/test.rs](../src/slothjs/test.rs.html), all uncommented tests in there should work.

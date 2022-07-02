@@ -1,17 +1,23 @@
-use std::fmt;
+//! A wrapper for executing [`slothjs::runtime::Runtime`] with [`slothjs::runtime::EsprimaParser`]
+//! on stdin/stdout.
+//!
+//! ```console
+//! // REPL mode (rlwrap is recommended):
+//! $ alias sljs="$(which rlwrap) cargo run -q --bin sljs"
+//! $ sljs
+//! sljs> var a = {one: 1}
+//! sljs> a.one + 2
+//! 3
+//! ```
 use std::io;
 
 use atty::Stream;
 
 use slothjs::runtime::{
+    self,
     EsprimaParser,
     Runtime,
 };
-
-fn die<E: fmt::Debug>(msg: &str, err: E, errcode: i32) -> ! {
-    eprintln!("{}: {:?}", msg, err);
-    std::process::exit(errcode);
-}
 
 fn main() -> io::Result<()> {
     let interactive = atty::is(Stream::Stdin);
@@ -19,14 +25,13 @@ fn main() -> io::Result<()> {
         eprint!("Loading...");
     }
 
-    let mut runtime =
-        Runtime::<EsprimaParser>::load().unwrap_or_else(|e| die("Runtime::load failed", e, 127));
+    let mut sljs = Runtime::<EsprimaParser>::load()?;
 
     if interactive {
         eprintln!("\rWelcome to sljs!");
-        runtime.repl_main()?;
+        runtime::repl_main(&mut sljs)?;
     } else {
-        runtime.batch_main()?;
+        runtime::batch_main(&mut sljs)?;
     }
 
     Ok(())

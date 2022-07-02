@@ -61,8 +61,6 @@ impl fmt::Debug for HeapNode {
 }
 
 impl SourceNode for HeapNode {
-    type Error = Self;
-
     fn to_error(&self) -> JSON {
         self.to_json().expect("HeapNode::to_error")
     }

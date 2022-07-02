@@ -14,9 +14,7 @@ use crate::{
 use crate::source;
 
 impl SourceNode for JSON {
-    type Error = JSON;
-
-    fn to_error(&self) -> Self::Error {
+    fn to_error(&self) -> JSON {
         self.clone()
     }
 

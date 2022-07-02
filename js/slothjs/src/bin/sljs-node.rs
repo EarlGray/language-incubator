@@ -15,29 +15,23 @@
 //! to execute the Esprima parser. It uses `$TMPDIR/sljs/` to unpack
 //! its helper files.
 
-use std::fmt;
 use std::io;
 
 use atty::Stream;
 
 use slothjs::runtime::{
+    self,
     NodejsParser,
     Runtime,
 };
 
-fn die<E: fmt::Debug>(msg: &str, err: E, errcode: i32) -> ! {
-    eprintln!("{}: {:?}", msg, err);
-    std::process::exit(errcode);
-}
-
 fn main() -> io::Result<()> {
-    let mut runtime =
-        Runtime::<NodejsParser>::load().unwrap_or_else(|e| die("Runtime::load failed", e, 1));
+    let mut sljs = Runtime::<NodejsParser>::load()?;
 
     if atty::is(Stream::Stdin) {
-        runtime.repl_main()?;
+        runtime::repl_main(&mut sljs)?;
     } else {
-        runtime.batch_main()?;
+        runtime::batch_main(&mut sljs)?;
     }
 
     Ok(())

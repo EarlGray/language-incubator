@@ -108,15 +108,13 @@ trait ParseFrom: Sized {
 
 /// `SourceNode` is how `ParseFrom::parse_from` sees AST nodes.
 pub trait SourceNode: Sized {
-    type Error: fmt::Debug;
-
     /// Location of the node where an error happened.
     fn to_error(&self) -> JSON;
 
     /// Try to get source mapping for `self`.
     fn get_location(&self) -> Option<source::Location>;
 
-    /// Make the node into a literal.
+    /// Use the node as a literal.
     fn get_literal(&self, property: &str) -> ParseResult<Literal>;
 
     /// Get the boolean value of a child node with name `property`.
@@ -128,6 +126,7 @@ pub trait SourceNode: Sized {
     fn get_str(&self, property: &str) -> ParseResult<String>;
 
     /// Check that the value of `property` is a string equal to `value`.
+    /// Depends on [`SourceNode::get_str`].
     fn expect_str(&self, property: &str, value: &'static str) -> ParseResult<()> {
         let got = self.get_str(property)?;
         match got == value {

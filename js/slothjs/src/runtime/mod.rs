@@ -64,6 +64,15 @@ impl From<io::Error> for EvalError {
     }
 }
 
+impl From<EvalError> for io::Error {
+    fn from(err: EvalError) -> io::Error {
+        match err {
+            EvalError::Io(err) => err,
+            _ => io::Error::new(io::ErrorKind::Other, err.to_string()),
+        }
+    }
+}
+
 impl From<std::string::FromUtf8Error> for EvalError {
     fn from(e: std::string::FromUtf8Error) -> EvalError {
         EvalError::Io(io::Error::new(io::ErrorKind::InvalidData, e))
@@ -122,54 +131,56 @@ impl<P: Parser> Runtime<P> {
             eprintln!("Command error: expected a number");
         }
     }
+}
 
-    pub fn batch_main(&mut self) -> io::Result<()> {
-        let mut input = String::new();
-        io::stdin().lock().read_to_string(&mut input)?;
+/// Reads stdin, parses and interprets it as one block.
+pub fn batch_main<P: Parser>(sljs: &mut Runtime<P>) -> io::Result<()> {
+    let mut input = String::new();
+    io::stdin().lock().read_to_string(&mut input)?;
 
-        match self.evaluate(&input) {
-            Ok(result) => println!("{}", self.string_from(result)),
-            Err(err) => eprintln!("{}", err),
-        }
-
-        Ok(())
+    match sljs.evaluate(&input) {
+        Ok(result) => println!("{}", sljs.string_from(result)),
+        Err(err) => eprintln!("{}", err),
     }
 
-    pub fn repl_main(&mut self) -> io::Result<()> {
-        let stdin = io::stdin();
-        let mut input_iter = stdin.lock().lines();
+    Ok(())
+}
 
-        loop {
-            // prompt
-            eprint!("sljs> ");
-            io::stderr().flush()?;
+/// Provides a simple command line using stdin/stdout.
+pub fn repl_main<P: Parser>(sljs: &mut Runtime<P>) -> io::Result<()> {
+    let stdin = io::stdin();
+    let mut input_iter = stdin.lock().lines();
 
-            // get input
-            let maybe_input = input_iter.next();
-            let input = match maybe_input {
-                None => break,
-                Some(input) => input?,
-            };
-            if input.is_empty() {
-                continue;
-            }
+    loop {
+        // prompt
+        eprint!("sljs> ");
+        io::stderr().flush()?;
 
-            if let Some(refstr) = input.strip_prefix(":dbg ") {
-                self.dbg(refstr);
-                continue;
-            }
+        // get input
+        let maybe_input = input_iter.next();
+        let input = match maybe_input {
+            None => break,
+            Some(input) => input?,
+        };
+        if input.is_empty() {
+            continue;
+        }
 
-            match self.evaluate(&input) {
-                Ok(result) => println!("{}", self.string_from(result)),
-                Err(err) => {
-                    eprintln!("{}", err);
-                    if let Err(e) = source::print_callstack(&self.heap) {
-                        eprintln!("   Exception thrown while getting stack trace: {:?}", e);
-                    }
+        if let Some(refstr) = input.strip_prefix(":dbg ") {
+            sljs.dbg(refstr);
+            continue;
+        }
+
+        match sljs.evaluate(&input) {
+            Ok(result) => println!("{}", sljs.string_from(result)),
+            Err(err) => {
+                eprintln!("{}", err);
+                if let Err(e) = source::print_callstack(&sljs.heap) {
+                    eprintln!("   Exception thrown while getting stack trace: {:?}", e);
                 }
             }
         }
-
-        Ok(())
     }
+
+    Ok(())
 }
