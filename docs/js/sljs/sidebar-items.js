@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["ESPRIMA",""]],"fn":[["batch_main",""],["die",""],["evaluate_input",""],["load_esprima",""],["main",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["main",""]]};

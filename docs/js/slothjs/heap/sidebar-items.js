@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Heap","Runtime heap"],["JSRef","A heap reference: a Heap index."]]});
+window.SIDEBAR_ITEMS = {"struct":[["Heap","Runtime heap"],["JSRef","A heap reference: a Heap index."]]};

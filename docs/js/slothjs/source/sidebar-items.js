@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["print_callstack",""],["save_caller",""]],"struct":[["Document",""],["Location",""],["Position",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["print_callstack",""],["save_caller",""]],"struct":[["Document",""],["Location",""],["Position",""]]};

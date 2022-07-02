@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["Interpretable",""]]});
+window.SIDEBAR_ITEMS = {"trait":[["Interpretable",""]]};

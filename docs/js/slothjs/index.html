@@ -1,16 +1,56 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="slothjs - a naïve, primitive, savage Javascript interpreter library."><meta name="keywords" content="rust, rustlang, rust-lang, slothjs"><title>slothjs - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script id="default-settings"></script><script src="../storage.js"></script><script src="../crates.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../slothjs/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><p class="location">Crate slothjs</p><div class="block version"><p>Version 0.1.0</p></div><div class="sidebar-elems"><a id="all-types" href="all.html"><p>See all slothjs's items</p></a><div class="block items"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div><p class="location"></p><div id="sidebar-vars" data-name="slothjs" data-ty="mod" data-relpath="../"></div></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Crate <a class="mod" href="">slothjs</a></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/slothjs/lib.rs.html#1-197" title="goto source code">[src]</a></span></h1><div class="docblock"><p>slothjs - a naïve, primitive, savage Javascript interpreter library.</p>
-<h2 id="usage-and-main-data-types" class="section-header"><a href="#usage-and-main-data-types">Usage and main data types</a></h2>
-<p>slothjs does not contains a lexical Javascript parser: an AST tree must be supplied in
-<a href="https://github.com/estree/estree/blob/master/es5.md">ESTree-compatible format</a>. For example:</p>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="slothjs - a naïve, primitive, savage JavaScript interpreter library."><meta name="keywords" content="rust, rustlang, rust-lang, slothjs"><title>slothjs - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../slothjs/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../slothjs/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Crate slothjs</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.1.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../slothjs/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
+                                <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
+                        </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">slothjs</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/slothjs/lib.rs.html#1-262">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>slothjs - a naïve, primitive, savage JavaScript interpreter library.</p>
+<h3 id="getting-started"><a href="#getting-started">Getting started</a></h3>
+<p>slothjs does not contains a lexical JavaScript parser: it consumes an AST tree supplied in the
+<a href="https://github.com/estree/estree/blob/master/es5.md">ESTree format</a>.</p>
+<p>When compiled with <code>feature = [&quot;std&quot;]</code> (used by default), sljs provides <a href="runtime/struct.Runtime.html" title="runtime::Runtime"><code>runtime::Runtime</code></a>
+abstraction that bundles an external JavaScript parser, a way to execute it and the interpreter
+itself.</p>
+<p>There are two <a href="runtime/trait.Parser.html" title="runtime::Parser"><code>runtime::Parser</code></a>s at the moment, both using a JavaScript parser written in
+JavaScript called <a href="https://esprima.org/">Esprima</a>:</p>
+<ul>
+<li>
+<p><a href="runtime/struct.NodejsParser.html" title="runtime::NodejsParser"><code>runtime::NodejsParser</code></a>: it runs Esprima in an external nodejs runtime to parse input into
+ESTree-structured JSON abstract syntax tree (AST), loaded and executed by the interpreter.</p>
+</li>
+<li>
+<p>experimental <a href="runtime/struct.EsprimaParser.html" title="runtime::EsprimaParser"><code>runtime::EsprimaParser</code></a>: it runs a JSON dump of Esprima’s AST bundled within
+the interpreter in the interpreter itself. It takes input and produces a AST directly on
+the heap of the interpreter. It is obviously slow and unstable at the moment: many methods
+of the builtin JavaScript objects like String/Object/Number/etc are not implemented yet.</p>
+</li>
+</ul>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">use</span> <span class="ident">slothjs</span>::<span class="kw-2">*</span>;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">slothjs::JSValue</span>;
+<span class="kw">use</span> <span class="ident">slothjs::runtime</span>::{<span class="ident">Runtime</span>, <span class="ident">EsprimaParser</span>};
 
-<span class="comment">// Javascript: &quot;2 + 2&quot;</span>
-<span class="kw">let</span> <span class="ident">source</span> <span class="op">=</span> <span class="string">r#&quot;{
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runtime</span> <span class="op">=</span> <span class="ident">Runtime</span>::<span class="op">&lt;</span><span class="ident">EsprimaParser</span><span class="op">&gt;</span><span class="ident">::load</span>().<span class="ident">expect</span>(<span class="string">&quot;Runtime::load&quot;</span>);
+
+<span class="ident">runtime</span>.<span class="ident">evaluate</span>(<span class="string">&quot;var x = 2, y = 2&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;eval: var x, y&quot;</span>);
+<span class="ident">runtime</span>.<span class="ident">evaluate</span>(<span class="string">&quot;function add(a, b) { return a + b }&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;eval: add&quot;</span>);
+<span class="kw">let</span> <span class="ident">result</span>: <span class="ident">JSValue</span> <span class="op">=</span> <span class="ident">runtime</span>.<span class="ident">evaluate</span>(<span class="string">&quot;add(x, y)&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;eval: x + y&quot;</span>);
+
+<span class="macro">assert_eq!</span>(<span class="ident">result</span>, <span class="ident">JSValue::from</span>(<span class="number">4.0</span>));</code></pre></div>
+<h3 id="a-more-detailed-usage-example"><a href="#a-more-detailed-usage-example">A more detailed usage example</a></h3>
+<p>If you don’t use the default features (i.e. <code>features = [&quot;std&quot;]</code>), <a href="runtime/struct.Runtime.html" title="runtime::Runtime"><code>runtime::Runtime</code></a> is not
+available. In that case you have to do the grunt work yourself:</p>
+<ul>
+<li>supply an ESTree AST</li>
+<li>parse it into a <a href="ast/struct.Program.html" title="Program"><code>Program</code></a></li>
+<li>execute the program on a <a href="heap/struct.Heap.html" title="Heap"><code>Heap</code></a>.</li>
+</ul>
+<p>For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">slothjs</span>::{<span class="ident">JSON</span>, <span class="ident">Heap</span>};      <span class="comment">// an alias for `serde_json::Value`</span>
+
+<span class="comment">// JavaScript: &quot;2 + 2&quot;</span>
+<span class="kw">let</span> <span class="ident">estree</span>: <span class="ident">JSON</span> <span class="op">=</span> <span class="ident">serde_json::from_str</span>(<span class="string">r#&quot;{
   &quot;type&quot;: &quot;Program&quot;,
   &quot;body&quot;: [
     {
@@ -23,61 +63,58 @@
       }
     }
   ]
-}&quot;#</span>;
-<span class="kw">let</span> <span class="ident">estree</span>: <span class="ident">JSON</span> <span class="op">=</span> <span class="ident">serde_json</span>::<span class="ident">from_str</span>(<span class="ident">source</span>).<span class="ident">expect</span>(<span class="string">&quot;JSON error&quot;</span>);</pre></div>
-<p>Access to ESTree nodes is provided by implementing the <a href="../slothjs/trait.SourceNode.html" title="SourceNode"><code>SourceNode</code></a> trait; 
-a reference implementation is provided for <code>slothjs::JSON</code> (an alias for <code>serde_json::Value</code>):</p>
+}&quot;#</span>).<span class="ident">expect</span>(<span class="string">&quot;JSON&quot;</span>);</code></pre></div>
+<p><a href="ast/struct.Program.html#method.parse_from" title="Program::parse_from"><code>Program::parse_from</code></a> can parse any representation of ESTree that implements the
+<a href="trait.SourceNode.html" title="SourceNode"><code>SourceNode</code></a> trait; a reference implementation is provided for <code>slothjs::JSON</code> (an alias for
+<code>serde_json::Value</code>):</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="ident">Program</span>::<span class="ident">parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">estree</span>).<span class="ident">expect</span>(<span class="string">&quot;ESTree error&quot;</span>);</pre></div>
-<p>To run a <a href="../slothjs/ast/struct.Program.html" title="Program"><code>Program</code></a>, create a <a href="../slothjs/heap/struct.Heap.html" title="Heap"><code>Heap</code></a> (it’s roughly a vector of
-<a href="../slothjs/object/struct.JSObject.html" title="JSObject"><code>JSObject</code></a>s with its indexes encapsulated in <a href="../slothjs/heap/struct.JSRef.html" title="JSRef"><code>JSRef</code></a>s) and interpret
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="ident">Program::parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">estree</span>).<span class="ident">expect</span>(<span class="string">&quot;ESTree&quot;</span>);</code></pre></div>
+<p>To run a <a href="ast/struct.Program.html" title="Program"><code>Program</code></a>, create a <a href="heap/struct.Heap.html" title="Heap"><code>Heap</code></a> (it’s roughly a vector of
+<a href="object/struct.JSObject.html" title="JSObject"><code>JSObject</code></a>s with its indexes encapsulated in <a href="heap/struct.JSRef.html" title="JSRef"><code>JSRef</code></a>s) and interpret
 the <code>program</code> on this <code>heap</code>:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="comment">// builtin objects like Object, String, etc, are initialized here:</span>
-<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">Heap</span>::<span class="ident">new</span>();  
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// builtin objects like Object, String, etc, are initialized here:</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">Heap::new</span>();
 
-<span class="kw">let</span> <span class="ident">result</span>: <span class="ident">Interpreted</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">program</span>.<span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>) {
-    <span class="prelude-val">Ok</span>(<span class="ident">result</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">result</span>,
-    <span class="prelude-val">Err</span>(<span class="ident">exc</span>) <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="macro">eprintln</span><span class="macro">!</span>(<span class="string">&quot;Exception: {:?}&quot;</span>, <span class="ident">exc</span>);
+<span class="kw">let</span> <span class="ident">result</span>: <span class="ident">JSValue</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">program</span>.<span class="ident">evaluate</span>(<span class="kw-2">&amp;mut</span> <span class="ident">heap</span>) {
+    <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; <span class="ident">result</span>,
+    <span class="prelude-val">Err</span>(<span class="ident">exc</span>) =&gt; {
+        <span class="macro">eprintln!</span>(<span class="string">&quot;Exception: {:?}&quot;</span>, <span class="ident">exc</span>);
         <span class="kw">return</span>;
     }
-};</pre></div>
-<p>A value of type <a href="../slothjs/object/enum.Interpreted.html" title="Interpreted"><code>Interpreted</code></a> is usually a wrapper for a <a href="../slothjs/object/enum.JSValue.html" title="JSValue"><code>JSValue</code></a>,
+};
+<span class="macro">assert_eq!</span>(<span class="ident">result</span>, <span class="ident">JSValue::from</span>(<span class="number">4.0</span>));</code></pre></div>
+<p>A value of type <a href="object/enum.Interpreted.html" title="Interpreted"><code>Interpreted</code></a> is usually a wrapper for a <a href="object/enum.JSValue.html" title="JSValue"><code>JSValue</code></a>,
 although it might represent an object member that does not exist yet (which evaluates to
 <code>JSValue::Undefined</code> when reading):</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="ident">heap</span>).<span class="ident">expect</span>(<span class="string">&quot;JSValue&quot;</span>);
-<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">value</span>, <span class="ident">JSValue</span>::<span class="ident">Number</span>(<span class="number">4.0</span>));
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="ident">heap</span>).<span class="ident">expect</span>(<span class="string">&quot;JSValue&quot;</span>);
+<span class="macro">assert_eq!</span>(<span class="ident">value</span>, <span class="ident">JSValue::Number</span>(<span class="number">4.0</span>));
 
-<span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>).<span class="ident">unwrap</span>();
-<span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Evaluation result: {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">output</span>);
-</pre></div>
-<h2 id="more-about-objects" class="section-header"><a href="#more-about-objects">More about objects</a></h2>
-<p><a href="../slothjs/object/struct.JSObject.html" title="JSObject"><code>JSObject</code></a> contains:</p>
+<span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">to_string</span>(<span class="kw-2">&amp;mut</span> <span class="ident">heap</span>).<span class="ident">unwrap</span>();
+<span class="macro">println!</span>(<span class="string">&quot;Evaluation result: {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">output</span>);
+</code></pre></div>
+<h3 id="more-about-objects"><a href="#more-about-objects">More about objects</a></h3>
+<p><a href="object/struct.JSObject.html" title="JSObject"><code>JSObject</code></a> contains:</p>
 <ul>
-<li>a <a href="../slothjs/heap/struct.JSRef.html" title="JSRef"><code>JSRef</code></a> to its prototype object</li>
-<li>optionally an <a href="../slothjs/object/enum.ObjectValue.html" title="object::ObjectValue"><code>object::ObjectValue</code></a> encapsulatng a primitive value,
-or a <a href="../slothjs/function/struct.VMCall.html" title="function::VMCall"><code>function::VMCall</code></a>/<a href="../slothjs/function/struct.Closure.html" title="function::Closure"><code>function::Closure</code></a>, or an optimized object storage
-(e.g. <a href="../slothjs/object/struct.JSArray.html" title="object::JSArray"><code>object::JSArray</code></a>)</li>
-<li>a hashmap from <code>String</code> keys to <a href="../slothjs/object/struct.Property.html" title="object::Property"><code>object::Property</code></a></li>
+<li>a <a href="heap/struct.JSRef.html" title="JSRef"><code>JSRef</code></a> to its prototype object</li>
+<li>optionally an <a href="object/enum.ObjectValue.html" title="object::ObjectValue"><code>object::ObjectValue</code></a> encapsulatng a primitive value,
+or a <a href="function/struct.VMCall.html" title="function::VMCall"><code>function::VMCall</code></a>/<a href="function/struct.Closure.html" title="function::Closure"><code>function::Closure</code></a>, or an optimized object storage
+(e.g. <a href="object/struct.JSArray.html" title="object::JSArray"><code>object::JSArray</code></a>)</li>
+<li>a hashmap from <code>String</code> keys to <a href="object/struct.Property.html" title="object::Property"><code>object::Property</code></a></li>
 </ul>
-<p>Each <a href="../slothjs/object/struct.Property.html" title="object::Property"><code>object::Property</code></a> consists of:</p>
+<p>Each <a href="object/struct.Property.html" title="object::Property"><code>object::Property</code></a> consists of:</p>
 <ul>
-<li><a href="../slothjs/object/struct.Access.html" title="object::Access"><code>object::Access</code></a> that determines if property is enumerable, writable, configurable;</li>
-<li><a href="../slothjs/object/enum.Content.html" title="object::Content"><code>object::Content</code></a> that encapsulates a way to get and/or set a <a href="../slothjs/object/enum.JSValue.html" title="JSValue"><code>JSValue</code></a>.</li>
+<li><a href="object/struct.Access.html" title="object::Access"><code>object::Access</code></a> that determines if property is enumerable, writable, configurable;</li>
+<li><a href="object/enum.Content.html" title="object::Content"><code>object::Content</code></a> that encapsulates a way to get and/or set a <a href="object/enum.JSValue.html" title="JSValue"><code>JSValue</code></a>.</li>
 </ul>
-<h2 id="functions-and-closures" class="section-header"><a href="#functions-and-closures">Functions and closures</a></h2>
-<p>An example of calling a Javascript closure from Rust using <a href="../slothjs/heap/struct.Heap.html#method.execute" title="Heap::execute"><code>Heap::execute</code></a>:</p>
+<h3 id="functions-and-closures"><a href="#functions-and-closures">Functions and closures</a></h3>
+<p>An example of calling a JavaScript closure from Rust using <a href="heap/struct.Heap.html#method.execute" title="Heap::execute"><code>Heap::execute</code></a>:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">use</span> <span class="ident">slothjs</span>::<span class="kw-2">*</span>;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">slothjs</span>::<span class="kw-2">*</span>;
 
 <span class="comment">// function zoom(size) { return 1.1 * size; }</span>
-<span class="kw">let</span> <span class="ident">estree</span>: <span class="ident">JSON</span> <span class="op">=</span> <span class="ident">serde_json</span>::<span class="ident">from_str</span>(<span class="string">r#&quot;{
+<span class="kw">let</span> <span class="ident">estree</span>: <span class="ident">JSON</span> <span class="op">=</span> <span class="ident">serde_json::from_str</span>(<span class="string">r#&quot;{
   &quot;type&quot;: &quot;Program&quot;,
   &quot;body&quot;: [{
       &quot;type&quot;: &quot;FunctionDeclaration&quot;,
@@ -97,12 +134,12 @@ or a <a href="../slothjs/function/struct.VMCall.html" title="function::VMCall"><
       }
   }]
 }&quot;#</span>).<span class="ident">expect</span>(<span class="string">&quot;JSON&quot;</span>);
-<span class="kw">let</span> <span class="ident">zoom_decl</span> <span class="op">=</span> <span class="ident">Program</span>::<span class="ident">parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">estree</span>).<span class="ident">expect</span>(<span class="string">&quot;ESTree&quot;</span>);
+<span class="kw">let</span> <span class="ident">zoom_decl</span> <span class="op">=</span> <span class="ident">Program::parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">estree</span>).<span class="ident">expect</span>(<span class="string">&quot;ESTree&quot;</span>);
 
-<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">Heap</span>::<span class="ident">new</span>();
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">Heap::new</span>();
 
 <span class="comment">// Create a function object for `zoom`:</span>
-<span class="ident">zoom_decl</span>.<span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>).<span class="ident">unwrap</span>();
+<span class="ident">zoom_decl</span>.<span class="ident">interpret</span>(<span class="kw-2">&amp;mut</span> <span class="ident">heap</span>).<span class="ident">unwrap</span>();
 
 <span class="comment">// Get a reference to the `zoom` function object:</span>
 <span class="kw">let</span> <span class="ident">zoomref</span>: <span class="ident">JSRef</span> <span class="op">=</span> <span class="ident">heap</span>
@@ -111,28 +148,38 @@ or a <a href="../slothjs/function/struct.VMCall.html" title="function::VMCall"><
     .<span class="ident">to_ref</span>(<span class="kw-2">&amp;</span><span class="ident">heap</span>).<span class="ident">expect</span>(<span class="string">&quot;reference&quot;</span>);
 
 <span class="comment">// Finally, call `zoom(10)`:</span>
-<span class="kw">let</span> <span class="ident">result</span>: <span class="ident">Interpreted</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">execute</span>(<span class="ident">zoomref</span>, <span class="ident">function</span>::<span class="ident">CallContext</span>{
-    <span class="ident">this_ref</span>: <span class="ident">Heap</span>::<span class="ident">GLOBAL</span>,
-    <span class="ident">method_name</span>: <span class="ident">String</span>::<span class="ident">from</span>(<span class="string">&quot;zoom&quot;</span>),  <span class="comment">// TODO: get zoom.name</span>
-    <span class="ident">arguments</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Interpreted</span>::<span class="ident">from</span>(<span class="number">10.0</span>)],
+<span class="kw">let</span> <span class="ident">result</span>: <span class="ident">Interpreted</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">execute</span>(<span class="ident">zoomref</span>, <span class="ident">function::CallContext</span>{
+    <span class="ident">this_ref</span>: <span class="ident">Heap::GLOBAL</span>,
+    <span class="ident">method_name</span>: <span class="ident">String::from</span>(<span class="string">&quot;zoom&quot;</span>),  <span class="comment">// TODO: get zoom.name</span>
+    <span class="ident">arguments</span>: <span class="macro">vec!</span>[<span class="ident">Interpreted::from</span>(<span class="number">10.0</span>)],
     <span class="ident">loc</span>: <span class="prelude-val">None</span>,
 }).<span class="ident">expect</span>(<span class="string">&quot;call result&quot;</span>);
 
 <span class="kw">let</span> <span class="ident">result</span>: <span class="ident">JSValue</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="ident">heap</span>).<span class="ident">unwrap</span>();
-<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>, <span class="ident">JSValue</span>::<span class="ident">Number</span>(<span class="number">11.0</span>));</pre></div>
-<h2 id="what-it-can-do" class="section-header"><a href="#what-it-can-do">What it can do?</a></h2>
+<span class="macro">assert_eq!</span>(<span class="ident">result</span>, <span class="ident">JSValue::Number</span>(<span class="number">11.0</span>));</code></pre></div>
+<h3 id="errors-and-exceptions"><a href="#errors-and-exceptions">Errors and exceptions</a></h3>
+<p>Most functions return a <a href="error/type.JSResult.html" title="JSResult&lt;T&gt;"><code>JSResult&lt;T&gt;</code></a>, an alias for <code>Result&lt;T, Exception&gt;</code>. An <a href="error/enum.Exception.html" title="Exception"><code>Exception</code></a>
+can wrap:</p>
+<ul>
+<li><a href="error/enum.Exception.html#variant.UserThrown" title="Exception::UserThrown"><code>Exception::UserThrown</code></a> produced by a <code>throw</code> in JavaScript</li>
+<li><a href="error/enum.Exception.html#variant.SyntaxTreeError" title="Exception::SyntaxTreeError"><code>Exception::SyntaxTreeError</code></a> wrapping a <a href="error/enum.ParseError.html" title="error::ParseError"><code>error::ParseError</code></a></li>
+<li>different kinds of builtin errors, e.g. <a href="error/enum.Exception.html#variant.ReferenceNotFound" title="Exception::ReferenceNotFound"><code>Exception::ReferenceNotFound</code></a>, etc.</li>
+</ul>
+<p><a href="runtime/enum.EvalError.html" title="runtime::EvalError"><code>runtime::EvalError</code></a> is a wrapper over <a href="error/enum.Exception.html" title="Exception"><code>Exception</code></a>, serde (de)serialization errors, I/O
+errors when executing an external parser.</p>
+<h3 id="what-it-can-do"><a href="#what-it-can-do">What it can do?</a></h3>
 <p>See <a href="../src/slothjs/test.rs.html">src/test.rs</a>, all uncommented tests in there should work.</p>
-<h2 id="what-is-not-done-yet" class="section-header"><a href="#what-is-not-done-yet">What is not done yet?</a></h2>
+<h3 id="what-is-not-done-yet"><a href="#what-is-not-done-yet">What is not done yet?</a></h3>
 <ul>
 <li>garbage collection;</li>
 <li>any kind of meaningful performance optimization;</li>
 </ul>
-</div><h2 id="reexports" class="section-header"><a href="#reexports">Re-exports</a></h2>
-<table><tr><td><code>pub use ast::<a class="struct" href="../slothjs/ast/struct.Program.html" title="struct slothjs::ast::Program">Program</a>;</code></td></tr><tr><td><code>pub use error::<a class="enum" href="../slothjs/error/enum.Exception.html" title="enum slothjs::error::Exception">Exception</a>;</code></td></tr><tr><td><code>pub use function::<a class="struct" href="../slothjs/function/struct.CallContext.html" title="struct slothjs::function::CallContext">CallContext</a>;</code></td></tr><tr><td><code>pub use interpret::<a class="trait" href="../slothjs/interpret/trait.Interpretable.html" title="trait slothjs::interpret::Interpretable">Interpretable</a>;</code></td></tr><tr><td><code>pub use heap::<a class="struct" href="../slothjs/heap/struct.Heap.html" title="struct slothjs::heap::Heap">Heap</a>;</code></td></tr><tr><td><code>pub use heap::<a class="struct" href="../slothjs/heap/struct.JSRef.html" title="struct slothjs::heap::JSRef">JSRef</a>;</code></td></tr><tr><td><code>pub use object::<a class="enum" href="../slothjs/object/enum.Interpreted.html" title="enum slothjs::object::Interpreted">Interpreted</a>;</code></td></tr><tr><td><code>pub use object::<a class="type" href="../slothjs/object/type.JSON.html" title="type slothjs::object::JSON">JSON</a>;</code></td></tr><tr><td><code>pub use object::<a class="struct" href="../slothjs/object/struct.JSObject.html" title="struct slothjs::object::JSObject">JSObject</a>;</code></td></tr><tr><td><code>pub use object::<a class="enum" href="../slothjs/object/enum.JSValue.html" title="enum slothjs::object::JSValue">JSValue</a>;</code></td></tr></table><h2 id="modules" class="section-header"><a href="#modules">Modules</a></h2>
-<table><tr class="module-item"><td><a class="mod" href="ast/index.html" title="slothjs::ast mod">ast</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="error/index.html" title="slothjs::error mod">error</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="function/index.html" title="slothjs::function mod">function</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="heap/index.html" title="slothjs::heap mod">heap</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="interpret/index.html" title="slothjs::interpret mod">interpret</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="object/index.html" title="slothjs::object mod">object</a></td><td class="docblock-short"></td></tr><tr class="module-item"><td><a class="mod" href="source/index.html" title="slothjs::source mod">source</a></td><td class="docblock-short"></td></tr></table><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
-<table><tr class="module-item"><td><a class="struct" href="struct.HeapNode.html" title="slothjs::HeapNode struct">HeapNode</a></td><td class="docblock-short"><p><code>HeapNode</code> contains a heap reference and a <code>JSRef</code> to an AST subtree in it.
-It implements <a href="../slothjs/trait.SourceNode.html" title="SourceNode"><code>SourceNode</code></a> for on-heap AST trees.</p>
-</td></tr></table><h2 id="traits" class="section-header"><a href="#traits">Traits</a></h2>
-<table><tr class="module-item"><td><a class="trait" href="trait.SourceNode.html" title="slothjs::SourceNode trait">SourceNode</a></td><td class="docblock-short"><p><code>SourceNode</code> is how <code>ParseFrom::parse_from</code> sees AST nodes.</p>
-</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../" data-current-crate="slothjs" data-search-js="../search-index.js"></div>
-    <script src="../main.js"></script></body></html>
+</div></details><h2 id="reexports" class="small-section-header"><a href="#reexports">Re-exports</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left import-item" id="reexport.Program"><code>pub use ast::<a class="struct" href="ast/struct.Program.html" title="struct slothjs::ast::Program">Program</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Exception"><code>pub use error::<a class="enum" href="error/enum.Exception.html" title="enum slothjs::error::Exception">Exception</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.JSResult"><code>pub use error::<a class="type" href="error/type.JSResult.html" title="type slothjs::error::JSResult">JSResult</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.CallContext"><code>pub use function::<a class="struct" href="function/struct.CallContext.html" title="struct slothjs::function::CallContext">CallContext</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Heap"><code>pub use heap::<a class="struct" href="heap/struct.Heap.html" title="struct slothjs::heap::Heap">Heap</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.JSRef"><code>pub use heap::<a class="struct" href="heap/struct.JSRef.html" title="struct slothjs::heap::JSRef">JSRef</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Interpretable"><code>pub use interpret::<a class="trait" href="interpret/trait.Interpretable.html" title="trait slothjs::interpret::Interpretable">Interpretable</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.Interpreted"><code>pub use object::<a class="enum" href="object/enum.Interpreted.html" title="enum slothjs::object::Interpreted">Interpreted</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.JSObject"><code>pub use object::<a class="struct" href="object/struct.JSObject.html" title="struct slothjs::object::JSObject">JSObject</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.JSValue"><code>pub use object::<a class="enum" href="object/enum.JSValue.html" title="enum slothjs::object::JSValue">JSValue</a>;</code></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left import-item" id="reexport.JSON"><code>pub use object::<a class="type" href="object/type.JSON.html" title="type slothjs::object::JSON">JSON</a>;</code></div><div class="item-right docblock-short"></div></div></div><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="ast/index.html" title="slothjs::ast mod">ast</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="error/index.html" title="slothjs::error mod">error</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="function/index.html" title="slothjs::function mod">function</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="heap/index.html" title="slothjs::heap mod">heap</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="interpret/index.html" title="slothjs::interpret mod">interpret</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="object/index.html" title="slothjs::object mod">object</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="runtime/index.html" title="slothjs::runtime mod">runtime</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="source/index.html" title="slothjs::source mod">source</a></div><div class="item-right docblock-short"></div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.HeapNode.html" title="slothjs::HeapNode struct">HeapNode</a></div><div class="item-right docblock-short"><p><code>HeapNode</code> contains a heap reference and a <code>JSRef</code> to an AST subtree in it.
+It implements <a href="trait.SourceNode.html" title="SourceNode"><code>SourceNode</code></a> for on-heap AST trees.</p>
+</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SourceNode.html" title="slothjs::SourceNode trait">SourceNode</a></div><div class="item-right docblock-short"><p><code>SourceNode</code> is how <code>ParseFrom::parse_from</code> sees AST nodes.</p>
+</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</body></html>

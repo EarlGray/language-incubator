@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Exception",""],["ParseError",""]],"fn":[["ignore_set_readonly",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Exception",""],["ParseError",""]],"fn":[["ignore_set_readonly",""]],"type":[["JSResult",""]]};

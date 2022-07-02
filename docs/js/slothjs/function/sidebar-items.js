@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CallContext",""],["Closure",""],["VMCall","A wrapper for NativeFunction to give it `fmt::Debug`."]],"type":[["NativeFunction",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["CallContext",""],["Closure",""],["VMCall","A wrapper for NativeFunction to give it `fmt::Debug`."]],"type":[["NativeFunction",""]]};
