@@ -347,7 +347,10 @@ impl Heap {
 
     /// Given a `func_ref` to a closure or a native call and a set of arguments,
     /// executes the function. `this_ref` is bound as `this`.
-    pub fn execute(&mut self, func_ref: JSRef, call: CallContext) -> JSResult<Interpreted> {
+    pub fn execute(&mut self, func_ref: JSRef, mut call: CallContext) -> JSResult<Interpreted> {
+        if call.loc.as_ref().is_none() {
+            call.loc = self.loc.clone();
+        }
         // Yes, we do need a clone() to workaround borrow checker:
         match &self.get(func_ref).value {
             ObjectValue::VMCall(vmcall) => vmcall.clone().call(call, self),

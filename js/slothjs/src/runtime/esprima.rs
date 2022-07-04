@@ -56,12 +56,7 @@ impl runtime::Parser for EsprimaParser {
         }
         let estree: Interpreted = heap.execute(
             self.esparse,
-            CallContext {
-                this_ref: self.object,
-                method_name: "parse".to_string(),
-                arguments,
-                loc: None,
-            },
+            CallContext::from(arguments).with_this(self.object).with_name("parse"),
         )?;
         let node = estree.to_ref(heap)?;
 

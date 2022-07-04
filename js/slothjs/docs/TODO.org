@@ -65,10 +65,10 @@
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
 ** DONE [2021-01-23 Sat] array member calls: ~a[0]()~
 * Builtin objects
-** builtin functions [1/4]
+** builtin functions [2/4]
 *** DONE [2021-04-28 Wed] =parseFloat=
 *** TODO =parseInt=
-*** TODO =eval=
+*** DONE [2022-07-05 Tue] =eval=
 *** TODO =isNaN=
 ** builtin =Object= [9/26]
 *** DONE [2021-01-05 Tue] Object.getOwnPropertyDescriptor
@@ -138,10 +138,11 @@
 **** TODO .endsWith()
 **** TODO .indexOf()
 **** TODO .lastIndexOf()
+**** TODO .replace()
 **** TODO ...
 *** TODO =Number=
 ** MAYBE builtin =assert= object
-** MAYBE =console= in sljs
+** NOPE =console= in sljs
    This is I/O and should not live in the interpreter core.
 * User functions [3/4]
 ** DONE FunctionExpression
@@ -205,14 +206,14 @@
    the unmanaged code.
 ** MAYBE Introduce an explicit stack for references in use?
 ** MAYBE A garbage collector in another thread?
-* TODO the **endgoal**: be able to run Esprima internally [3/6]
+* TODO the **endgoal**: be able to run Esprima internally [4/6]
 ** DONE [2021-02-08 Sun] all of Esprima syntax is understood
 ** DONE [2021-03-02 Tue] all of Esprima code can be loaded
 ** DONE [2021-05-22 Sat] there is a binary doing parsing via internal Esprima
-** TODO make parsing engines abstract
+** DONE [2022-06-05 Sun] make parsing engines abstract
 ** TODO interpreter doing parsing with Esprima can parse Esprima.
 ** MAYBE treesitter?
-* TODO =eval=
+* DONE =eval=
 
 
-#+TODO: BUG TODO MAYBE | DONE
+#+TODO: BUG TODO MAYBE | DONE NOPE

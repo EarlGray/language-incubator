@@ -187,12 +187,10 @@
 //!     .to_ref(&heap).expect("reference");
 //!
 //! // Finally, call `zoom(10)`:
-//! let result: Interpreted = heap.execute(zoomref, function::CallContext{
-//!     this_ref: Heap::GLOBAL,
-//!     method_name: String::from("zoom"),  // TODO: get zoom.name
-//!     arguments: vec![Interpreted::from(10.0)],
-//!     loc: None,
-//! }).expect("call result");
+//! let call = CallContext::from(vec![Interpreted::from(10)])
+//!     .with_this(Heap::GLOBAL)
+//!     .with_name("zoom");
+//! let result: Interpreted = heap.execute(zoomref, call).expect("call result");
 //!
 //! let result: JSValue = result.to_value(&heap).unwrap();
 //! assert_eq!(result, JSValue::from(11.0));

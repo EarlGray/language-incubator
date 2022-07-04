@@ -21,6 +21,16 @@ pub struct CallContext {
 }
 
 impl CallContext {
+    pub fn with_this(mut self, this_ref: JSRef) -> Self {
+        self.this_ref = this_ref;
+        self
+    }
+
+    pub fn with_name<S: ToString>(mut self, name: S) -> Self {
+        self.method_name = name.to_string();
+        self
+    }
+
     pub fn arg_value(&self, index: usize, heap: &mut Heap) -> JSResult<JSValue> {
         self.arguments
             .get(index)
@@ -34,6 +44,12 @@ impl CallContext {
             None => return Ok(None),
         };
         Ok(Some(arg.numberify(heap).unwrap_or(0.0) as i64))
+    }
+}
+
+impl From<Vec<Interpreted>> for CallContext {
+    fn from(arguments: Vec<Interpreted>) -> CallContext {
+        CallContext{ arguments, method_name: "".to_string(), loc: None, this_ref: Heap::NULL }
     }
 }
 

@@ -344,13 +344,9 @@ impl CatchClause {
                 //Exception::ReferenceNotFound(ident) => { // TODO: ReferenceError
                 _ => {
                     let message = format!("{:?}", exc);
+                    let args = vec![Interpreted::from(message)];
                     let errval = builtin::error::error_constructor(
-                        CallContext {
-                            this_ref,
-                            method_name: "Error".to_string(),
-                            arguments: vec![Interpreted::from(message)],
-                            loc: None, // TODO: get the location of the reference
-                        },
+                        CallContext::from(args).with_this(this_ref).with_name("Error"),
                         heap,
                     )?;
                     errval.to_value(heap)?
@@ -713,7 +709,6 @@ impl Interpretable for AssignmentExpression {
 impl Interpretable for CallExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let CallExpression(callee_expr, argument_exprs) = self;
-        let loc = heap.loc.clone();
 
         let arguments = (argument_exprs.iter())
             .map(|argexpr| argexpr.interpret(heap))
@@ -722,15 +717,9 @@ impl Interpretable for CallExpression {
         let callee = callee_expr.interpret(heap)?;
         let (func_ref, this_ref, name) = callee.resolve_call(heap)?;
 
-        let method_name = name.to_string();
         heap.execute(
             func_ref,
-            CallContext {
-                this_ref,
-                method_name,
-                arguments,
-                loc,
-            },
+            CallContext::from(arguments).with_this(this_ref).with_name(name),
         )
     }
 }
@@ -738,8 +727,6 @@ impl Interpretable for CallExpression {
 impl Interpretable for NewExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let NewExpression(callee_expr, argument_exprs) = self;
-
-        let loc = heap.loc.clone();
 
         let arguments = (argument_exprs.iter())
             .map(|expr| expr.interpret(heap))
@@ -761,12 +748,7 @@ impl Interpretable for NewExpression {
         // call its constructor
         let result = heap.execute(
             funcref,
-            CallContext {
-                this_ref: object_ref,
-                method_name: "<constructor>".to_string(),
-                arguments,
-                loc,
-            },
+            CallContext::from(arguments).with_this(object_ref).with_name("<constructor>"),
         )?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),

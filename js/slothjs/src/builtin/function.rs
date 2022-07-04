@@ -43,15 +43,9 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
         None => Vec::new(),
     };
 
-    let funcref = call.this_ref;
     heap.execute(
-        funcref,
-        CallContext {
-            this_ref: bound_this,
-            method_name: call.method_name,
-            arguments: call_args,
-            loc: heap.loc.clone(),
-        },
+        call.this_ref,
+        CallContext::from(call_args).with_this(bound_this).with_name(call.method_name),
     )
 }
 
