@@ -1439,4 +1439,9 @@ fn test_arrays() {
     */
 }
 
+#[test]
+fn test_eval() {
+    assert_eval!("eval('2 + 2')",  4.0);
+}
+
 }

@@ -11,6 +11,7 @@ use crate::{
     Interpretable,
     Interpreted,
     JSRef,
+    JSResult,
     Program,
 };
 use serde_json::json;
@@ -49,12 +50,16 @@ impl runtime::Parser for EsprimaParser {
     }
 
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program> {
+        let mut arguments = vec![Interpreted::from(input)];
+        if self.locflag != Heap::NULL {
+            arguments.push(Interpreted::from(self.locflag));
+        }
         let estree: Interpreted = heap.execute(
             self.esparse,
             CallContext {
                 this_ref: self.object,
                 method_name: "parse".to_string(),
-                arguments: vec![Interpreted::from(input), Interpreted::from(self.locflag)],
+                arguments,
                 loc: None,
             },
         )?;
@@ -63,5 +68,26 @@ impl runtime::Parser for EsprimaParser {
         let program =
             HeapNode::with(heap, node, Program::parse_from).map_err(Exception::SyntaxTreeError)?;
         Ok(program)
+    }
+
+    fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+        let code = call.arg_value(0, heap)?.stringify(heap)?;
+
+        let esprima_ref = (heap .get(Heap::GLOBAL) .get_own_value("esprima"))
+            .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima")))?
+            .to_ref()?;
+        let parse_ref = (heap .get(esprima_ref) .get_own_value("parse"))
+            .ok_or_else(|| {
+                Exception::TypeErrorGetProperty(Interpreted::from(esprima_ref), "parse".to_string())
+            })?
+            .to_ref()?;
+
+        let parser = EsprimaParser {
+            object: esprima_ref,
+            esparse: parse_ref,
+            locflag: Heap::NULL,
+        };
+        let program = parser.parse(&code, heap)?;
+        program.interpret(heap)
     }
 }

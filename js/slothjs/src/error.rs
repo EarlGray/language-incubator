@@ -65,6 +65,10 @@ pub enum Exception {
     UserThrown(JSValue),
 }
 
+// TODO: impl Display for Exception
+// TODO: #[cfg(feature = "std"] impl Error for Exception
+// TODO: capture JavaScript stack trace in Exception
+
 impl Exception {
     pub fn instance_required<V>(arg: V, of: &str) -> Exception
     where

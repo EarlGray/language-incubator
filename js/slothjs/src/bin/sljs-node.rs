@@ -26,6 +26,7 @@ use slothjs::runtime::{
 };
 
 fn main() -> io::Result<()> {
+    // TODO: parse arguments, if they are files, interpret the files.
     let mut sljs = Runtime::<NodejsParser>::load()?;
 
     if atty::is(Stream::Stdin) {

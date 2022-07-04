@@ -19,6 +19,11 @@ use crate::{
 pub trait Interpretable {
     /// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
+
+    /// A wrapper for `.interpret` that also resolves the result to JSValue
+    fn evaluate(&self, heap: &mut Heap) -> JSResult<JSValue> {
+        self.interpret(heap)?.to_value(heap)
+    }
 }
 
 // ==============================================
@@ -26,7 +31,6 @@ pub trait Interpretable {
 impl Interpretable for Program {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         heap.declare(self.variables.iter(), self.functions.iter())?;
-
         self.body.interpret(heap)
     }
 }
@@ -76,8 +80,7 @@ impl Interpretable for BlockStatement {
 
 impl Interpretable for IfStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let jbool = self.test.interpret(heap)?;
-        let cond = jbool.to_value(heap)?;
+        let cond = self.test.evaluate(heap)?;
         if cond.boolify(heap) {
             self.consequent.interpret(heap)
         } else if let Some(else_stmt) = self.alternate.as_ref() {
@@ -90,8 +93,7 @@ impl Interpretable for IfStatement {
 
 impl Interpretable for SwitchStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let matchee = self.discriminant.interpret(heap)?;
-        let switchval = matchee.to_value(heap)?;
+        let switchval = self.discriminant.evaluate(heap)?;
 
         let mut default: Option<usize> = None; // the index of the default case, if any
         let mut found_case: Option<usize> = None;
@@ -103,7 +105,7 @@ impl Interpretable for SwitchStatement {
                     default = Some(i);
                     continue;
                 }
-                Some(test) => test.interpret(heap)?.to_value(heap)?,
+                Some(test) => test.evaluate(heap)?,
             };
 
             if JSValue::strict_eq(&switchval, &caseval, heap) {
@@ -154,8 +156,8 @@ impl ForStatement {
         match self.test.as_ref() {
             None => Ok(true),
             Some(testexpr) => {
-                let result = testexpr.interpret(heap)?;
-                Ok(result.to_value(heap)?.boolify(heap))
+                let result = testexpr.evaluate(heap)?;
+                Ok(result.boolify(heap))
             }
         }
     }
@@ -180,8 +182,7 @@ impl ForInStatement {}
 
 impl Interpretable for ForInStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let iteratee = self.right.interpret(heap)?;
-        let iteratee = iteratee.to_value(heap)?.objectify(heap);
+        let iteratee = self.right.evaluate(heap)?.objectify(heap);
 
         let assignexpr = match &self.left {
             ForInTarget::Expr(expr) => expr.clone(),
@@ -305,8 +306,7 @@ impl Interpretable for LabelStatement {
 
 impl Interpretable for ExpressionStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let result = self.expression.interpret(heap)?;
-        let value = result.to_value(heap)?;
+        let value = self.expression.evaluate(heap)?;
         Ok(Interpreted::Value(value))
     }
 }
@@ -325,9 +325,7 @@ impl Interpretable for ReturnStatement {
 impl Interpretable for ThrowStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let ThrowStatement(exc_expr) = self;
-        let exc_value = exc_expr.interpret(heap)?;
-        let exc_value = exc_value.to_value(heap)?;
-
+        let exc_value = exc_expr.evaluate(heap)?;
         heap.throw(Exception::UserThrown(exc_value))
     }
 }
@@ -403,7 +401,7 @@ impl Interpretable for VariableDeclaration {
         for decl in &self.declarations {
             if let Some(initexpr) = decl.init.as_ref() {
                 let name = &decl.name.0;
-                let value = initexpr.interpret(heap)?.to_value(heap)?;
+                let value = initexpr.evaluate(heap)?;
                 match heap.lookup_var(name) {
                     Some(Interpreted::Member { of, name }) => {
                         heap.get_mut(of)
@@ -468,7 +466,7 @@ impl Interpretable for Identifier {
 
 impl Interpretable for ConditionalExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let cond = self.condexpr.interpret(heap)?.to_value(heap)?;
+        let cond = self.condexpr.evaluate(heap)?;
         if cond.boolify(heap) {
             self.thenexpr.interpret(heap)
         } else {
@@ -480,9 +478,9 @@ impl Interpretable for ConditionalExpression {
 impl Interpretable for LogicalExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let LogicalExpression(lexpr, op, rexpr) = self;
-        let lval = lexpr.interpret(heap)?.to_value(heap)?;
+        let lval = lexpr.evaluate(heap)?;
         let value = match (lval.boolify(heap), op) {
-            (true, BoolOp::And) | (false, BoolOp::Or) => rexpr.interpret(heap)?.to_value(heap)?,
+            (true, BoolOp::And) | (false, BoolOp::Or) => rexpr.evaluate(heap)?,
             _ => lval,
         };
         Ok(Interpreted::Value(value))
@@ -551,8 +549,8 @@ impl BinOp {
 impl Interpretable for BinaryExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let BinaryExpression(lexpr, op, rexpr) = self;
-        let lval = lexpr.interpret(heap)?.to_value(heap)?;
-        let rval = rexpr.interpret(heap)?.to_value(heap)?;
+        let lval = lexpr.evaluate(heap)?;
+        let rval = rexpr.evaluate(heap)?;
         let result = op.compute(&lval, &rval, heap)?;
         Ok(Interpreted::Value(result))
     }
@@ -689,7 +687,7 @@ impl Interpretable for AssignmentExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let AssignmentExpression(leftexpr, AssignOp(modop), valexpr) = self;
 
-        let value = valexpr.interpret(heap)?;
+        let value = valexpr.evaluate(heap)?;
 
         // This can be:
         // - Interpreted::Member{ existing object, attribute }
@@ -699,10 +697,9 @@ impl Interpretable for AssignmentExpression {
         let assignee = leftexpr.interpret(heap)?;
 
         let newvalue = match modop {
-            None => value.to_value(heap)?,
+            None => value,
             Some(op) => {
                 let oldvalue = assignee.to_value(heap)?;
-                let value = value.to_value(heap)?;
                 op.compute(&oldvalue, &value, heap)?
             }
         };

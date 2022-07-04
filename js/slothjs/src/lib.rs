@@ -143,6 +143,7 @@
 //! - [`object::Access`] that determines if property is enumerable, writable, configurable;
 //! - [`object::Content`] that encapsulates a way to get and/or set a [`JSValue`].
 //!
+//! TODO: more about JSObject API
 //!
 //! ## Functions and closures
 //!

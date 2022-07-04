@@ -12,8 +12,12 @@ use crate::runtime::{
 };
 use crate::{
     error::ParseError,
+    CallContext,
     Exception,
     Heap,
+    Interpretable,
+    Interpreted,
+    JSResult,
     Program,
     JSON,
 };
@@ -33,9 +37,7 @@ impl NodejsParser {
     };
 
     fn run_esprima(&self, input: &str) -> EvalResult<String> {
-        let tmpdir = self
-            .espath
-            .parent()
+        let tmpdir = (self.espath.parent())
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("{:?}", self.espath)))?;
         let mut esparse = proc::Command::new(Self::NODE)
             .arg(&self.espath)
@@ -94,5 +96,16 @@ impl runtime::Parser for NodejsParser {
 
         let program = Program::parse_from(&json).map_err(Exception::SyntaxTreeError)?;
         Ok(program)
+    }
+
+    fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+        let code = call.arg_value(0, heap)?.stringify(heap)?;
+
+        let tmpdir = env::temp_dir().join(NodejsParser::TMPDIRNAME);
+        let espath = tmpdir.join("esparse.js");
+        let parser = NodejsParser { espath };
+
+        let program = parser.parse(&code, heap)?;
+        program.interpret(heap)
     }
 }

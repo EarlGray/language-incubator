@@ -8,9 +8,12 @@ use crate::prelude::*;
 use crate::{
     error,
     source,
+    CallContext,
     Exception,
     Heap,
-    Interpretable,
+    //Interpretable,
+    Interpreted,
+    JSResult,
     JSValue,
     Program,
     JSON,
@@ -64,6 +67,12 @@ impl From<io::Error> for EvalError {
     }
 }
 
+impl From<std::string::FromUtf8Error> for EvalError {
+    fn from(e: std::string::FromUtf8Error) -> EvalError {
+        EvalError::Io(io::Error::new(io::ErrorKind::InvalidData, e))
+    }
+}
+
 impl From<EvalError> for io::Error {
     fn from(err: EvalError) -> io::Error {
         match err {
@@ -73,9 +82,13 @@ impl From<EvalError> for io::Error {
     }
 }
 
-impl From<std::string::FromUtf8Error> for EvalError {
-    fn from(e: std::string::FromUtf8Error) -> EvalError {
-        EvalError::Io(io::Error::new(io::ErrorKind::InvalidData, e))
+impl From<EvalError> for Exception {
+    fn from(err: EvalError) -> Exception {
+        match err {
+            EvalError::Exception(exc) => exc,
+            EvalError::Serialization(e) => Exception::UserThrown(JSValue::from(e.to_string())),
+            EvalError::Io(e) => Exception::UserThrown(JSValue::from(e.to_string())),
+        }
     }
 }
 
@@ -84,6 +97,7 @@ pub type EvalResult<T> = Result<T, EvalError>;
 pub trait Parser: Sized {
     fn load(heap: &mut Heap) -> EvalResult<Self>;
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program>;
+    fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 
 pub struct Runtime<P> {
@@ -95,15 +109,16 @@ impl<P: Parser> Runtime<P> {
     pub fn load() -> EvalResult<Self> {
         let mut heap = Heap::new();
         let parser = P::load(&mut heap)?;
+
+        let eval_ref = heap.alloc_func(P::eval);
+        heap.get_mut(Heap::GLOBAL).set_hidden("eval", eval_ref)?;
+
         Ok(Runtime { heap, parser })
     }
 
     pub fn evaluate(&mut self, input: &str) -> EvalResult<JSValue> {
         let program = self.parser.parse(input, &mut self.heap)?;
-
-        let result = program.interpret(&mut self.heap)?;
-        let value = result.to_value(&self.heap)?;
-        Ok(value)
+        self.heap.evaluate(&program).map_err(EvalError::Exception)
     }
 
     pub fn json_from(&mut self, value: JSValue) -> JSON {
