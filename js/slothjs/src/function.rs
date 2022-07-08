@@ -49,7 +49,12 @@ impl CallContext {
 
 impl From<Vec<Interpreted>> for CallContext {
     fn from(arguments: Vec<Interpreted>) -> CallContext {
-        CallContext{ arguments, method_name: "".to_string(), loc: None, this_ref: Heap::NULL }
+        CallContext {
+            arguments,
+            method_name: "".to_string(),
+            loc: None,
+            this_ref: Heap::NULL,
+        }
     }
 }
 

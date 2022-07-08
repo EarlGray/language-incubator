@@ -141,11 +141,56 @@ fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
     Ok(Interpreted::from(char_start + char_index as i64))
 }
 
+fn string_proto_replace(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let string = heap.ref_to_string(call.this_ref)?;
+
+    let search = call.arg_value(0, heap)?;
+    if let JSValue::Ref(r) = search {
+        if r.has_proto(Heap::REGEXP_PROTO, heap) {
+            todo!("String.prototype.replace(regexp, ...)");
+        }
+    }
+    let search = search.stringify(heap)?;
+
+    let (before, matched, after) = match string.split_once(&search) {
+        None => return Ok(Interpreted::from(string)),
+        Some((before, after)) => (before, &search, after),
+    };
+
+    let replace = call.arg_value(1, heap)?;
+    if let JSValue::Ref(r) = replace {
+        if r.has_proto(Heap::FUNCTION_PROTO, heap) {
+            todo!("String.prototype.replace(.. , function)");
+        }
+    }
+    let replace = replace.stringify(heap)?;
+
+    let mut result = String::from(before);
+    let mut replace_iter = replace.chars().peekable();
+    while let Some(c) = replace_iter.next() {
+        if c != '$' {
+            result.push(c);
+            continue;
+        }
+        match replace_iter.next_if(|&c| "$`&'".contains(c)) {
+            None => result.push(c),
+            Some('$') => result.push('$'),
+            Some('`') => result.push_str(before),
+            Some('&') => result.push_str(matched),
+            Some('\'') => result.push_str(after),
+            _ => unreachable!(),
+        }
+    }
+    result.push_str(after);
+    Ok(Interpreted::from(result))
+}
+
 pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
     let mut string_proto = JSObject::new();
     string_proto.set_hidden("charAt", heap.alloc_func(string_proto_charAt))?;
     string_proto.set_hidden("charCodeAt", heap.alloc_func(string_proto_charCodeAt))?;
     string_proto.set_hidden("indexOf", heap.alloc_func(string_proto_indexOf))?;
+    string_proto.set_hidden("replace", heap.alloc_func(string_proto_replace))?;
     string_proto.set_hidden("slice", heap.alloc_func(string_proto_slice))?;
     string_proto.set_hidden("substr", heap.alloc_func(string_proto_substr))?;
     string_proto.set_hidden("toString", heap.alloc_func(string_proto_valueOf))?;

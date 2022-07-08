@@ -346,7 +346,9 @@ impl CatchClause {
                     let message = format!("{:?}", exc);
                     let args = vec![Interpreted::from(message)];
                     let errval = builtin::error::error_constructor(
-                        CallContext::from(args).with_this(this_ref).with_name("Error"),
+                        CallContext::from(args)
+                            .with_this(this_ref)
+                            .with_name("Error"),
                         heap,
                     )?;
                     errval.to_value(heap)?
@@ -719,7 +721,9 @@ impl Interpretable for CallExpression {
 
         heap.execute(
             func_ref,
-            CallContext::from(arguments).with_this(this_ref).with_name(name),
+            CallContext::from(arguments)
+                .with_this(this_ref)
+                .with_name(name),
         )
     }
 }
@@ -748,7 +752,9 @@ impl Interpretable for NewExpression {
         // call its constructor
         let result = heap.execute(
             funcref,
-            CallContext::from(arguments).with_this(object_ref).with_name("<constructor>"),
+            CallContext::from(arguments)
+                .with_this(object_ref)
+                .with_name("<constructor>"),
         )?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),

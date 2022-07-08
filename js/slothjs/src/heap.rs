@@ -25,6 +25,10 @@ use crate::{
 pub struct JSRef(usize);
 
 impl JSRef {
+    pub fn has_proto(&self, protoref: JSRef, heap: &Heap) -> bool {
+        (heap.get(*self).protochain(heap)).any(|pref| pref == protoref)
+    }
+
     pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> JSResult<bool> {
         let protoval = heap.get(constructor).get_own_value("prototype");
         let protoval = protoval.ok_or_else(|| {
@@ -32,11 +36,7 @@ impl JSRef {
             Exception::TypeErrorNotCallable(what)
         })?;
         let protoref = protoval.to_ref()?;
-
-        let found = (heap.get(*self))
-            .protochain(heap)
-            .any(|pref| pref == protoref);
-        Ok(found)
+        Ok(self.has_proto(protoref, heap))
     }
 
     /// Check if the object behind the reference `self` has a prototype of `constructor`.
@@ -81,10 +81,11 @@ impl Heap {
     pub const BOOLEAN_PROTO: JSRef = JSRef(5);
     //pub const NUMBER_PROTO: JSRef = JSRef(6);
     pub const STRING_PROTO: JSRef = JSRef(7);
+    pub const REGEXP_PROTO: JSRef = JSRef(8);
 
-    pub const ERROR_PROTO: JSRef = JSRef(8);
+    pub const ERROR_PROTO: JSRef = JSRef(9);
 
-    const USERSTART: usize = 9;
+    const USERSTART: usize = 10;
 
     pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";

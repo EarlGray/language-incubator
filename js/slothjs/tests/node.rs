@@ -1239,13 +1239,21 @@ fn test_builtin_string() {
     assert_eval!("'undefined'.indexOf()", 0.0);
 
     // String.prototype.replace()
-    /*
     assert_eval!("'test'.replace('t', 'T')", "Test");
     assert_eval!("'test'.replace('es', '')", "tt");
-    assert_eval!("'test'.replace('', 'T')", "Ttest");
-    assert_eval!("'test'.replace('', 'T')", "Ttest");
-    assert_eval!("String.prototype.replace.call(202, '2', '3'", "302"); // it's generic over this
+    assert_eval!("'test'.replace('', 'passed ')", "passed test");
+    assert_eval!(r#"
+        'слава Україні'.replace('', 'героям ').replace(' Україні', '')
+    "#, "героям слава");
+    //assert_eval!("String.prototype.replace.call(202, '2', '3')", "302");
+    assert_eval!("String.prototype.replace.call(true, '', 'un')", "untrue");  // generic over this
     assert_eval!("'test'.replace('t', 1)", "1est"); // replaceValue.toString() is used
+    assert_eval!("'aaa'.replace('a', '$$')", "$aa");
+    assert_eval!("'test'.replace('es', '$&$&')", "tesest");
+    assert_eval!(r#"'test'.replace('es', "$$'$$")"#, "t$'$t");
+    assert_eval!(r#"'abc'.replace('b', "$`")"#, "aac");
+    assert_eval!(r#"'abc'.replace('b', "$'")"#, "acc");
+    /*
     assert_eval!("'test'.replace('t', function() { return 1 })", "1est"); // replaceValue can be a function.
     assert_eval!(r#"
         "__test__".replace("t", function(match, offset, str) {
@@ -1254,6 +1262,7 @@ fn test_builtin_string() {
     "#, "__t<t,2,__test__>est__");
     */
     //TODO: replace(RegExp, ...)
+    //assert_eval!(r"'$1,$2'.replace(/(\$(\d))/g, '$$1-$1$2')", "$1-$11,$1-$22");
 }
 
 #[test]

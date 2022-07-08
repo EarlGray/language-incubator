@@ -45,7 +45,9 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
 
     heap.execute(
         call.this_ref,
-        CallContext::from(call_args).with_this(bound_this).with_name(call.method_name),
+        CallContext::from(call_args)
+            .with_this(bound_this)
+            .with_name(call.method_name),
     )
 }
 

@@ -178,7 +178,7 @@ impl JSValue {
                 let _ = crate::source::print_callstack(heap);
                 todo!(); // TODO: Number object
             }
-            JSValue::String(s) => heap.alloc(JSObject::from_string(s.clone())),
+            JSValue::String(s) => heap.alloc(JSObject::from(s.clone())),
             JSValue::Ref(r) => *r,
         }
     }
@@ -751,6 +751,12 @@ impl JSObject {
 impl From<String> for JSObject {
     fn from(s: String) -> Self {
         JSObject::from_string(s)
+    }
+}
+
+impl From<&str> for JSObject {
+    fn from(s: &str) -> Self {
+        JSObject::from_string(s.to_string())
     }
 }
 

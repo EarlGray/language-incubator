@@ -56,7 +56,9 @@ impl runtime::Parser for EsprimaParser {
         }
         let estree: Interpreted = heap.execute(
             self.esparse,
-            CallContext::from(arguments).with_this(self.object).with_name("parse"),
+            CallContext::from(arguments)
+                .with_this(self.object)
+                .with_name("parse"),
         )?;
         let node = estree.to_ref(heap)?;
 
@@ -68,10 +70,10 @@ impl runtime::Parser for EsprimaParser {
     fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         let code = call.arg_value(0, heap)?.stringify(heap)?;
 
-        let esprima_ref = (heap .get(Heap::GLOBAL) .get_own_value("esprima"))
+        let esprima_ref = (heap.get(Heap::GLOBAL).get_own_value("esprima"))
             .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima")))?
             .to_ref()?;
-        let parse_ref = (heap .get(esprima_ref) .get_own_value("parse"))
+        let parse_ref = (heap.get(esprima_ref).get_own_value("parse"))
             .ok_or_else(|| {
                 Exception::TypeErrorGetProperty(Interpreted::from(esprima_ref), "parse".to_string())
             })?

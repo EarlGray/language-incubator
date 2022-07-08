@@ -47,13 +47,12 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> JSResult<Interpr
 }
 
 fn object_object_create(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let proto =
-        (call.arguments.get(0)).ok_or(Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
-    let protoref =
-        (proto.to_ref(heap)).map_err(|_| Exception::TypeErrorInvalidPrototype(proto.clone()))?;
+    let proto = (call.arg_value(0, heap))
+        .map_err(|_| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
+    let protoref = (proto.to_ref())
+        .map_err(|_| Exception::TypeErrorInvalidPrototype(Interpreted::from(proto)))?;
 
-    let properties: Option<JSRef> =
-        (call.arguments.get(1)).and_then(|props| props.to_ref(heap).ok());
+    let properties: Option<JSRef> = call.arg_value(1, heap).and_then(|val| val.to_ref()).ok();
 
     let mut object = JSObject::new();
     object.proto = protoref;
@@ -70,24 +69,22 @@ fn object_object_create(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
 fn object_object_is(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     use JSValue::*;
 
-    let left = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let right = call.arguments.get(1).unwrap_or(&Interpreted::VOID);
+    let left = call.arg_value(0, heap)?;
+    let right = call.arg_value(1, heap)?;
 
-    let answer = match (left.to_value(heap), right.to_value(heap)) {
-        (Ok(Undefined), Ok(Undefined)) => true,
-        (Ok(String(lstr)), Ok(String(rstr))) if lstr == rstr => true,
-        (Ok(Bool(lb)), Ok(Bool(rb))) if lb == rb => true,
-        (Ok(Number(lnum)), Ok(Number(rnum))) => {
+    let answer = match (left, right) {
+        (Undefined, Undefined) => true,
+        (String(lstr), String(rstr)) if lstr == rstr => true,
+        (Bool(lb), Bool(rb)) if lb == rb => true,
+        (Number(lnum), Number(rnum)) => {
             if f64::abs(lnum) == 0.0 && f64::abs(rnum) == 0.0 {
                 f64::is_sign_positive(lnum) == f64::is_sign_positive(rnum)
             } else {
                 (f64::is_nan(lnum) && f64::is_nan(rnum)) || lnum == rnum
             }
         }
-        _ => match (left.to_ref(heap), right.to_ref(heap)) {
-            (Ok(lref), Ok(rref)) => lref == rref,
-            _ => false,
-        },
+        (Ref(lref), Ref(rref)) => lref == rref,
+        _ => false,
     };
     Ok(Interpreted::from(answer))
 }
@@ -97,13 +94,11 @@ fn object_object_getOwnPropertyDescriptor(
     call: CallContext,
     heap: &mut Heap,
 ) -> JSResult<Interpreted> {
-    let inspected = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
-    let inspected_ref =
-        (inspected.to_ref(heap)).map_err(|_| Exception::ReferenceNotAnObject(inspected.clone()))?;
+    let inspected = call.arg_value(0, heap)?;
+    let inspected_ref = (inspected.to_ref())
+        .map_err(|_| Exception::ReferenceNotAnObject(Interpreted::from(inspected)))?;
 
-    let propname = (call.arguments.get(1).unwrap_or(&Interpreted::VOID))
-        .to_value(&*heap)?
-        .stringify(heap)?;
+    let propname = call.arg_value(1, heap)?.stringify(heap)?;
 
     let inspected_object = heap.get(inspected_ref);
     let prop = match inspected_object.properties.get(&propname) {
