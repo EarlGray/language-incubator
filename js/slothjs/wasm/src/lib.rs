@@ -3,7 +3,7 @@
 use core::fmt;
 use core::cell::RefCell;
 use slothjs::{
-    Interpretable,
+    //Interpretable,
     JSON,
     Heap,
     Program,
@@ -42,8 +42,7 @@ pub fn interpret_string(json_ast: &str) -> Result<JsValue, JsValue> {
         .map_err(jserror)?;
 
     let mut heap = Heap::new();
-    let result = program.interpret(&mut heap).map_err(jserror)?
-        .to_value(&heap).map_err(jserror)?
+    let result = heap.evaluate(&program).map_err(jserror)?
         // TODO: implement serde::Serializer directly for JSValue?
         .to_json(&heap).map_err(jserror)?;
     JsValue::from_serde(&result).map_err(jserror)
@@ -54,8 +53,8 @@ pub fn interpret(jsobject: &JsValue) -> Result<JsValue, JsValue> {
     let json: JSON = jsobject.into_serde().map_err(jserror)?;
     let program = Program::parse_from(&json).map_err(jserror)?;
     let result = HEAP.with_borrow_mut(|heap| {
-        // TODO: implement serde::Serializer directly for JSValue?
-        program.interpret(heap)?.to_value(heap)?.to_json(heap)
+        heap.evaluate(&program)?.to_json(heap)
     }).map_err(jserror)?;
+    // TODO: implement serde::Serializer directly for JSValue?
     JsValue::from_serde(&result).map_err(jserror)
 }

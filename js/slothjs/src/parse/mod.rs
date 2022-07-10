@@ -2,6 +2,7 @@ mod heapnode;
 mod jsonnode;
 #[cfg(test)]
 mod test;
+pub mod estree;
 
 use crate::prelude::*;
 

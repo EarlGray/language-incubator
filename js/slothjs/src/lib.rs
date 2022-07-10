@@ -257,4 +257,5 @@ pub use object::{
 pub use parse::{
     HeapNode,
     SourceNode,
+    estree::ToESTree,
 };

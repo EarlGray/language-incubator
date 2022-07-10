@@ -19,6 +19,18 @@ pub struct Statement {
     pub loc: Option<Box<source::Location>>,
 }
 
+impl Statement {
+    pub fn with_loc(self, loc: &source::Location) -> Self {
+        Statement { stmt: self.stmt, loc: Some(Box::new(loc.clone())) }
+    }
+}
+
+impl<T> From<T> for Statement where Stmt: From<T> {
+    fn from(stmt: T) -> Self {
+        Statement { stmt: Stmt::from(stmt), loc: None }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Stmt {
     Empty,
@@ -40,6 +52,18 @@ pub enum Stmt {
     Function(FunctionDeclaration),
 }
 
+impl<E> From<E> for Stmt where Expression: From<E>{
+    fn from(expr: E) -> Stmt {
+        Stmt::Expr(ExpressionStatement{ expression: Expression::from(expr) })
+    }
+}
+
+impl From<VariableDeclaration> for Stmt {
+    fn from(var: VariableDeclaration) -> Stmt {
+        Stmt::Variable(var)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ObjectKey {
     Computed(Expression),
@@ -52,8 +76,10 @@ pub struct ExpressionStatement {
     pub expression: Expression,
 }
 
+
 // ==============================================
 #[derive(Clone, Debug)]
+
 pub struct VariableDeclarator {
     pub name: Pattern,
     pub init: Option<Box<Expression>>,
@@ -71,6 +97,7 @@ pub struct VariableDeclaration {
     pub kind: DeclarationKind,
     pub declarations: Vec<VariableDeclarator>,
 }
+
 
 // ==============================================
 #[derive(Clone, Debug)]
@@ -167,6 +194,19 @@ pub struct Expression {
     pub loc: Option<Box<source::Location>>,
 }
 
+impl Expression {
+    pub fn with_loc(self, loc: &source::Location) -> Self {
+        Expression { expr: self.expr, loc: Some(Box::new(loc.clone())) }
+    }
+}
+
+impl<E> From<E> for Expression where Expr: From<E> {
+    fn from(expr: E) -> Expression {
+        Expression { expr: Expr::from(expr), loc: None }
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(Literal),
@@ -187,6 +227,24 @@ pub enum Expr {
     New(Box<NewExpression>),
 }
 
+impl From<Literal> for Expr {
+    fn from(lit: Literal) -> Expr {
+        Expr::Literal(lit)
+    }
+}
+
+impl From<Identifier> for Expr {
+    fn from(id: Identifier) -> Expr {
+        Expr::Identifier(id)
+    }
+}
+
+impl From<BinaryExpression> for Expr {
+    fn from(binary: BinaryExpression) -> Expr {
+        Expr::BinaryOp(Box::new(binary))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Literal(pub JSON);
 
@@ -205,8 +263,10 @@ impl From<&str> for Identifier {
     }
 }
 
+
 #[derive(Clone, Debug)]
 pub struct BinaryExpression(pub Expression, pub BinOp, pub Expression);
+
 
 #[derive(Clone, Debug)]
 pub struct LogicalExpression(pub Expression, pub BoolOp, pub Expression);
@@ -316,3 +376,52 @@ pub enum UpdOp {
     Increment,
     Decrement,
 }
+
+pub mod builder {
+use super::*;
+
+impl<'a, I> From<I> for Program where I: Iterator<Item=&'a Statement> {
+    fn from(it: I) -> Program {
+        Program {
+            body: stmt::block(it),
+            variables: HashSet::new(),  // TODO: block analysis
+            functions: vec![],          // TODO: block analysis
+        }
+    }
+}
+
+pub mod stmt {
+    use crate::ast::*;
+
+    pub fn block<'a>(it: impl Iterator<Item=&'a Statement>) -> BlockStatement {
+        BlockStatement{ body: it.cloned().collect(), bindings: HashSet::new() }
+    }
+
+    pub fn var<'a>(it: impl Iterator<Item=&'a (&'a str, Expression)>) -> VariableDeclaration {
+        let declarations =  it.map(|(name, init)|
+            VariableDeclarator{
+                name: Identifier::from(*name),
+                init: Some(Box::new(init.clone())),
+            }
+        ).collect();
+        VariableDeclaration{ kind: DeclarationKind::Var, declarations }
+    }
+} // mod ast::builder::stmt
+
+pub mod expr {
+    use crate::ast::*;
+
+    pub fn lit<V>(value: V) -> Expression where JSON: From<V> {
+        Expression::from(Literal(JSON::from(value)))
+    }
+
+    pub fn id(name: &str) -> Expression {
+        Expression::from(Identifier::from(name))
+    }
+
+    pub fn add(left: Expression, right: Expression) -> Expression {
+        Expression::from(BinaryExpression(left, BinOp::Plus, right))
+    }
+}
+
+} // mod ast::builder
