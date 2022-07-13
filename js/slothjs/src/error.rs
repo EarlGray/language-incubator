@@ -51,6 +51,7 @@ pub enum Exception {
     TypeErrorNotConfigurable(Interpreted, String),
     TypeErrorGetProperty(Interpreted, String),
     TypeErrorCannotAssign(Interpreted),
+    TypeErrorConstAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
     TypeErrorNotArraylike(Interpreted),
     TypeErrorInstanceRequired(Interpreted, String),

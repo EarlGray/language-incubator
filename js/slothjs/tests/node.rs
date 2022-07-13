@@ -312,6 +312,30 @@ fn test_assignment() {
 
     assert_exception!("var var = 'var'",      Exception::SyntaxTreeError);
 
+    // let-bindings
+    assert_eval!( "let a = 1; a = 2; a",    2.0 );
+    assert_eval!( "let a = 1; a += 1; a",   2.0 );
+    assert_eval!( "let a = 1; a += 1",      2.0 );
+    assert_eval!( "let a = 3; a *= a; a",   9.0 );
+    assert_eval!( "let a = 1; a -= 1; a",   0.0 );
+    assert_eval!("let a = 3; a /= a; a",    1.0);
+    assert_eval!("let a = 13; a %= 8; a",   5.0);
+    assert_eval!("let a = 1; a <<= 4; a",   16.0);
+    assert_eval!("let a = 32; a >>= 4; a",  2.0);
+    assert_eval!("let a = 32; a >>>= 4; a", 2.0);
+    assert_eval!("let a = 6; a &= 9; a",    0.0);
+    assert_eval!("let a = 6; a ^= 9; a",    15.0);
+    assert_eval!("let a = 3; a |= 6; a",    7.0);
+    //assert_eval!("let a = 3; a **= a; a",   27.0);
+
+    // const-bindings
+    /*
+    assert_exception!( "const a = 1; a = 2; a",    Exception::TypeErrorConstAssign );
+    assert_exception!( "const a = 1; a += 1; a",   Exception::TypeErrorConstAssign );
+    assert_exception!( "const a = 1; a += 1",      Exception::TypeErrorConstAssign );
+    assert_eval!( "const a = 1; if (0) a = 2; a",  1.0 );  // not a syntax error
+    */
+
     // TODO: destructuring assignment
     //assert_eval!( "let obj = { key: 42 }; let { k } = obj; k", 42.0 );
 }
@@ -431,9 +455,6 @@ fn test_block_scope() {
     "#, true);
     // TODO: let-bindings in for (let i=0; ...)
     // TODO: eval introduces its own block scope
-
-    // const variables
-    //assert_exception!( "const a = true; a = false; a",  Exception::TypeErrorConstAssign );
 
     // Closures capture let-bindings:
     /*

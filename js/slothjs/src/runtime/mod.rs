@@ -153,11 +153,8 @@ pub fn batch_main<P: Parser>(sljs: &mut Runtime<P>) -> io::Result<()> {
     let mut input = String::new();
     io::stdin().lock().read_to_string(&mut input)?;
 
-    match sljs.evaluate(&input) {
-        Ok(result) => println!("{}", sljs.string_from(result)),
-        Err(err) => eprintln!("{}", err),
-    }
-
+    let result = sljs.evaluate(&input)?;
+    println!("{}", sljs.string_from(result));
     Ok(())
 }
 
