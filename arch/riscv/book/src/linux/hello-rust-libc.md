@@ -62,7 +62,7 @@ runner = "qemu-riscv64"                     # to make `cargo run` work on x86\_6
 ```
 
 `linker = "riscv64gc-unknown-linux-gnu"` is crucial for cross-compilation, without it 
-rustc just tries to use whatever `ld` it finds in $PATH and fails miserably. I still
+rustc just tries to use whichever `ld` it finds in $PATH and fails miserably. I still
 don't understand why different GCC toolchains require mostly-the-same, but different 
 GNU linkers.
 

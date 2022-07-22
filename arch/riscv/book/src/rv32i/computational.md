@@ -2,6 +2,9 @@
 
 There are 21 computational instructions.
 
+_rd_ denotes a _d_estination _r_egister, _rs1_ and _rs2_ some _s_ource _r_egisters.
+_imm_ stands for "immediate value".
+
 
 | Instruction                 | "C"                                       | Meaning              |
 |-----------------------------|-------------------------------------------|----------------------|
@@ -14,18 +17,18 @@ There are 21 computational instructions.
 | **or**  _rd_, _rs1_, _rs2_  | _rd_ = _rs1_ \| _rs2_                     | bitwise OR
 | **xor** _rd_, _rs1_, _rs2_  | _rd_ = _rs1_ ^ _rs2_                      | bitwise XOR
 | **slt** _rd_, _rs1_, _rs2_  | _rd_ = ((int)_rs1_ < (int)_rs2_)          | compare, set 1/0
-| **sltu** _rd_, _rs1_, _rs2_ | _rd_ = ((uint)_rs1_ < (uint)_rs2_)| compare, set 1/0
-| **addi** _rd_, _rs1_, imm   | _rd_ = _rs1_ + (int32_t)imm               |
-| **slli** _rd_, _rs1_, imm | _rd_ = _rs1_ << imm[4:0]                  |
-| **srli** _rd_, _rs1_, imm | ???                                       | shift right logical by immediate
-| **srai** _rd_, _rs1_, imm | ???                                       | shift right arithm. by immediate
-| **andi** _rd_, _rs1_, imm   | _rd_ = _rs1_ \& imm                       | bitwise AND with immediate
-| **ori**  _rd_, _rs1_, imm   | _rd_ = _rs1_ \| imm                       | bitwise OR with immediate
-| **xori** _rd_, _rs1_, imm   | _rd_ = _rs1_ ^ imm                        | bitwise XOR with immediate
-| **slti** _rd_, _rs1_, imm   | _rd_ = ((int)_rs1_ < (int)imm)            | sign-extend imm, compare, set 1/0
-| **sltui** _rd_, _rs1_, imm  | _rd_ = ((uint)_rs1_ < (uint)imm)          | sign-extend imm, compare as unsigned, set 1/0
-| **lui** _rd_, imm           | _rd_ = (imm << 12)                        | load upper immediate, set lower 12 bits to 0
-| **auipc** _rd_, imm         | _rd_ = pc + (imm << 12)                   | add upper immediate to `pc`
+| **sltu** _rd_, _rs1_, _rs2_ | _rd_ = ((uint)_rs1_ < (uint)_rs2_)        | compare, set 1/0
+| **addi** _rd_, _rs1_, _imm_ | _rd_ = _rs1_ + (int32\_t)imm              |
+| **slli** _rd_, _rs1_, _imm_ | _rd_ = _rs1_ << imm[4:0]                  |
+| **srli** _rd_, _rs1_, _imm_ | ???                                       | shift right logical by immediate
+| **srai** _rd_, _rs1_, _imm_ | ???                                       | shift right arithm. by immediate
+| **andi** _rd_, _rs1_, _imm_ | _rd_ = _rs1_ \& imm                       | bitwise AND with immediate
+| **ori**  _rd_, _rs1_, _imm_ | _rd_ = _rs1_ \| imm                       | bitwise OR with immediate
+| **xori** _rd_, _rs1_, _imm_ | _rd_ = _rs1_ ^ imm                        | bitwise XOR with immediate
+| **slti** _rd_, _rs1_, _imm_ | _rd_ = ((int)_rs1_ < (int)imm)            | sign-extend imm, compare, set 1/0
+| **sltui** _rd_, _rs1_, imm_ | _rd_ = ((uint)_rs1_ < (uint)imm)          | sign-extend imm, compare as unsigned, set 1/0
+| **lui** _rd_, _imm_         | _rd_ = (imm << 12)                        | load upper immediate, set lower 12 bits to 0
+| **auipc** _rd_, _imm_       | _rd_ = pc + (imm << 12)                   | add upper immediate to `pc`
 
 
 Signed integers are stored as 2's complements. All of instructions sign-extend operands if needed.
