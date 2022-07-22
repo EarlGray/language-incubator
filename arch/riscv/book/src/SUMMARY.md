@@ -17,8 +17,6 @@
   + [**D**: Double-Precision Floating Point]()
   + [**C**: Compressed ISA extension]()
 - [Privileged architecture]()
-- [Toolchains]()
-  + [riscv64gc-unknown-linux-gnu](toolchain/riscv64gc-unknown-linux-gnu.md)
-- [Linux]()
+- [Linux and cross-compilation]()
   + ["Hello world" in GNU assembly](linux/hello-gas.md)
-
+  + ["Hello world" in Rust with libc](linux/hello-rust-libc.md)

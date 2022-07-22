@@ -15,7 +15,7 @@ In order to get Linux-specific APIs for RISC-V, we'll also use
 package [linux-libc-dev-riscv64-cross](https://packages.ubuntu.com/jammy/linux-libc-dev-riscv64-cross)
 that provides RISC-V specific C headers in `/usr/riscv64-linux-gnu/include`.
 
-Package [qemu-riscv64](https://packages.ubuntu.com/jammy/qemu-user) allows to run RV64 binaries 
+Package [qemu-user](https://packages.ubuntu.com/jammy/qemu-user) allows to run RV64 binaries 
 in a software-emulated RV64 Linux environment.
 
 Documentation and references:
@@ -112,7 +112,7 @@ By default, `riscv64-unknown-elf-gcc` tries to link start code from some `crt0.o
 libc functionality. Our program does not need libc, so let's add `-nostdlib` to `LDFLAGS`.
 
 To be able to include `asm-generic/unistd.h` from `/usr/riscv64-linux-gnu/include`, adjust
-`ASFLAGS` to include files from `-I /usr/riscv64-linux-gnu/include`.
+`ASFLAGS` to include files from there: `-I /usr/riscv64-linux-gnu/include`.
 
 The `Makefile`:
 
@@ -134,7 +134,7 @@ clean:
 
 ```
 
-Calling `make` produces a 1208-byte ELF executable that runs via `qemu-riscv64` and outputs
+Running `make` produces a 1208-byte ELF executable that runs via `qemu-riscv64` and outputs
 "Hello world" (or just run it directly if `qemu-user-binfmt` is installed):
 
 ```sh
