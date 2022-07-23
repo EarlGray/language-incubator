@@ -19,4 +19,5 @@
 - [Privileged architecture]()
 - [Linux and cross-compilation]()
   + ["Hello world" in GNU assembly](linux/hello-gas.md)
-  + ["Hello world" in Rust with libc](linux/hello-rust-libc.md)
+  + ["Hello world" in Rust, with glibc](linux/hello-rust-libc.md)
+  + ["Hello world" in `no_std` Rust](linux/hello-rust-bare.md)
