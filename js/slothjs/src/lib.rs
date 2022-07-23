@@ -19,7 +19,6 @@ pub mod source;
 pub mod runtime;
 
 #[cfg(test)]
-#[rustfmt::skip]
 mod test;
 
 pub use ast::Program;

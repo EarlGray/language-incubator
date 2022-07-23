@@ -1,15 +1,10 @@
-use crate::{
-    Interpreted, 
-    heap,
-    function,
-    object::{self, Access, Content, ObjectValue, Property},
-};
-
 /// ```sh
 /// $ cargo -q test --lib sizes -- --nocapture
 /// ```
 #[test]
 fn test_sizes() {
+    use crate::*;
+    use crate::object::*;
     use std::mem::size_of;
 
     println!("============================");

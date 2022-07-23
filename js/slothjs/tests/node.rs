@@ -5,11 +5,15 @@ use serde_json::json;
 
 use slothjs::{
     Exception,
-    runtime::{Runtime, NodejsParser, EvalError},
+    runtime::EvalError,
 };
 
+type Runtime = slothjs::runtime::Runtime<
+    slothjs::runtime::NodejsParser,
+>;
+
 fn evalbool(input: &str) -> bool {
-    let mut js = Runtime::<NodejsParser>::load().unwrap();
+    let mut js = Runtime::load().unwrap();
     let result = js.evaluate(input).unwrap();
     result.boolify(&js.heap)
 }
@@ -19,7 +23,7 @@ fn evalbool(input: &str) -> bool {
 /// understands).
 macro_rules! assert_eval {
     ($js:literal, $json:tt) => {
-        let mut js = Runtime::<NodejsParser>::load().expect("Runtime::load");
+        let mut js = Runtime::load().expect("Runtime::load");
         let expected = json!($json);
         match js.evaluate($js) {
             Ok(result) => {
@@ -43,7 +47,7 @@ macro_rules! assert_eval {
 // ```
 macro_rules! assert_exception {
     ($js:literal, $exc:path) => {
-        let mut js = Runtime::<NodejsParser>::load().expect("Runtime::load");
+        let mut js = Runtime::load().expect("Runtime::load");
         match js.evaluate($js) {
             Err(EvalError::Exception($exc(_))) => (),
             other => {
