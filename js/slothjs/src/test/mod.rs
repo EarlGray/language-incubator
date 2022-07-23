@@ -1,3 +1,45 @@
+mod interp;
+
+
+/// Runs interpretation of the first argument (a string literal),
+/// then compares the result to the second argument (anything that `serde_json::json!`
+/// understands).
+macro_rules! assert_eval {
+    ($program:expr, $json:tt) => {
+        assert_eval!($program, $json, "");
+    };
+    ($program:expr, $json:tt, $desc:expr) => {
+        let want = serde_json::json!($json);
+        let interpretable = $program;
+        let mut heap = crate::Heap::new();
+        let result = match heap.evaluate(&interpretable) {
+            Ok(r) => r,
+            Err(exc) => panic!("\n  error: {:?}\n    want: {}", &exc, &want),
+        };
+        let got = result.to_json(&mut heap).expect("json");
+        if got != want {
+            panic!("{}\n     got: {}\n    want: {}", $desc, &got, &want);
+        }
+    };
+}
+
+pub(crate) use assert_eval;
+
+/*
+/// Run interpretation of the first argument (a string literal),
+/// then expects it to fail with a given variant of Exception:
+/// ```ignored
+/// assert_exception!( "bla", Exception::ReferenceNotFound );
+/// ```
+macro_rules! assert_exception {
+    ($js:literal, $exc:path) => {
+    }
+}
+
+pub(crate) use assert_exception;
+*/
+
+
 /// ```sh
 /// $ cargo -q test --lib sizes -- --nocapture
 /// ```

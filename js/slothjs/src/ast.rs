@@ -248,6 +248,13 @@ impl From<BinaryExpression> for Expr {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Literal(pub JSON);
 
+impl<V> From<V> for Expr where JSON: From<V> {
+    fn from(val: V) -> Expr {
+        let json = JSON::from(val);
+        Expr::Literal(Literal(json))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Identifier(pub String);
 
@@ -419,7 +426,11 @@ pub mod expr {
         Expression::from(Identifier::from(name))
     }
 
-    pub fn add(left: Expression, right: Expression) -> Expression {
+    pub fn add<E1, E2>(left: E1, right: E2) -> Expression 
+        where Expression: From<E1>, Expression: From<E2>
+    {
+        let left = Expression::from(left);
+        let right = Expression::from(right);
         Expression::from(BinaryExpression(left, BinOp::Plus, right))
     }
 }
