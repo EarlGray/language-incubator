@@ -16,6 +16,7 @@ use crate::{
 };
 use serde_json::json;
 
+/// [`EsprimaParser`] is an experimental parser that runs Esprima in sljs
 pub struct EsprimaParser {
     object: JSRef,
     esparse: JSRef,

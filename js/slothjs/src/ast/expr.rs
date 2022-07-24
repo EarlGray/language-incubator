@@ -1,3 +1,7 @@
+//! AST definitions for JavaScript expressions.
+//!
+//! The main struct here is [`Expression`], which wraps [`Expr`] enum.
+
 use crate::prelude::*;
 
 use crate::{
@@ -10,6 +14,7 @@ use super::stmt::{
     FunctionDeclaration,
 };
 
+/// `Expression` represents an [`Expr`] together with its source span, if any.
 #[derive(Debug, Clone)]
 pub struct Expression {
     pub expr: Expr,
@@ -42,6 +47,7 @@ where
     }
 }
 
+/// The enumeration of every possible kind of JS expressions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     Literal(Literal),
@@ -167,6 +173,7 @@ pub struct ArrayExpression(pub Vec<Expression>);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObjectExpression(pub Vec<(ObjectKey, Expression)>);
 
+/// Describes an [`ObjectExpression`] key: `ObjectKey::Computed` or `ObjectKey::Identifier`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectKey {
     Computed(Expression),
@@ -193,7 +200,7 @@ pub struct MemberExpression(pub Expression, pub Expression, pub bool);
 pub struct SequenceExpression(pub Vec<Expression>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AssignmentExpression(pub Expression, pub AssignOp, pub Expression);
+pub struct AssignmentExpression(pub Expression, pub Option<BinOp>, pub Expression);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConditionalExpression {
@@ -202,6 +209,7 @@ pub struct ConditionalExpression {
     pub elseexpr: Expression,
 }
 
+/// `Function` describes a JS function definition (`params`, `body`, etc).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
     pub id: Option<Identifier>,
@@ -226,6 +234,7 @@ pub type Pattern = Identifier;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewExpression(pub Expression, pub Vec<Expression>);
 
+/// Lists all possible binary operation for [`BinaryExpression`]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BinOp {
     Plus,
@@ -251,15 +260,14 @@ pub enum BinOp {
     InstanceOf,
 }
 
+/// Lists all boolean operations (`&&`, `||`) for [`LogicalExpression`]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BoolOp {
     And,
     Or,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AssignOp(pub Option<BinOp>);
-
+/// Lists all unary operations for [`UnaryExpression`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnOp {
     Exclamation,
@@ -271,27 +279,30 @@ pub enum UnOp {
     Delete,
 }
 
+/// Lists all update operations (`++`, `--`) for [`UpdateExpression`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdOp {
     Increment,
     Decrement,
 }
 
-/// make a [`Literal`](`JSON::Null`).
+/// make a [`Literal`] (`JSON::Null`) (JS: `null`).
 pub fn null() -> Expression {
     lit(JSON::Null)
 }
 
-/// make an [`Identifier`]("undefined")
+/// make an [`Identifier`] (`"undefined"`), (JS: `undefined`)
 pub fn undefined() -> Expression {
     id("undefined")
 }
 
-/// make a [`Literal`]:
-///    `lit(2)` is `2` in JavaScript
-///    `lit(true)` is `true` in JavaScript
-///    ...
-/// DO NOT USE this for arrays and objects, use [`array`] and [`object`] instead!
+/// make a [`Literal`] from `value`
+///
+///  - `lit(2)` is `2` in JavaScript
+///  - `lit(true)` is `true` in JavaScript
+///  - ...
+///
+/// DO NOT USE this for arrays and objects, use [`array()`] and [`object()`] instead!
 pub fn lit<V>(value: V) -> Expression
 where
     JSON: From<V>,
@@ -299,12 +310,12 @@ where
     Expression::from(Literal(JSON::from(value)))
 }
 
-/// make an [`Identifier`] `Expression` (js: `name`)
+/// make an [`Identifier`] from `name` (JS: `name`)
 pub fn id(name: &str) -> Expression {
     Expression::from(Identifier::from(name))
 }
 
-/// make [`ArrayExpression`](vec![v1, v2, ...]) (i.e. `[v1, v2, ...]`)
+/// make an [`ArrayExpression`] (`vec![v1, v2, ...]`) (JS: `[v1, v2, ...]`)
 pub fn array<E>(exprs: Vec<E>) -> Expression
 where
     Expression: From<E>,
@@ -314,12 +325,12 @@ where
     Expression { expr, loc: None }
 }
 
-/// make an empty [`ObjectExpression`], i.e. '{}'
+/// make an empty [`ArrayExpression`], JS: `[]`
 pub fn empty_array() -> Expression {
     array::<Expression>(vec![])
 }
 
-/// make [`ObjectExpression`](vec![(k1, v1), ...]) (i.e. `{k1: v1, ...}`)
+/// make a [`ObjectExpression`] (`vec![(k1, v1), ...]`) (JS: `{k1: v1, ...}`)
 pub fn object<K>(pairs: Vec<(K, Expression)>) -> Expression
 where
     ObjectKey: From<K>,
@@ -330,12 +341,12 @@ where
     Expression::from(ObjectExpression(pairs))
 }
 
-/// make [`ObjectExpression`]()
+/// make an empty [`ObjectExpression`] (JS: `{}`)
 pub fn empty_object() -> Expression {
     object::<Identifier>(vec![])
 }
 
-/// make [`UnaryExpression`]([`UnOp::Plus`], expr)
+/// make a [`UnaryExpression`]([`UnOp::Plus`], `expr`)
 pub fn plus<E>(expr: E) -> Expression
 where
     Expression: From<E>,
@@ -345,7 +356,7 @@ where
     Expression { expr, loc: None }
 }
 
-/// make [`BinaryExpression`](`left`, `op`, `right`)
+/// make a [`BinaryExpression`](`left`, `op`, `right`)
 pub fn binary<E1, E2>(op: BinOp, left: E1, right: E2) -> Expression
 where
     Expression: From<E1> + From<E2>,
@@ -355,7 +366,7 @@ where
     Expression::from(BinaryExpression(left, op, right))
 }
 
-/// make [`BinaryExpression`] (`left`, [`BinOp::Plus`], `right`)
+/// make a [`BinaryExpression`] (`left`, [`BinOp::Plus`], `right`)
 pub fn add<E1, E2>(left: E1, right: E2) -> Expression
 where
     Expression: From<E1> + From<E2>,
@@ -378,7 +389,7 @@ where
     MemberExpression(object, attr, false).into()
 }
 
-/// make a computed (i.e. `object[attr]`) [`MemberExpression`](`object`, `attr`)
+/// make a computed  [`MemberExpression`](`object`, `attr`) (JS: `object[attr]`)
 pub fn index<E>(object: E, attr: Expression) -> Expression
 where
     Expression: From<E>,
@@ -387,7 +398,7 @@ where
     MemberExpression(object, attr, true).into()
 }
 
-/// make a [`CallExpression`]()
+/// make a [`CallExpression`] with `callee` and `arguments` (JS: `callee(arguments...)`)
 pub fn call<E>(callee: E, arguments: Vec<Expression>) -> Expression
 where
     Expression: From<E>,

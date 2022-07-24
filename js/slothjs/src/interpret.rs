@@ -15,15 +15,15 @@ use crate::{
 };
 
 // ==============================================
-
+/// Describes things (i.e. AST nodes, [`Function`]) that can be interpreted on a [`Heap`]
 pub trait Interpretable {
-    /// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].
-    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
-
     /// A wrapper for `.interpret` that also resolves the result to JSValue
     fn evaluate(&self, heap: &mut Heap) -> JSResult<JSValue> {
         self.interpret(heap)?.to_value(heap)
     }
+
+    /// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].
+    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 
 // ==============================================
@@ -683,7 +683,7 @@ impl Interpretable for ArrayExpression {
 
 impl Interpretable for AssignmentExpression {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let AssignmentExpression(leftexpr, AssignOp(modop), valexpr) = self;
+        let AssignmentExpression(leftexpr, modop, valexpr) = self;
 
         let value = valexpr.evaluate(heap)?;
 

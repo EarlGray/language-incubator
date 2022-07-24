@@ -203,7 +203,7 @@ can wrap:
 
 - [`Exception::UserThrown`] produced by a `throw` in JavaScript
 - [`Exception::SyntaxTreeError`] wrapping a [`error::ParseError`]
-- different kinds of builtin errors, e.g. [`Exception::ReferenceNotFound`], etc.
+- builtin errors, e.g. [`Exception::ReferenceNotFound`], etc.
 
 [`runtime::EvalError`] is a wrapper over [`Exception`], serde (de)serialization errors, I/O
 errors when executing an external parser.

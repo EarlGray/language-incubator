@@ -19,8 +19,8 @@ use crate::{
     JSON,
 };
 
-pub use self::esprima::EsprimaParser;
 pub use self::nodejs::NodejsParser;
+pub use self::esprima::EsprimaParser;
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -94,18 +94,53 @@ impl From<EvalError> for Exception {
 
 pub type EvalResult<T> = Result<T, EvalError>;
 
+/// Describes anything that can parse JS code.
 pub trait Parser: Sized {
+    /// Creates a Parser
     fn load(heap: &mut Heap) -> EvalResult<Self>;
+
+    /// Parses an input into a `Program` (potentially using the `heap`)
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program>;
+
+    /// The native callback for `eval()` in JavaScript provided by this parser
     fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 
+/// The sljs JavaScript runtime.
+///
+/// It should be parameterized by a [`Parser`] implementation, e.g. [`NodejsParser`] or
+/// [`EsprimaParser`]:
+///
+/// ```
+/// use slothjs::JSON;
+/// use slothjs::runtime::{Runtime, NodejsParser};
+///
+/// let mut sljs = Runtime::<NodejsParser>::load()
+///     .expect("Runtime::load");
+/// ```
+///
+/// The [`Runtime`] evaluates JavaScript source code and creates/stores [`crate::JSObject`]s.
+///
+/// ```
+/// # use slothjs::JSON;
+/// # use slothjs::runtime::{Runtime, NodejsParser};
+/// # let mut sljs = Runtime::<NodejsParser>::load().expect("Runtime::load");
+///
+/// sljs.evaluate("var x = 12")
+///     .expect("eval: var x");
+/// let x = sljs.evaluate("x")
+///     .expect("eval: x");
+///
+/// assert_eq!(sljs.json_from(x), JSON::from(12.0));
+/// ```
+///
 pub struct Runtime<P> {
     pub heap: Heap,
     parser: P,
 }
 
 impl<P: Parser> Runtime<P> {
+    /// Creates a sljs runtime.
     pub fn load() -> EvalResult<Self> {
         let mut heap = Heap::new();
         let parser = P::load(&mut heap)?;
@@ -116,19 +151,23 @@ impl<P: Parser> Runtime<P> {
         Ok(Runtime { heap, parser })
     }
 
+    /// Exposes the configured parser.
     pub fn parse(&mut self, input: &str) -> EvalResult<Program> {
         self.parser.parse(input, &mut self.heap)
     }
 
+    /// Takes an `input` and evaluates it.
     pub fn evaluate(&mut self, input: &str) -> EvalResult<JSValue> {
         let program = self.parse(input)?;
         self.heap.evaluate(&program).map_err(EvalError::Exception)
     }
 
+    /// Turn a [`JSValue`] into [`JSON`]
     pub fn json_from(&mut self, value: JSValue) -> JSON {
         value.to_json(&self.heap).expect("JSValue.to_json()")
     }
 
+    /// Turn a [`JSValue`] into a human-readable string.
     pub fn string_from(&mut self, value: JSValue) -> String {
         value
             .to_string(&mut self.heap)

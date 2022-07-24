@@ -165,6 +165,9 @@ pub trait SourceNode: Sized {
 }
 
 impl Program {
+    /// Makes a [`Program`] from anything that implements [`SourceNode`]
+    ///
+    /// e.g. from a [`JSON`] ESTree.
     pub fn parse_from<S: SourceNode>(source: &S) -> ParseResult<Program> {
         source.expect_str("type", "Program")?;
 
@@ -728,7 +731,7 @@ impl ParseFrom for AssignmentExpression {
         let right = source.map_node("right", |jright| Expression::parse_from(jright, ctx))?;
         let left = source.map_node("left", |jleft| Expression::parse_from(jleft, ctx))?;
 
-        Ok(AssignmentExpression(left, AssignOp(modop), right))
+        Ok(AssignmentExpression(left, modop, right))
     }
 }
 

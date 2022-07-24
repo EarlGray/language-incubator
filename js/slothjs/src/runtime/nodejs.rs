@@ -22,6 +22,7 @@ use crate::{
     JSON,
 };
 
+/// [`NodejsParser`] runs Esprima in an external nodejs process, consumes JSON AST.
 pub struct NodejsParser {
     espath: PathBuf,
 }

@@ -13,6 +13,28 @@ use crate::{
     JSValue,
 };
 
+/// Call context information (e.g. arguments) for [`Heap::execute()`].
+///
+/// Whenever you want to call a JS function, it needs to know:
+///
+/// - `arguments`
+/// - `this_ref`: what `this` is for this call
+///
+/// The regular usage is:
+/// ```
+/// # use slothjs::{Heap, JSRef, JSValue, JSON, Interpreted, CallContext};
+/// # let mut heap = Heap::new();
+/// let func_ref: JSRef = heap
+///     .lookup_var("parseInt").expect("parseInt")
+///     .to_ref(&heap).expect("to_ref");
+///
+/// let arguments = vec![ Interpreted::from("42") ];
+/// let result = heap.execute( func_ref, CallContext::from(arguments)).expect("execute");
+/// let result = result.to_value(&heap).unwrap();
+///
+/// assert_eq!(result, JSValue::from(42));
+/// ```
+///
 pub struct CallContext {
     pub this_ref: JSRef,
     pub method_name: String,

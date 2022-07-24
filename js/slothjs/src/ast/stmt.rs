@@ -1,3 +1,7 @@
+//! AST definitions for JavaScript statements.
+//!
+//! The main struct here is [`Statement`], which wraps [`Stmt`] enum.
+
 use crate::prelude::*;
 
 use crate::source;
@@ -9,6 +13,7 @@ use super::expr::{
     Pattern,
 };
 
+/// `Statement` represents an [`Stmt`] together with its source span, if any.
 #[derive(Clone, Debug)]
 pub struct Statement {
     pub stmt: Stmt,

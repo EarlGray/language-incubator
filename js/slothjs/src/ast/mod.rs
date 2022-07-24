@@ -7,7 +7,7 @@ pub mod stmt;
 pub use self::expr::*;
 pub use self::stmt::*;
 
-// ==============================================
+/// represents a complete top-level JS script.
 #[derive(Debug)]
 pub struct Program {
     pub body: BlockStatement,
