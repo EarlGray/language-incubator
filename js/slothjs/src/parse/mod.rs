@@ -1,8 +1,8 @@
+pub mod estree;
 mod heapnode;
 mod jsonnode;
 #[cfg(test)]
 mod test;
-pub mod estree;
 
 use crate::prelude::*;
 
@@ -566,7 +566,7 @@ impl ParseFrom for Expression {
             "ThisExpression" => Expr::This,
             "UnaryExpression" => {
                 let expr = UnaryExpression::parse_from(source, ctx)?;
-                Expr::Unary(expr)
+                Expr::Unary(Box::new(expr))
             }
             "UpdateExpression" => {
                 let expr = UpdateExpression::parse_from(source, ctx)?;
@@ -611,7 +611,7 @@ impl ParseFrom for UnaryExpression {
         };
 
         let argument = source.map_node("argument", |jarg| Expression::parse_from(jarg, ctx))?;
-        Ok(UnaryExpression(op, Box::new(argument)))
+        Ok(UnaryExpression(op, argument))
     }
 }
 

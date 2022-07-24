@@ -1,11 +1,13 @@
 #[rustfmt::skip]
-mod test {
+mod parse {
 
 use serde_json::json;
 
 use slothjs::{
     Exception,
+    Program,
     runtime::EvalError,
+    ast::builder::{expr, stmt},
 };
 
 type Runtime = slothjs::runtime::Runtime<
@@ -16,6 +18,19 @@ fn evalbool(input: &str) -> bool {
     let mut js = Runtime::load().unwrap();
     let result = js.evaluate(input).unwrap();
     result.boolify(&js.heap)
+}
+
+/// Ensures that the parses produces the given [`Program`]
+macro_rules! assert_parse {
+    ($code:literal, $program:expr) => {
+        assert_parse!($code, $program, "");
+    };
+    ($code:literal, $program:expr, $desc:literal) => {
+        let mut sljs = Runtime::load().expect("Runtime::load");
+        let want = Program::from_stmt($program);
+        let got = sljs.parse($code).expect("Runtime::parse");
+        assert_eq!(got, want, $desc);
+    }
 }
 
 /// Runs interpretation of the first argument (a string literal),
@@ -58,45 +73,44 @@ macro_rules! assert_exception {
 }
 
 #[test]
-fn test_literals() {
-    assert_eval!( "null",       null);
-    assert_eval!( "true",       true);
-    assert_eval!( "42",         42.0);
-    assert_eval!( "0x2a",       42.0);
-    assert_eval!( "052",        42.0);
-    assert_eval!( "[]",         []);
-    assert_eval!( "+5",         5.0);
-    assert_eval!( "+'5'",       5.0);
-
-    assert_eval!( "\"hello \\\"world\\\"\"", "hello \"world\"");
-
-    assert_eval!("var a = {one:1, two:2}; a", {"one": 1.0, "two": 2.0});
-
-    assert_eval!("var x = 'one'; var o = {[x]: 1}; o.one", 1.0);
-
-    assert_eval!( "var undefined = 5; undefined", null );
-    assert_eval!( "var NaN = 5; NaN != NaN", true );
+fn literals() {
+    assert_parse!( "null",      expr::null());
+    assert_parse!( "true",      true);
+    assert_parse!( "42",         expr::lit(42));
+    assert_parse!( "0x2a",       expr::lit(42));
+    assert_parse!( "052",        expr::lit(42));
+    assert_parse!( "[]",         expr::empty_array());
+    assert_parse!( "+5",         expr::plus(5));
+    assert_parse!( "+'5'",       expr::plus("5"));
+    assert_parse!(
+        "\"hello \\\"world\\\"\"",
+        expr::lit("hello \"world\""),
+        "escaped quotes in strings"
+    );
+    assert_parse!("({one:1, two:2})",
+        expr::object(vec![
+            (expr::id("one"), expr::lit(1)),
+            (expr::id("two"), expr::lit(2)),
+        ])
+    );
 }
 
 #[test]
-fn test_binary_addition() {
-    assert_eval!("2 + 2",          4.0);
-    assert_eval!("'1' + '2'",      "12");
-    assert_eval!("[1] + [2,3]",    "12,3");
-    assert_eval!("[1,2] + null",   "1,2null");
-    assert_eval!("null + null",    0.0);
-    assert_eval!("true + null",    1.0);
-    assert_eval!( "'' + [1, 2]",   "1,2");
-    assert_eval!( "'' + null",     "null");
-    assert_eval!( "'' + true",     "true");
-    assert_eval!( "'' + {}",       "[object Object]");
-    assert_eval!( "({} + {})",     "[object Object][object Object]" );
-    assert_eval!( "({} + [])",     "[object Object]"); // expression
-    assert_eval!( "{} +[]",         0.0 );             // two statements
-    //assert_eval!("undefined + undefined",  (f64::NAN));
-    //assert_eval!("5 + undefined",  (f64::NAN));
-    assert_eval!("undefined + 5",  "undefined5");
-    assert_eval!("1 + {}",         "1[object Object]");
+fn binary_plus() {
+    assert_parse!("2 + 2",         expr::add(2, 2));
+    assert_parse!("'1' + '2'",     expr::add("1", "2"));
+    assert_parse!("[1] + [2,3]",   expr::add(expr::array(vec![1]), expr::array(vec![2, 3])));
+    assert_parse!("true + null",   expr::add(true, expr::null()));
+    assert_parse!( "'' + [1, 2]",  expr::add("", expr::array(vec![1, 2])));
+    assert_parse!( "'' + null",    expr::add("", expr::null()));
+    assert_parse!( "'' + {}",      expr::add("", expr::empty_object()));
+    assert_parse!( "({} + {})",    expr::add(expr::empty_object(), expr::empty_object()));
+    assert_parse!( "({} + [])",    expr::add(expr::empty_object(), expr::empty_array()));
+    assert_parse!( "{} +[]",       stmt::block(vec![
+            stmt::block(vec![]).into(),
+            expr::plus(expr::empty_array()).into()
+    ]) );
+    assert_parse!("undefined+undefined", expr::add(expr::undefined(), expr::undefined()));
 }
 
 #[test]
@@ -311,6 +325,7 @@ fn test_assignment() {
     //assert_eval!("var a = 3; a **= a; a",   27.0);
 
     // Assignment of read-only variables:
+    assert_eval!( "var NaN = 5; NaN != NaN", true );
     assert_eval!("undefined = 5; typeof undefined", "undefined");
     assert_eval!("undefined += 1; typeof undefined", "undefined");
 
@@ -1302,6 +1317,7 @@ fn test_builtin_error() {
 
 #[test]
 fn test_objects() {
+    assert_eval!( "var x = 'one'; var o = {[x]: 1}; o.one", 1.0);
     assert_eval!( "var a = [1]; a[0] = 2; a[0]",    2.0);
     assert_eval!( "var a = {v: 1}; a.v = 2; a.v",   2.0);
     assert_eval!( "var a = {}; a.one = 1; a",       {"one": 1.0});

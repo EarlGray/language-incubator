@@ -1,5 +1,3 @@
-use serde_json::json;
-
 use crate::ast::builder::expr;
 
 use super::assert_eval;
@@ -7,24 +5,35 @@ use super::assert_eval;
 
 #[test]
 fn binary_addition() {
-    assert_eval!( expr::add(2, 2),      4.0);
-    assert_eval!( expr::add("1", "2"),  "12");
-    assert_eval!( expr::add(json!([1]), json!([2, 3])), "12,3");
-    assert_eval!( expr::add(json!([1,2]), json!(null)), "1,2null");
-    assert_eval!( expr::add(json!(null), json!(null)),    0.0);
-    /*
-    assert_eval!("true + null",    1.0);
-    assert_eval!( "'' + [1, 2]",   "1,2");
-    assert_eval!( "'' + null",     "null");
-    assert_eval!( "'' + true",     "true");
-    assert_eval!( "'' + {}",       "[object Object]");
-    assert_eval!( "({} + {})",     "[object Object][object Object]" );
-    assert_eval!( "({} + [])",     "[object Object]"); // expression
-    assert_eval!( "{} +[]",         0.0 );             // two statements
-    //assert_eval!("undefined + undefined",  (f64::NAN));
-    //assert_eval!("5 + undefined",  (f64::NAN));
-    assert_eval!("undefined + 5",  "undefined5");
-    assert_eval!("1 + {}",         "1[object Object]");
-    */
+    assert_eval!(4.0, expr::add(2, 2));
+    assert_eval!("12", expr::add("1", "2"));
+    assert_eval!(
+        "12,3",
+        expr::add(expr::array(vec![1]), expr::array(vec![2, 3]))
+    );
+    assert_eval!("1,2null", expr::add(expr::array(vec![1, 2]), expr::null()));
+    assert_eval!(0.0, expr::add(expr::null(), expr::null()));
+    assert_eval!(1.0, expr::add(true, expr::null()));
+    assert_eval!("1,2", expr::add("", expr::array(vec![1, 2])));
+    assert_eval!("null", expr::add("", expr::null()));
+    assert_eval!("true", expr::add("", true));
+    assert_eval!(
+        "[object Object]",
+        expr::add("", expr::empty_object()),
+        "js: '' + {} "
+    );
+    assert_eval!(
+        "[object Object][object Object]",
+        expr::add(expr::empty_object(), expr::empty_object()),
+        "js: {} + {} "
+    );
+    assert_eval!(
+        "[object Object]",
+        expr::add(expr::empty_object(), expr::empty_array()),
+        "js: {} + [] "
+    );
+    assert_eval!("undefined5", expr::add(expr::undefined(), "5"));
+    assert_eval!("1[object Object]", expr::add(1, expr::empty_object()));
+    //assert_eval!((f64::NAN),   expr::add(expr::undefined(), expr::undefined()));
+    //assert_eval!((f64::NAN),  expr::add("5", expr::undefined())),  );
 }
-

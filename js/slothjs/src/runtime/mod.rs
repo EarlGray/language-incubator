@@ -116,8 +116,12 @@ impl<P: Parser> Runtime<P> {
         Ok(Runtime { heap, parser })
     }
 
+    pub fn parse(&mut self, input: &str) -> EvalResult<Program> {
+        self.parser.parse(input, &mut self.heap)
+    }
+
     pub fn evaluate(&mut self, input: &str) -> EvalResult<JSValue> {
-        let program = self.parser.parse(input, &mut self.heap)?;
+        let program = self.parse(input)?;
         self.heap.evaluate(&program).map_err(EvalError::Exception)
     }
 

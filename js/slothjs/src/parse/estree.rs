@@ -1,9 +1,9 @@
 use serde_json::json;
 
 use crate::{
-    JSON,
     ast::*,
     prelude::*,
+    JSON,
 };
 
 /// ToESTree de-parses an AST struct into its Esprima representation.
@@ -13,7 +13,7 @@ pub trait ToESTree {
 
 impl ToESTree for JSON {
     fn to_estree(&self) -> JSON {
-        self.clone()  // TODO: validate it's a valid ESTree?
+        self.clone() // TODO: validate it's a valid ESTree?
     }
 }
 
@@ -33,14 +33,18 @@ impl ToESTree for BlockStatement {
 
 impl ToESTree for VariableDeclaration {
     fn to_estree(&self) -> JSON {
-        let declarations: Vec<JSON> = self.declarations.iter().map(|decl| {
-            let jid = decl.name.to_estree();
-            let jinit = match decl.init.as_ref() {
-                Some(init) => init.to_estree(),
-                None => JSON::Null,
-            };
-            json!({"type": "VariableDeclarator", "id": jid, "init": jinit})
-        }).collect();
+        let declarations: Vec<JSON> = self
+            .declarations
+            .iter()
+            .map(|decl| {
+                let jid = decl.name.to_estree();
+                let jinit = match decl.init.as_ref() {
+                    Some(init) => init.to_estree(),
+                    None => JSON::Null,
+                };
+                json!({"type": "VariableDeclarator", "id": jid, "init": jinit})
+            })
+            .collect();
         let kind = self.kind.to_estree();
         json!({"type": "VariableDeclaration", "kind": kind, "declarations": declarations })
     }
@@ -63,7 +67,7 @@ impl ToESTree for Statement {
             Stmt::Expr(stmt) => {
                 let jexpr = stmt.expression.to_estree();
                 json!({"type": "ExpressionStatement", "expression": jexpr})
-            },
+            }
             Stmt::Variable(vardecl) => vardecl.to_estree(),
             _ => todo!(),
         }
@@ -86,7 +90,6 @@ impl ToESTree for Expression {
         }
     }
 }
-
 
 impl ToESTree for Identifier {
     fn to_estree(&self) -> JSON {
