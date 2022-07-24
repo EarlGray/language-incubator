@@ -7,7 +7,7 @@ use slothjs::{
     Exception,
     Program,
     runtime::EvalError,
-    ast::builder::{expr, stmt},
+    ast::{expr, stmt},
 };
 
 type Runtime = slothjs::runtime::Runtime<

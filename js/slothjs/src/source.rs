@@ -18,8 +18,8 @@ const CALLER_LOCATION: &str = "[[caller_location]]";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Position {
-    line: usize,
-    column: usize,
+    line: u32,
+    column: u32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -31,12 +31,12 @@ pub struct Location {
 impl Location {
     fn from_saved(object: &JSObject, heap: &Heap) -> Result<Location, Exception> {
         if let Some(array) = object.as_array() {
-            let line = array.storage[0].numberify(heap).unwrap() as usize;
-            let column = array.storage[1].numberify(heap).unwrap() as usize;
+            let line = array.storage[0].numberify(heap).unwrap() as u32;
+            let column = array.storage[1].numberify(heap).unwrap() as u32;
             let start = Position { line, column };
 
-            let line = array.storage[2].numberify(heap).unwrap() as usize;
-            let column = array.storage[3].numberify(heap).unwrap() as usize;
+            let line = array.storage[2].numberify(heap).unwrap() as u32;
+            let column = array.storage[3].numberify(heap).unwrap() as u32;
             let end = Position { line, column };
 
             Ok(Location { start, end })
