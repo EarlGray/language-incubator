@@ -88,6 +88,12 @@ impl From<BlockStatement> for Stmt {
     }
 }
 
+impl From<ReturnStatement> for Stmt {
+    fn from(ret: ReturnStatement) -> Stmt {
+        Stmt::Return(ret)
+    }
+}
+
 // ==============================================
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionStatement {
@@ -212,16 +218,19 @@ pub struct TryStatement {
     pub finalizer: Option<BlockStatement>,
 }
 
+// ==============================================
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CatchClause {
     pub param: Pattern,
     pub body: BlockStatement,
 }
 
+/// make a [`BlockStatement`]
 pub fn block(body: Vec<Statement>) -> BlockStatement {
     BlockStatement::from(body)
 }
 
+/// make a [`VariableDeclaration`] from [(var1, value1), ...]
 pub fn var<'a>(it: impl Iterator<Item = &'a (&'a str, Expression)>) -> VariableDeclaration {
     let declarations = it
         .map(|(name, init)| VariableDeclarator {
@@ -233,4 +242,14 @@ pub fn var<'a>(it: impl Iterator<Item = &'a (&'a str, Expression)>) -> VariableD
         kind: DeclarationKind::Var,
         declarations,
     }
+}
+
+/// make an [`ExpressionStatement`](`expr`)
+pub fn expr(expr: Expression) -> Statement {
+    Statement::from(expr)
+}
+
+/// make a [`ReturnStatement`](`expr`)
+pub fn return_(expr: Expression) -> Statement {
+    Statement::from(ReturnStatement(Some(expr)))
 }

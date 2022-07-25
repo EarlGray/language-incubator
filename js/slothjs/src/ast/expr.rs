@@ -98,16 +98,36 @@ impl From<ObjectExpression> for Expr {
     }
 }
 
+impl From<MemberExpression> for Expr {
+    fn from(membexpr: MemberExpression) -> Expr {
+        Expr::Member(Box::new(membexpr))
+    }
+}
+
+impl From<CallExpression> for Expr {
+    fn from(callexpr: CallExpression) -> Expr {
+        Expr::Call(Box::new(callexpr))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Literal(pub JSON);
+
+impl<V> From<V> for Literal
+where
+    JSON: From<V>,
+{
+    fn from(val: V) -> Literal {
+        Literal(JSON::from(val))
+    }
+}
 
 impl<V> From<V> for Expr
 where
     JSON: From<V>,
 {
     fn from(val: V) -> Expr {
-        let json = JSON::from(val);
-        Expr::Literal(Literal(json))
+        Expr::Literal(Literal::from(val))
     }
 }
 
@@ -257,13 +277,21 @@ pub enum UpdOp {
     Decrement,
 }
 
+/// make a [`Literal`](`JSON::Null`).
 pub fn null() -> Expression {
     lit(JSON::Null)
 }
+
+/// make an [`Identifier`]("undefined")
 pub fn undefined() -> Expression {
     id("undefined")
 }
 
+/// make a [`Literal`]:
+///    `lit(2)` is `2` in JavaScript
+///    `lit(true)` is `true` in JavaScript
+///    ...
+/// DO NOT USE this for arrays and objects, use [`array`] and [`object`] instead!
 pub fn lit<V>(value: V) -> Expression
 where
     JSON: From<V>,
@@ -271,10 +299,12 @@ where
     Expression::from(Literal(JSON::from(value)))
 }
 
+/// make an [`Identifier`] `Expression` (js: `name`)
 pub fn id(name: &str) -> Expression {
     Expression::from(Identifier::from(name))
 }
 
+/// make [`ArrayExpression`](vec![v1, v2, ...]) (i.e. `[v1, v2, ...]`)
 pub fn array<E>(exprs: Vec<E>) -> Expression
 where
     Expression: From<E>,
@@ -284,26 +314,28 @@ where
     Expression { expr, loc: None }
 }
 
+/// make an empty [`ObjectExpression`], i.e. '{}'
 pub fn empty_array() -> Expression {
     array::<Expression>(vec![])
 }
 
+/// make [`ObjectExpression`](vec![(k1, v1), ...]) (i.e. `{k1: v1, ...}`)
 pub fn object<K>(pairs: Vec<(K, Expression)>) -> Expression
 where
     ObjectKey: From<K>,
 {
-    let pairs = pairs
-        .into_iter()
+    let pairs = (pairs.into_iter())
         .map(|(k, v)| (ObjectKey::from(k), v))
         .collect();
     Expression::from(ObjectExpression(pairs))
 }
 
+/// make [`ObjectExpression`]()
 pub fn empty_object() -> Expression {
     object::<Identifier>(vec![])
 }
 
-/// [`UnaryExpression`]([`UnOp::Plus`], expr)
+/// make [`UnaryExpression`]([`UnOp::Plus`], expr)
 pub fn plus<E>(expr: E) -> Expression
 where
     Expression: From<E>,
@@ -313,13 +345,53 @@ where
     Expression { expr, loc: None }
 }
 
-/// [`BinaryExpression`](left, [`BinOp::Plus`], right)
-pub fn add<E1, E2>(left: E1, right: E2) -> Expression
+/// make [`BinaryExpression`](`left`, `op`, `right`)
+pub fn binary<E1, E2>(op: BinOp, left: E1, right: E2) -> Expression
 where
-    Expression: From<E1>,
-    Expression: From<E2>,
+    Expression: From<E1> + From<E2>,
 {
     let left = Expression::from(left);
     let right = Expression::from(right);
-    Expression::from(BinaryExpression(left, BinOp::Plus, right))
+    Expression::from(BinaryExpression(left, op, right))
+}
+
+/// make [`BinaryExpression`] (`left`, [`BinOp::Plus`], `right`)
+pub fn add<E1, E2>(left: E1, right: E2) -> Expression
+where
+    Expression: From<E1> + From<E2>,
+{
+    binary(BinOp::Plus, Expression::from(left), Expression::from(right))
+}
+
+/// make a non-computed (i.e. `object.attr`) [`MemberExpression`](`object`, `attr`)
+pub fn memb<E, I>(object: E, attr: I) -> Expression
+where
+    Expression: From<E>,
+    Identifier: From<I>,
+{
+    let object = Expression::from(object);
+    let attr = Identifier::from(attr);
+    let attr = Expression {
+        expr: Expr::Identifier(attr),
+        loc: None,
+    };
+    MemberExpression(object, attr, false).into()
+}
+
+/// make a computed (i.e. `object[attr]`) [`MemberExpression`](`object`, `attr`)
+pub fn index<E>(object: E, attr: Expression) -> Expression
+where
+    Expression: From<E>,
+{
+    let object = Expression::from(object);
+    MemberExpression(object, attr, true).into()
+}
+
+/// make a [`CallExpression`]()
+pub fn call<E>(callee: E, arguments: Vec<Expression>) -> Expression
+where
+    Expression: From<E>,
+{
+    let callee = Expression::from(callee);
+    CallExpression(callee, arguments).into()
 }
