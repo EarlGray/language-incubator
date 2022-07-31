@@ -8,7 +8,7 @@ pub use core::{
 pub use alloc::{
     boxed::Box,
     format,
-    rc::Rc,
+    rc::{Rc, Weak},
     string::{
         String,
         ToString,
