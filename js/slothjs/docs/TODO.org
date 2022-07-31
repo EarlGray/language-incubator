@@ -58,26 +58,33 @@
 ** DONE [2021-02-13 Sat] assignment to an outer variable
 ** DONE [2021-02-13 Sat] free-variables analysis for closures
 ** DONE [2022-06-15 Sat] a new local scope in =catch {}=
-** TODO =let= variables, block scope
+** TODO =let= variables, block scope [1/2]
+*** DONE [2022-06-19 Sun] initial hack: create an object scope for every block
+*** TODO proper declarative lexical scope for blocks
 ** TODO =const= values
 * Function calls [3/3]
 ** DONE [2021-01-01 Fri] CallExpression
 ** DONE [2021-01-16 Sun] immediate calls: ~(function(){})()~
 ** DONE [2021-01-23 Sat] array member calls: ~a[0]()~
 * Builtin objects
-** builtin functions [2/4]
+** builtin functions [3/5]
 *** DONE [2021-04-28 Wed] =parseFloat=
-*** TODO =parseInt=
+*** DONE [2021-01-09 Sat] =parseInt=
+*** TODO proper =parseInt=
 *** DONE [2022-07-05 Tue] =eval=
 *** TODO =isNaN=
-** builtin =Object= [9/26]
+** builtin =Object= [10/26]
+*** DONE [2021-01-05 Tue] create it!
 *** DONE [2021-01-05 Tue] Object.getOwnPropertyDescriptor
+*** DONE [2021-01-08 Fri] .constructor
 *** DONE [2021-01-08 Fri] Object.is()
 *** DONE [2021-01-18 Mon] Object() constructor
+*** DONE [2021-01-18 Mon] .valueOf()
 *** DONE [2021-02-10 Wed] Object.create()
 *** DONE [2021-02-10 Wed] Object.defineProperties()
+*** DONE [2021-02-13 Sat] Object.setPrototypeOf()
+*** DONE [2021-02-13 Sat] .hasOwnProperty()
 *** TODO Object.getPrototypeOf()
-*** TODO Object.setPrototypeOf()
 *** TODO Object.assign()
 *** TODO Object.keys()
 *** TODO Object.values()
@@ -91,10 +98,6 @@
 *** TODO Object.isExtensible()
 *** TODO Object.seal()
 *** TODO Object.isSealed()
-*** DONE [2021-01-05 Tue] create it!
-*** DONE [2021-01-08 Fri] .constructor
-*** DONE [2021-01-18 Mon] .valueOf()
-*** DONE [2021-02-13 Sat] .hasOwnProperty()
 *** TODO .isPrototypeOf()
 *** TODO .propertyIsEnumerable()
 ** builtin =Function= [4/6]
@@ -104,14 +107,16 @@
 *** DONE [2021-01-20 Wed] .apply()
 *** TODO .bind()
 *** TODO ...everything else
-** builtin =Array= [4/8]
+** builtin =Array= [6/10]
 *** DONE [2021-01-10 Sun] =src/builtin/array.rs=
 *** DONE [2021-01-15 Fri] (de)serialization
+*** DONE [2021-01-16 Sat] .toString()
+*** DONE [2021-05-16 Sun] .length
+*** DONE [2021-05-16 Sun] .push()
+*** DONE [2021-05-22 Sat] .pop()
 *** TODO Array.from
 *** TODO Array.of
 *** TODO Array.isArray()
-*** DONE [2021-01-16 Sat] .toString()
-*** DONE [2021-05-16 Sun] .length
 *** TODO ...everything else
 ** builtin =JSON= [/]
 ** builtin =Boolean= [3/3]
@@ -120,27 +125,29 @@
 *** DONE [2021-01-20 Wed] Boolean.prototype
 **** DONE [2021-01-20 Wed] .valueOf
 **** DONE [2021-01-20 Wed] .toString
-** builtin =String= [3/6]
+** builtin =String= [10/20]
+*** DONE [2021-03-10 Wed] .length
 *** DONE [2021-04-24 Sat] string indexing
 *** DONE [2021-04-24 Sat] =src/builtin/string.rs=
 *** DONE [2021-04-24 Sat] String() constructor; Object("string")
+*** DONE [2021-04-28 Wed] .charCodeAt()
+*** DONE [2021-05-01 Sat] .charAt()
+*** DONE [2021-05-01 Sat] .slice()
+*** DONE [2021-05-22 Sat] .substr()
+*** DONE [2021-05-30 Sun] .indexOf()
+*** DONE [2022-07-09 Sat] .replace()
+*** TODO =.replace(/regexp/)=
 *** TODO check escape notation
-*** TODO static methods [0/3]
-**** TODO String.fromCharCode()
-**** TODO String.fromCodePoint()
-**** TODO String.raw()
-*** TODO prototype [3/9]
-**** DONE [2021-03-10 Wed] .length
-**** DONE [2021-05-01 Sat] .charAt()
-**** DONE [2021-04-28 Wed] .charCodeAt()
-**** TODO .concat()
-**** TODO .includes()
-**** TODO .endsWith()
-**** TODO .indexOf()
-**** TODO .lastIndexOf()
-**** TODO .replace()
-**** TODO ...
-*** TODO =Number=
+*** TODO String.fromCharCode()
+*** TODO String.fromCodePoint()
+*** TODO String.raw()
+*** TODO .concat()
+*** TODO .includes()
+*** TODO .endsWith()
+*** TODO .lastIndexOf()
+*** TODO .replace()
+*** TODO ...
+** builtin =Number= [/]
 ** MAYBE builtin =assert= object
 ** NOPE =console= in sljs
    This is I/O and should not live in the interpreter core.
@@ -170,7 +177,13 @@
 * DONE [2021-01-14 Thu] rewrite the =Heap= to be =Vec<JSObject>=
 * DONE [2020-12-31 Thu] make it a library
 * DONE [2021-01-01 Fri] a repl executable
-* TODO move tests to =tests/=
+* testing [1/3]
+** DONE [2022-06-19 Sun] move tests to =tests/=
+** WIP split tests into internal =assert_eval= and external =assert_parse=
+   Internal tests (=src/test/interp.rs=) should take an AST constructed via a DSL
+   for AST construction.
+   External tests (=tests/parse.rs=) verify parsing from a string to an AST.
+** TODO write a test262 harness in Rust
 * MAYBE optimizations [1/6]
 ** DONE Set up microbenchmarks
    *Why*: because optimization is not possible without metrics.
@@ -181,6 +194,8 @@
    *How*: something like https://docs.rs/qjsonrs reads from a Read, producing JSON
    tokens, some of which trigger callbacks SAX-style. A bottom-up "parser" assembles
    pieces into a Program. Some intermediate JSON-like structures may be kept around.
+** TODO Bytecode compilation
+   *Why*: AST-based interpretation is dumb.
 ** MAYBE Intern all property names
    *Why*: all properties are currently stored by a =String= key.
    This means that each property key is 24 bytes and contains a pointer to its
@@ -198,9 +213,7 @@
 ** MAYBE Frozen/sealed objects to store their properties in a vector.
    *Why*: frozen/sealed objects are by definition non-extensible.
    Attaching a hidden class looks like a good idea.
-** MAYBE Bytecode compilation
-   *Why*: AST-based interpretation is dumb.
-* TODO garbage collection [1/2]
+* TODO garbage collection [1/3]
 ** DONE [2021-05-31 Mon] SimpleCopyingGC draft
    It kinda works, but has a fatal flaw: ~JSRef~s are free-floating in
    the unmanaged code.
@@ -212,8 +225,10 @@
 ** DONE [2021-05-22 Sat] there is a binary doing parsing via internal Esprima
 ** DONE [2022-06-05 Sun] make parsing engines abstract
 ** TODO interpreter doing parsing with Esprima can parse Esprima.
-** MAYBE treesitter?
+   Blocked by: needs GC, 16 GB RAM is not enough.
+** MAYBE try treesitter?
 * DONE =eval=
+  It's buggy, but it's metainterpreted now.
 
 
-#+TODO: BUG TODO MAYBE | DONE NOPE
+#+TODO: BUG TODO MAYBE WIP | DONE NOPE
