@@ -1,6 +1,8 @@
 mod value;
 mod object;
 
+use core::num::NonZeroU32;
+
 use crate::prelude::*;
 
 use self::object::{
@@ -14,18 +16,28 @@ pub use self::value::{
 };
 
 /// An index on the heap.
-type HRef = usize;
+type HRef = NonZeroU32;
 
 /// An external reference to an object on the [`Heap`].
 #[derive(Debug)]
 pub struct JSRef {
     heap: Weak<Heap>,
-    href: usize,
+    href: HRef,         // external references make internal references "pinned"
+}
+
+impl Drop for JSRef {
+    fn drop(&mut self) {
+        if let Some(heaprc) = Rc::upgrade(self.heap) {
+            Rc::get(heaprc).objects[self.href].drop_extref();
+        }
+    }
 }
 
 /// Runtime heap: storage for objects.
 #[derive(Debug)]
-pub struct Heap(Vec<Object>);
+pub struct Heap{
+    objects: Vec<Object>,
+}
 
 impl Heap { }
 

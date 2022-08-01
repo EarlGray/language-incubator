@@ -18,6 +18,7 @@ pub struct Symbol();
 */
 
 /// JavaScript primitive (non-object) value.
+#[derive(Debug, Clone)]
 pub enum Value {
     /// The value of ES6 type Undefined, a (yet) absent value.
     Undefined,

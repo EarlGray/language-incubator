@@ -10,7 +10,6 @@ pub mod error;
 pub mod function;
 pub mod heap;
 pub mod interpret;
-pub mod object;
 mod parse;
 mod prelude;
 pub mod source;
@@ -32,14 +31,10 @@ pub use heap::{
     JSRef,
 };
 pub use interpret::Interpretable;
-pub use object::{
-    Interpreted,
-    JSObject,
-    JSValue,
-    JSON,
-};
 pub use parse::{
     estree::ToESTree,
     HeapNode,
     SourceNode,
 };
+
+pub type JSON = serde_json::Value;
