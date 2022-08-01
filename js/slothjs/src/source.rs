@@ -8,13 +8,12 @@ use crate::{
     error::ParseError,
     Exception,
     Heap,
-    Interpreted,
-    JSObject,
-    JSValue,
     JSON,
 };
 
+/*
 const CALLER_LOCATION: &str = "[[caller_location]]";
+*/
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Position {
@@ -29,6 +28,7 @@ pub struct Location {
 }
 
 impl Location {
+    /*
     fn from_saved(object: &JSObject, heap: &Heap) -> Result<Location, Exception> {
         if let Some(array) = object.as_array() {
             let line = array.storage[0].numberify(heap).unwrap() as u32;
@@ -44,6 +44,7 @@ impl Location {
             Err(Exception::TypeErrorNotArraylike(Interpreted::VOID))
         }
     }
+    */
 }
 
 #[derive(Clone, Debug)]
@@ -52,6 +53,8 @@ pub struct Document {
 }
 
 pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(), Exception> {
+    todo!()
+    /*
     if let Some(loc) = caller {
         let array = vec![
             JSValue::from(loc.start.line as f64),
@@ -63,6 +66,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
         heap.scope_mut().set_system(CALLER_LOCATION, loc_ref)?;
     }
     Ok(())
+    */
 }
 
 /// Usage: `println!("{}", Callstack { heap} );`
@@ -72,6 +76,7 @@ struct Callstack<'heap> {
 
 impl<'heap> fmt::Display for Callstack<'heap> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        /*
         let loc = self.heap.loc.clone();
         writeln!(f, "{:?}", loc)?;
 
@@ -95,6 +100,7 @@ impl<'heap> fmt::Display for Callstack<'heap> {
                 None => Heap::NULL,
             };
         }
+        */
 
         Ok(())
     }
@@ -102,6 +108,8 @@ impl<'heap> fmt::Display for Callstack<'heap> {
 
 #[cfg(feature = "std")]
 pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
+    todo!()
+    /*
     use std::io::Write;
 
     let callstack = Callstack { heap };
@@ -110,6 +118,7 @@ pub fn print_callstack(heap: &Heap) -> Result<(), Exception> {
         let msg = format!("{}", e);
         Exception::UserThrown(JSValue::from(msg))
     })
+    */
 }
 
 #[cfg(not(feature = "std"))]

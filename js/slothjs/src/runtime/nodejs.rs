@@ -15,11 +15,13 @@ use crate::{
     CallContext,
     Exception,
     Heap,
-    Interpretable,
     Interpreted,
     JSResult,
     Program,
     JSON,
+    /*
+    Interpretable,
+     */
 };
 
 /// [`NodejsParser`] runs Esprima in an external nodejs process, consumes JSON AST.
@@ -100,6 +102,8 @@ impl runtime::Parser for NodejsParser {
     }
 
     fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+        todo!()
+        /*
         let code = call.arg_value(0, heap)?.stringify(heap)?;
 
         let tmpdir = env::temp_dir().join(NodejsParser::TMPDIRNAME);
@@ -108,5 +112,6 @@ impl runtime::Parser for NodejsParser {
 
         let program = parser.parse(&code, heap)?;
         program.interpret(heap)
+        */
     }
 }

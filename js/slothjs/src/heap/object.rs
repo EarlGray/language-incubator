@@ -9,6 +9,7 @@ use super::{
 };
 
 /// An attribute of an object
+#[derive(Debug, Clone)]
 struct Property {
     content: Content,
     enumerable: bool,
@@ -16,6 +17,7 @@ struct Property {
 }
 
 /// Content of a Property
+#[derive(Debug, Clone)]
 enum Content {
     Data{
         value: HRef,
@@ -28,6 +30,7 @@ enum Content {
 }
 
 /// An instrinsic value of an Object
+#[derive(Debug, Clone)]
 enum Inner {
     /// A primitive value for String/Number/Boolean
     Prim(Value),
@@ -63,13 +66,14 @@ impl Default for Inner {
 /// - Non-extensible object: `extensible=false`
 /// - Sealed object: non-extensible + all properties marked `configurable=false`
 /// - Frozen object: sealed + all properties marked `writable=false`
+#[derive(Debug)]
 pub(super) struct Object {
     proto: Option<HRef>,    // None means this is an Inner::Prim(_) placeholder
     value: Inner,           // The intrinsic value or Prim::Undefined otherwise.
     n_ext: AtomicU32,       // counter for external references
     extensible: bool,       // new properties are allowed
-    properties: HashSet<JSString, Property>,
-    // TODO: symbol_properties: HashSet<JSSymbol, Property>
+    properties: HashMap<JSString, Property>,
+    // TODO: symbol_properties: HashMap<JSSymbol, Property>
 }
 
 impl Object {
@@ -78,7 +82,7 @@ impl Object {
         Object{
             proto: Some(proto),
             value: Inner::default(),
-            properties: HashSet::new(),
+            properties: HashMap::new(),
             n_ext: AtomicU32::default(),
             extensible: true,
         }
@@ -89,19 +93,19 @@ impl Object {
         Object{
             proto: None,
             value: Inner::Prim(value),
-            properties: HashSet::new(),
+            properties: HashMap::new(),
             n_ext: AtomicU32::default(),
             extensible: false,
         }
     }
 
-    fn drop_extref(&self) {
+    pub(super) fn make_extref(&self) {
+        self.n_ext.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(super) fn drop_extref(&self) {
         // This AtomicU32 is only used in a single-threaded context,
         // so Ordering::Relaxed should be fine (?).
         self.n_ext.fetch_sub(1, Ordering::Relaxed);
-    }
-
-    fn make_extref(&self) {
-        self.n_ext.fetch_add(1, Ordering::Relaxed);
     }
 }

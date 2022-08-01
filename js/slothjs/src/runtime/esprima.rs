@@ -1,5 +1,6 @@
+#![allow(unused_variables)]    // TODO
+
 use crate::{
-    ast::Identifier,
     runtime::{
         self,
         EvalResult,
@@ -7,20 +8,25 @@ use crate::{
     CallContext,
     Exception,
     Heap,
-    HeapNode,
-    Interpretable,
-    Interpreted,
     JSRef,
     JSResult,
     Program,
+    Interpreted,
+    /*
+    ast::Identifier,
+    HeapNode,
+    Interpretable,
+    */
 };
-use serde_json::json;
+//use serde_json::json;
 
 /// [`EsprimaParser`] is an experimental parser that runs Esprima in sljs
 pub struct EsprimaParser {
+    /*
     object: JSRef,
     esparse: JSRef,
     locflag: JSRef,
+    */
 }
 
 impl EsprimaParser {
@@ -33,6 +39,8 @@ impl runtime::Parser for EsprimaParser {
 
         let esprima = Program::parse_from(&esprima_json).map_err(Exception::SyntaxTreeError)?;
 
+        todo!()
+        /*
         esprima.interpret(heap)?;
 
         let object: JSRef = heap.lookup_path(&["esprima"])?.to_ref(heap)?;
@@ -48,9 +56,12 @@ impl runtime::Parser for EsprimaParser {
             esparse,
             locflag,
         })
+        */
     }
 
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program> {
+        todo!()
+        /*
         let mut arguments = vec![Interpreted::from(input)];
         if self.locflag != Heap::NULL {
             arguments.push(Interpreted::from(self.locflag));
@@ -66,9 +77,12 @@ impl runtime::Parser for EsprimaParser {
         let program =
             HeapNode::with(heap, node, Program::parse_from).map_err(Exception::SyntaxTreeError)?;
         Ok(program)
+        */
     }
 
     fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+        todo!()
+        /*
         let code = call.arg_value(0, heap)?.stringify(heap)?;
 
         let esprima_ref = (heap.get(Heap::GLOBAL).get_own_value("esprima"))
@@ -87,5 +101,6 @@ impl runtime::Parser for EsprimaParser {
         };
         let program = parser.parse(&code, heap)?;
         program.interpret(heap)
+        */
     }
 }

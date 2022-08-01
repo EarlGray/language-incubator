@@ -15,16 +15,19 @@
 
 use std::io;
 
-use serde_json::Value as JSON;
-
-use slothjs::interpret::Interpretable;
+/*
 use slothjs::{
+    Program,
     Exception,
     Heap,
-    Program,
+    Interpretable,
+
 };
+*/
 
 fn main() -> io::Result<()> {
+    todo!()
+    /*
     let stdin = io::stdin();
     let stdin = stdin.lock();
 
@@ -44,4 +47,5 @@ fn main() -> io::Result<()> {
         println!("{}", output);
     }
     Ok(())
+    */
 }

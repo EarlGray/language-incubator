@@ -25,12 +25,30 @@ pub struct JSRef {
     href: HRef,         // external references make internal references "pinned"
 }
 
-impl Drop for JSRef {
-    fn drop(&mut self) {
-        if let Some(heaprc) = Rc::upgrade(self.heap) {
-            Rc::get(heaprc).objects[self.href].drop_extref();
+impl Clone for JSRef {
+    fn clone(&self) -> Self {
+        if let Some(heaprc) = self.heap.upgrade() {
+            heaprc.get(self.href).make_extref();
+        }
+        JSRef{
+            heap: Weak::clone(&self.heap),
+            href: self.href,
         }
     }
+}
+
+impl Drop for JSRef {
+    fn drop(&mut self) {
+        if let Some(heaprc) = self.heap.upgrade() {
+            heaprc.get(self.href).drop_extref();
+        }
+    }
+}
+
+/// ES6 Realm: a storage + its global object.
+pub struct Realm {
+    heap: Rc<Heap>,
+    global: HRef,
 }
 
 /// Runtime heap: storage for objects.
@@ -39,10 +57,9 @@ pub struct Heap{
     objects: Vec<Object>,
 }
 
-impl Heap { }
-
-/// ES6 Realm: a storage + its global object.
-pub struct Realm {
-    heap: Rc<Heap>,
-    global: HRef,
+impl Heap {
+    fn get(&self, href: HRef) -> &Object {
+        self.objects.get(href.get() as usize)
+            .unwrap_or_else(|| panic!("href={:?} not found", href))
+    }
 }

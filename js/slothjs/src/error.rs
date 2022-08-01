@@ -2,11 +2,7 @@
 use std::io;
 
 use crate::ast::Identifier;
-use crate::object::{
-    Interpreted,
-    JSValue,
-    JSON,
-};
+use crate::JSON;
 use crate::prelude::*;
 
 pub type JSResult<T> = Result<T, Exception>;
@@ -45,6 +41,7 @@ pub enum Exception {
     SyntaxErrorForInMultipleVar(),
     SyntaxErrorContinueLabelNotALoop(Identifier),
 
+    /*
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(Identifier),
     TypeErrorSetReadonly(Interpreted, String),
@@ -64,6 +61,7 @@ pub enum Exception {
     JumpContinue(Option<Identifier>),
 
     UserThrown(JSValue),
+    */
 }
 
 // TODO: impl Display for Exception
@@ -71,6 +69,7 @@ pub enum Exception {
 // TODO: capture JavaScript stack trace in Exception
 
 impl Exception {
+    /*
     pub fn instance_required<V>(arg: V, of: &str) -> Exception
     where
         Interpreted: From<V>,
@@ -78,6 +77,7 @@ impl Exception {
         let arg = Interpreted::from(arg);
         Exception::TypeErrorInstanceRequired(arg, of.to_string())
     }
+    */
 }
 
 impl From<ParseError> for Exception {
@@ -95,9 +95,11 @@ impl From<Exception> for io::Error {
     }
 }
 
+/*
 pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
     match e {
         Exception::TypeErrorSetReadonly(_, _) => Ok(()),
         _ => Err(e),
     }
 }
+*/

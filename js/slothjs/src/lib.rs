@@ -2,6 +2,9 @@
 #![feature(let_else)]
 #![doc = include_str!("../docs/DOC.md")]
 
+#![allow(unused_imports)]   // TODO
+#![allow(unused_variables)] // TODO
+
 extern crate alloc;
 
 pub mod ast;
@@ -38,3 +41,7 @@ pub use parse::{
 };
 
 pub type JSON = serde_json::Value;
+
+// STUBS
+pub type JSValue = ();       // TODO
+pub type Interpreted = ();   // TODO

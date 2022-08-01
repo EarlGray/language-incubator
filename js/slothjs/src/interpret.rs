@@ -3,15 +3,15 @@ use crate::prelude::*;
 use crate::ast::*; // yes, EVERYTHING
 use crate::builtin;
 use crate::{
-    function::Closure,
-    object::Access,
-    CallContext,
-    Exception,
     Heap,
-    Interpreted,
-    JSObject,
     JSResult,
     JSValue,
+    Interpreted,
+    /*
+    function::Closure,
+    CallContext,
+    Exception,
+    */
 };
 
 // ==============================================
@@ -19,13 +19,17 @@ use crate::{
 pub trait Interpretable {
     /// A wrapper for `.interpret` that also resolves the result to JSValue
     fn evaluate(&self, heap: &mut Heap) -> JSResult<JSValue> {
+        todo!()
+        /*
         self.interpret(heap)?.to_value(heap)
+        */
     }
 
     /// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted>;
 }
 
+/*
 // ==============================================
 
 impl Interpretable for Program {
@@ -786,3 +790,4 @@ impl Interpretable for FunctionExpression {
         Ok(Interpreted::from(function_ref))
     }
 }
+*/

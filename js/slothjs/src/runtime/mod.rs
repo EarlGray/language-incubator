@@ -11,12 +11,14 @@ use crate::{
     CallContext,
     Exception,
     Heap,
-    //Interpretable,
-    Interpreted,
     JSResult,
-    JSValue,
     Program,
     JSON,
+    Interpreted,
+    JSValue,
+    /*
+    Interpretable,
+     */
 };
 
 pub use self::nodejs::NodejsParser;
@@ -84,11 +86,14 @@ impl From<EvalError> for io::Error {
 
 impl From<EvalError> for Exception {
     fn from(err: EvalError) -> Exception {
+        todo!()
+        /*
         match err {
             EvalError::Exception(exc) => exc,
             EvalError::Serialization(e) => Exception::UserThrown(JSValue::from(e.to_string())),
             EvalError::Io(e) => Exception::UserThrown(JSValue::from(e.to_string())),
         }
+        */
     }
 }
 
@@ -142,6 +147,8 @@ pub struct Runtime<P> {
 impl<P: Parser> Runtime<P> {
     /// Creates a sljs runtime.
     pub fn load() -> EvalResult<Self> {
+        todo!()
+        /*
         let mut heap = Heap::new();
         let parser = P::load(&mut heap)?;
 
@@ -149,6 +156,7 @@ impl<P: Parser> Runtime<P> {
         heap.get_mut(Heap::GLOBAL).set_hidden("eval", eval_ref)?;
 
         Ok(Runtime { heap, parser })
+        */
     }
 
     /// Exposes the configured parser.
@@ -158,23 +166,34 @@ impl<P: Parser> Runtime<P> {
 
     /// Takes an `input` and evaluates it.
     pub fn evaluate(&mut self, input: &str) -> EvalResult<JSValue> {
+        todo!()
+        /*
         let program = self.parse(input)?;
         self.heap.evaluate(&program).map_err(EvalError::Exception)
+        */
     }
 
     /// Turn a [`JSValue`] into [`JSON`]
     pub fn json_from(&mut self, value: JSValue) -> JSON {
+        todo!()
+        /*
         value.to_json(&self.heap).expect("JSValue.to_json()")
+        */
     }
 
     /// Turn a [`JSValue`] into a human-readable string.
     pub fn string_from(&mut self, value: JSValue) -> String {
+        todo!()
+        /*
         value
             .to_string(&mut self.heap)
             .expect("JSValue.to_string()")
+        */
     }
 
     fn dbg(&mut self, refstr: &str) {
+        todo!()
+        /*
         if let Ok(refnum) = usize::from_str(refstr) {
             match self.heap.get_index(refnum) {
                 Some(object) => {
@@ -188,6 +207,7 @@ impl<P: Parser> Runtime<P> {
             // TODO: evaluate an expression to a reference
             eprintln!("Command error: expected a number");
         }
+        */
     }
 }
 

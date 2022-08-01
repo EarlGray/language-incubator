@@ -1,3 +1,5 @@
+#![allow(unused_mut)]     // TODO
+
 use crate::prelude::*;
 use crate::{
     source,
@@ -22,6 +24,8 @@ impl HeapNode {
     where
         F: FnMut(&HeapNode) -> T,
     {
+        todo!()
+        /*
         let mut tmp = Heap::new();
         core::mem::swap(heap, &mut tmp);
         let heapptr = Rc::new(tmp);
@@ -35,6 +39,7 @@ impl HeapNode {
         tmp = Rc::try_unwrap(heapnode.heap).expect("only one reference left");
         core::mem::swap(heap, &mut tmp);
         result
+        */
     }
 
     pub fn with_node(&self, node: JSRef) -> Self {
@@ -44,13 +49,19 @@ impl HeapNode {
         }
     }
 
+    /*
     fn property(&self, name: &str) -> ParseResult<JSValue> {
+        todo!()
         (self.heap.get(self.node).get_own_value(name))
             .ok_or_else(|| ParseError::no_attr(name, self.to_error()))
     }
+    */
 
     fn to_json(&self) -> JSResult<JSON> {
+        todo!()
+        /*
         self.heap.get(self.node).to_json(&self.heap)
+        */
     }
 }
 
@@ -77,31 +88,42 @@ impl SourceNode for HeapNode {
     }
 
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {
+        todo!()
+        /*
         let child = self.property(property)?;
         let json = child.to_json(&self.heap).map_err(ParseError::invalid_ast)?;
         Ok(Literal(json))
+        */
     }
 
     fn get_bool(&self, property: &str) -> ParseResult<bool> {
+        todo!()
+        /*
         let value = self.property(property)?;
         match value {
             JSValue::Bool(b) => Ok(b),
             _ => Err(ParseError::want("bool", self.to_error())),
         }
+        */
     }
 
     fn get_str(&self, property: &str) -> ParseResult<String> {
+        todo!()
+        /*
         let value = self.property(property)?;
         match value {
             JSValue::String(s) => Ok(s),
             _ => Err(ParseError::want("string", self.to_error())),
         }
+        */
     }
 
     fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T>
     where
         F: FnMut(&Self) -> ParseResult<T>,
     {
+        todo!()
+        /*
         match self.property(property)? {
             JSValue::Ref(childref) => {
                 let child = self.with_node(childref);
@@ -109,12 +131,15 @@ impl SourceNode for HeapNode {
             }
             _ => Err(ParseError::no_attr(property, self.to_error())),
         }
+        */
     }
 
     fn map_array<T, F>(&self, property: &str, mut func: F) -> ParseResult<Vec<T>>
     where
         F: FnMut(&Self) -> ParseResult<T>,
     {
+        todo!()
+        /*
         let value = self.property(property)?;
         let arrref = (value.to_ref()).map_err(|_| ParseError::want("array", self.to_error()))?;
         let array = (self.heap.get(arrref).as_array())
@@ -128,5 +153,6 @@ impl SourceNode for HeapNode {
             result.push(r);
         }
         Ok(result)
+        */
     }
 }

@@ -3,14 +3,15 @@ use crate::prelude::*;
 use crate::{
     ast,
     source,
-    Exception,
     Heap,
-    Interpretable,
-    Interpreted,
-    JSObject,
     JSRef,
     JSResult,
     JSValue,
+    Interpreted,
+    /*
+    Exception,
+    Interpretable,
+    */
 };
 
 /// Call context information (e.g. arguments) for [`Heap::execute()`].
@@ -38,7 +39,7 @@ use crate::{
 pub struct CallContext {
     pub this_ref: JSRef,
     pub method_name: String,
-    pub arguments: Vec<Interpreted>,
+    //pub arguments: Vec<Interpreted>,
     pub loc: Option<Box<source::Location>>,
 }
 
@@ -54,21 +55,28 @@ impl CallContext {
     }
 
     pub fn arg_value(&self, index: usize, heap: &mut Heap) -> JSResult<JSValue> {
+        todo!()
+        /*
         self.arguments
             .get(index)
             .unwrap_or(&Interpreted::VOID)
             .to_value(heap)
+        */
     }
 
     pub fn arg_as_number(&self, argnum: usize, heap: &Heap) -> JSResult<Option<i64>> {
+        todo!()
+        /*
         let arg = match self.arguments.get(argnum) {
             Some(arg) => arg.to_value(heap)?,
             None => return Ok(None),
         };
         Ok(Some(arg.numberify(heap).unwrap_or(0.0) as i64))
+        */
     }
 }
 
+/*
 impl From<Vec<Interpreted>> for CallContext {
     fn from(arguments: Vec<Interpreted>) -> CallContext {
         CallContext {
@@ -81,6 +89,7 @@ impl From<Vec<Interpreted>> for CallContext {
 }
 
 pub type NativeFunction = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
+
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.
 #[derive(Clone)]
@@ -105,14 +114,17 @@ impl fmt::Debug for VMCall {
     }
 }
 
+*/
 #[derive(Clone, Debug)]
 pub struct Closure {
     pub function: Rc<ast::Function>,
-    pub captured_scope: JSRef, // TODO: capture free variables only
+    //pub captured_scope: JSRef, // TODO: capture free variables only
 }
 
 impl Closure {
     pub fn call(&self, call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+        todo!()
+        /*
         let capture_ref = self.captured_scope;
         let result = heap.enter_new_scope(call.this_ref, capture_ref, |heap| {
             // `arguments`
@@ -144,5 +156,6 @@ impl Closure {
             Err(Exception::JumpReturn(returned)) => Ok(returned),
             Err(e) => Err(e),
         }
+        */
     }
 }

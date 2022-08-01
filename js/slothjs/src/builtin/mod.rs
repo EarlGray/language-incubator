@@ -1,3 +1,4 @@
+/*
 pub mod array;
 pub mod boolean;
 pub mod error;
@@ -38,3 +39,4 @@ pub fn init(heap: &mut Heap) -> JSResult<()> {
 
     Ok(())
 }
+*/
