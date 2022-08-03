@@ -1,4 +1,9 @@
+use core::pin::Pin;
+
 use crate::prelude::*;
+
+use crate::JSResult;
+use super::{Realm, Ref};
 
 /// JavaScript string
 ///
@@ -41,4 +46,30 @@ pub enum Value {
     /// Values of ES6 type Symbol
     Symbol()
     */
+}
+
+/// A key in an object
+pub type StrKey = JSString;
+
+impl From<&str> for StrKey {
+    fn from(s: &str) -> Self {
+        JSString(s.to_string())
+    }
+}
+
+
+/// What a Rust fn must look like to be callable from Javascript.
+///
+/// It receives a [`Ref`] bound to an array-like argument object.
+/// It should write the return value back to the same [`Ref`].
+pub type HostFn = fn(&Realm, Pin<&mut Ref>) -> JSResult<()>;
+
+/// A wrapper for a native Rust function, [`HostFn`]
+#[derive(Clone)]
+pub struct HostFunc(pub HostFn);
+
+impl fmt::Debug for HostFunc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HostFunc(*{:#016p})", self.0 as *const ())
+    }
 }

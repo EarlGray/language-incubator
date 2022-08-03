@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(let_else)]
+#![feature(maybe_uninit_uninit_array)]
+#![feature(maybe_uninit_array_assume_init)]
 #![doc = include_str!("../docs/DOC.md")]
 
 #![allow(unused_imports)]   // TODO
@@ -30,14 +32,17 @@ pub use error::{
 };
 pub use function::CallContext;
 pub use heap::{
+    Realm,
     Heap,
     JSRef,
+    Ref,
 };
+pub use heap::value;
 pub use interpret::Interpretable;
 pub use parse::{
     estree::ToESTree,
-    HeapNode,
     SourceNode,
+    //HeapNode,
 };
 
 pub type JSON = serde_json::Value;

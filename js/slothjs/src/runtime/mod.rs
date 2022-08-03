@@ -38,9 +38,10 @@ pub enum EvalError {
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use error::{Exc, SyntaxError, ParseError};
         match self {
-            EvalError::Exception(exc) => match exc {
-                Exception::SyntaxTreeError(error::ParseError::InvalidJSON { err }) => {
+            EvalError::Exception(Exception(exc)) => match exc {
+                Exc::Syntax(SyntaxError::Parse(ParseError::InvalidJSON { err })) => {
                     writeln!(f, "syntax error:\n{}", err)
                 }
                 _ => write!(f, "sljs error: {:?}", exc),

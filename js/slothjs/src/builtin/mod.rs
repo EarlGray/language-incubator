@@ -1,17 +1,39 @@
+pub mod object;
+pub mod function;
 /*
 pub mod array;
 pub mod boolean;
 pub mod error;
-pub mod function;
 pub mod global;
-pub mod object;
 pub mod string;
+*/
 
 use crate::{
-    Heap,
     JSResult,
+    Realm,
+    value::HostFn,
+    heap::With,
 };
 
+/// This describes a ES6 class implemented in native code.
+pub struct HostClass{
+    pub name: &'static str,
+    pub constructor: HostFn,
+    pub static_methods: &'static [(&'static str, HostFn)],
+    pub proto_methods: &'static [(&'static str, HostFn)],
+}
+
+impl HostClass {
+    pub fn init(&self, realm: &Realm) -> JSResult<()> {
+        realm.with_new(|ctor| {
+            realm.with_new(|proto| {
+                Ok(())
+            })
+        })
+    }
+}
+
+/*
 pub fn init(heap: &mut Heap) -> JSResult<()> {
     global::init(heap)?;
 

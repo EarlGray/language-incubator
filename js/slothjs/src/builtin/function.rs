@@ -1,6 +1,10 @@
 /// The implementation of the builtin Function object.
 use crate::prelude::*;
 use crate::{
+    JSResult,
+    Realm,
+    Ref,
+    /*
     function::CallContext,
     Exception,
     Heap,
@@ -8,8 +12,14 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
+    */
 };
 
+pub fn constructor(realm: &Realm, inout: Pin<&mut Ref>) -> JSResult<()> {
+    todo!()
+}
+
+/*
 fn function_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
     todo!()
 }
@@ -70,3 +80,4 @@ pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
 
     Ok(the_function_ref)
 }
+*/

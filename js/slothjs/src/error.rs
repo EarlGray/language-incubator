@@ -1,13 +1,17 @@
 #[cfg(feature = "std")]
 use std::io;
 
-use crate::ast::Identifier;
-use crate::JSON;
 use crate::prelude::*;
+
+use crate::{
+    JSON,
+    ast::Identifier
+};
+
 
 pub type JSResult<T> = Result<T, Exception>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     InvalidJSON { err: String },
     ObjectWithout { attr: String, value: JSON },
@@ -36,53 +40,17 @@ impl ParseError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Exception {
-    SyntaxTreeError(ParseError),
-    SyntaxErrorForInMultipleVar(),
-    SyntaxErrorContinueLabelNotALoop(Identifier),
-
-    /*
-    ReferenceNotAnObject(Interpreted),
-    ReferenceNotFound(Identifier),
-    TypeErrorSetReadonly(Interpreted, String),
-    TypeErrorNotConfigurable(Interpreted, String),
-    TypeErrorGetProperty(Interpreted, String),
-    TypeErrorCannotAssign(Interpreted),
-    TypeErrorConstAssign(Interpreted),
-    TypeErrorNotCallable(Interpreted),
-    TypeErrorNotArraylike(Interpreted),
-    TypeErrorInstanceRequired(Interpreted, String),
-    TypeErrorInvalidDescriptor(Interpreted),
-    TypeErrorInvalidPrototype(Interpreted),
-
-    // nonlocal transfers of control, "abrupt completions"
-    JumpReturn(Interpreted),
-    JumpBreak(Option<Identifier>),
-    JumpContinue(Option<Identifier>),
-
-    UserThrown(JSValue),
-    */
-}
-
-// TODO: impl Display for Exception
-// TODO: #[cfg(feature = "std"] impl Error for Exception
-// TODO: capture JavaScript stack trace in Exception
+pub struct Exception(pub Exc);
 
 impl Exception {
-    /*
-    pub fn instance_required<V>(arg: V, of: &str) -> Exception
-    where
-        Interpreted: From<V>,
-    {
-        let arg = Interpreted::from(arg);
-        Exception::TypeErrorInstanceRequired(arg, of.to_string())
+    pub fn type_error(message: String) -> Self {
+        Exception(Exc::Type(TypeError{message}))
     }
-    */
 }
 
 impl From<ParseError> for Exception {
     fn from(err: ParseError) -> Self {
-        Self::SyntaxTreeError(err)
+        Exception(Exc::Syntax(SyntaxError::Parse(err)))
     }
 }
 
@@ -95,11 +63,19 @@ impl From<Exception> for io::Error {
     }
 }
 
-/*
-pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
-    match e {
-        Exception::TypeErrorSetReadonly(_, _) => Ok(()),
-        _ => Err(e),
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum Exc {
+    Thrown,
+    Syntax(SyntaxError),
+    Type(TypeError),
 }
-*/
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SyntaxError {
+    Parse(ParseError),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeError{
+    message: String,
+}

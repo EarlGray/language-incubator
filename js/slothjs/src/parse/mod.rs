@@ -1,5 +1,5 @@
 pub mod estree;
-mod heapnode;
+//mod heapnode;
 mod jsonnode;
 #[cfg(test)]
 mod test;
@@ -12,7 +12,7 @@ use crate::error::ParseError;
 use crate::source;
 use crate::JSON;
 
-pub use self::heapnode::HeapNode;
+//pub use self::heapnode::HeapNode;
 
 type ParseResult<T> = Result<T, ParseError>;
 

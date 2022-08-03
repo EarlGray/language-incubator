@@ -1,5 +1,6 @@
-mod interp;
+//mod interp;
 
+/*
 /// Runs interpretation of the first argument (a string literal),
 /// then compares the result to the second argument (anything that `serde_json::json!`
 /// understands).
@@ -23,6 +24,7 @@ macro_rules! assert_eval {
 }
 
 pub(crate) use assert_eval;
+*/
 
 /*
 /// Run interpretation of the first argument (a string literal),
@@ -43,12 +45,13 @@ pub(crate) use assert_exception;
 /// ```
 #[test]
 fn test_sizes() {
-    use crate::object::*;
+    //use crate::object::*;
     use crate::*;
     use std::mem::size_of;
 
     println!("============================");
     println!("size_of JSRef:  \t{}", size_of::<heap::JSRef>());
+    /*
     println!("size_of JSValue:\t{}", size_of::<object::JSValue>());
     println!("size_of Interpreted:\t{}", size_of::<Interpreted>());
     println!("size_of JSObject:\t{}", size_of::<object::JSObject>());
@@ -67,6 +70,7 @@ fn test_sizes() {
     println!("size_of   Access:\t{}", size_of::<Access>());
     println!("size_of   Content:\t{}", size_of::<Content>());
     println!("============================");
+    */
 }
 
 #[test]

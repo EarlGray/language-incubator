@@ -1,5 +1,9 @@
 use crate::prelude::*;
 use crate::{
+    JSResult,
+    Realm,
+    Ref,
+/*
     object::Access,
     CallContext,
     Exception,
@@ -7,10 +11,15 @@ use crate::{
     Interpreted,
     JSObject,
     JSRef,
-    JSResult,
     JSValue,
+*/
 };
 
+pub fn constructor(realm: &Realm, inout: Pin<&mut Ref>) -> JSResult<()> {
+    todo!()
+}
+
+/*
 fn object_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let value = call.arg_value(0, heap)?;
     let object_ref = match value.objectify(heap) {
@@ -256,3 +265,4 @@ pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
 
     Ok(the_object_ref)
 }
+*/

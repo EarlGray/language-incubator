@@ -2,6 +2,7 @@ pub use core::{
     convert::TryFrom,
     fmt,
     fmt::Write,
+    pin::Pin,
     str::FromStr,
 };
 
