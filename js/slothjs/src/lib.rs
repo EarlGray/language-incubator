@@ -32,12 +32,13 @@ pub use error::{
 };
 pub use function::CallContext;
 pub use heap::{
-    Realm,
     Heap,
     JSRef,
+    Realm,
     Ref,
+    With,
+    value::{self, Value},
 };
-pub use heap::value;
 pub use interpret::Interpretable;
 pub use parse::{
     estree::ToESTree,

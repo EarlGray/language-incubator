@@ -128,6 +128,13 @@ impl Object {
         object
     }
 
+    pub(super) fn to_primitive(&self) -> Option<Value> {
+        match &self.value {
+            Inner::Prim(value) => Some(value.clone()),
+            _ => None,
+        }
+    }
+
     pub(super) fn set_proto(&mut self, proto: HRef) {
         self.proto = Some(proto);
     }

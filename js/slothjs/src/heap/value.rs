@@ -11,12 +11,24 @@ use super::{Realm, Ref};
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct JSString(String);
 
+impl JSString {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 /// JavaScript number
 #[derive(Debug, Clone, PartialEq)]
 pub struct JSNumber(f64);
 
 impl JSNumber {
     pub const NAN: JSNumber = JSNumber(f64::NAN);
+}
+
+impl From<f64> for JSNumber {
+    fn from(n: f64) -> Self {
+        JSNumber(n)
+    }
 }
 
 /* TODO: string interner, its handles here.
@@ -46,6 +58,12 @@ pub enum Value {
     /// Values of ES6 type Symbol
     Symbol()
     */
+}
+
+impl<N> From<N> for Value where JSNumber: From<N> {
+    fn from(n: N) -> Self {
+        Value::Number(JSNumber::from(n))
+    }
 }
 
 /// A key in an object

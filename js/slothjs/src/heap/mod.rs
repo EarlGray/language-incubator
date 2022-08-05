@@ -86,6 +86,7 @@ impl Realm {
     fn init_global(&mut self) -> JSResult<()> {
         let (global, object_proto, function_proto): (HRef, HRef, HRef) = {
             let mut heap = self.heap.borrow_mut();
+            // TODO: move this into Heap.
             let global = heap.alloc(Object::with_proto(NULL));
 
             // Initialize it with the builtins it depends on
@@ -128,43 +129,73 @@ impl Realm {
         Ok(())
     }
 
-    pub fn with<T, F, const N: usize>(&self, its: [With; N], mut action: F) -> JSResult<T>
+    /// Run a closure `action` with an array of temporary [`Ref`]s
+    /// created from an array of [`With`] initializers.
+    ///
+    /// E.g.
+    /// ```
+    /// # use core::pin::Pin;
+    /// # use slothjs::{Realm, With, Ref, Value};
+    /// let realm = Realm::init().unwrap();
+    /// realm.with([With::Val(Value::from(4.0))], |[four]| {
+    ///     assert_eq!(four.as_value(), Some(Value::from(4.0)));
+    ///     Ok(())
+    /// }).unwrap();
+    /// ```
+    /// TODO: some compile_fail examples for moving out `Pin<&mut Ref>`.
+    pub fn with<T, F, const N: usize>(&self, withs: [With; N], mut action: F) -> JSResult<T>
         where F: FnMut([Pin<&mut Ref>; N]) -> JSResult<T>
     {
-        use core::mem::MaybeUninit;
-        let mut lrefs: [MaybeUninit<Ref>; N] = MaybeUninit::uninit_array();
-        for i in 0..N {
-            let mut heap = self.heap.borrow_mut();
-            let innerref = match &its[i] {
-                With::New => {
-                    let href = heap.alloc(Object::with_proto(self.object_proto));
-                    InnerRef::href(href)
-                }
-                With::Val(value) => {
-                    let href = heap.alloc(Object::with_value(value.clone()));
-                    InnerRef::href(href)
-                }
-                With::Var(varpath) => {
-                    heap.lookup_path(self.global, varpath)
-                }
-            };
-            let lref = heap.refstack.len();
-            heap.refstack.push(innerref);
-            lrefs[i].write(Ref{realm: &self, lref});
-        }
-        let mut lrefs: [Ref; N] = unsafe { MaybeUninit::array_assume_init(lrefs) };
+        use core::mem::MaybeUninit;     // because const-array programming is not fun.
 
-        let mut lrefs_slice: &mut [Ref] = lrefs.as_mut_slice();
-        let mut refpins: [MaybeUninit<Pin<&mut Ref>>; N] = MaybeUninit::uninit_array();
-        let mut i = 0;
-        while let Some((head, tail)) = lrefs_slice.split_first_mut() {
-            lrefs_slice = tail;
-            refpins[i].write(Pin::new(head));
-            i += 1;
+        // create `Ref`s from descriptions in `withs`:
+        let mut refs: [Ref; N] = {
+            let mut refs: [MaybeUninit<Ref>; N] = MaybeUninit::uninit_array();
+            for i in 0..N {
+                let mut heap = self.heap.borrow_mut();
+                let innerref = match &withs[i] {
+                    With::New => {
+                        let href = heap.alloc(Object::with_proto(self.object_proto));
+                        InnerRef::href(href)
+                    }
+                    With::Val(value) => {
+                        let href = heap.alloc(Object::with_value(value.clone()));
+                        InnerRef::href(href)
+                    }
+                    With::Var(varpath) => {
+                        heap.lookup_path(self.global, varpath)
+                    }
+                };
+                let lref = heap.refstack.len();
+                heap.refstack.push(innerref);
+                refs[i].write(Ref{realm: &self, lref});
+            }
+            unsafe { MaybeUninit::array_assume_init(refs) }
+        };
+
+        // Create `refpins: [Pin<&mut Ref>; N]` from `[Ref; N]`:
+        let refpins: [Pin<&mut Ref>; N] = {
+            let mut lrefs_slice: &mut [Ref] = refs.as_mut_slice();
+            let mut refpins: [MaybeUninit<Pin<&mut Ref>>; N] = MaybeUninit::uninit_array();
+            let mut i = 0;
+            while let Some((head, tail)) = lrefs_slice.split_first_mut() {
+                lrefs_slice = tail;
+                refpins[i].write(Pin::new(head));
+                i += 1;
+            }
+            unsafe { MaybeUninit::array_assume_init(refpins) }
+        };
+
+        // do it!
+        let result = action(refpins);
+
+        // refpins are now consumed by `action`, it's safe to clean up `refs`:
+        let mut heap = self.heap.borrow_mut();
+        for r in refs.as_slice() {
+            heap.refstack.pop();
         }
 
-        let refpins = unsafe { MaybeUninit::array_assume_init(refpins) };
-        action(refpins)
+        result
     }
 
     pub fn with_new<T, F>(&self, mut action: F) -> JSResult<T>
@@ -187,13 +218,26 @@ impl Realm {
         result
     }
 
+    /*
+    pub fn with_prop<T, F>(&self, of: Pin<&mut Ref>, name: &str, mut action: F) -> JSResult<T>
+        where F: FnMut(Pin<&mut Ref>, Pin<&mut Ref>) -> JSResult<T>
+    {
+        let lref = {
+            let mut heap = self.heap.borrow_mut();
+            heap.ref_to_inner(of).to_href();
+            }
+        }
+        let mut var = Ref{realm: &self, lref};
+        action(Pin::new(&mut var))
+    }
+    */
+
     fn with_heap<'b, 's: 'b, T, F>(&'s self, mut action: F) -> T
         where F: FnMut(core::cell::RefMut<'b, Heap>) -> T
     {
         let heap = self.heap.borrow_mut();
         action(heap)
     }
-
 }
 
 /*
@@ -251,6 +295,24 @@ impl Heap {
         }
         InnerRef::member(href, id)
     }
+
+    fn innerref(&self, r: Pin<&mut Ref>) -> &InnerRef {
+        &self.refstack[r.lref]
+    }
+
+    fn innerref_mut(&mut self, r: Pin<&mut Ref>) -> &mut InnerRef {
+        &mut self.refstack[r.lref]
+    }
+
+    fn ref_to_href(&self, r: Pin<&mut Ref>) -> Option<HRef> {
+        match &self.refstack[r.lref] {
+            InnerRef(None) => None,
+            InnerRef(Some((href, None))) => Some(*href),
+            InnerRef(Some((base, Some(name)))) => {
+                self.get(*base).get(name.as_str())
+            }
+        }
+    }
 }
 
 
@@ -287,8 +349,38 @@ pub struct Ref<'r>{
 impl<'r> Ref<'r> {
     pub fn is_empty(self: Pin<&mut Self>) -> bool {
         let heap = self.realm.heap.borrow();
-        heap.refstack[self.lref] == InnerRef::EMPTY
+        *heap.innerref(self) == InnerRef::EMPTY
     }
+
+    pub fn as_value(self: Pin<&mut Self>) -> Option<Value> {
+        let heap = self.realm.heap.borrow_mut();
+        match heap.innerref(self) {
+            InnerRef(Some((href, None))) => {
+                heap.get(*href).to_primitive()
+            }
+            InnerRef(None) => None,     // it's empty, nothing to see here
+            InnerRef(_) => None,        // it's an uninitialized attribute
+        }
+    }
+
+    /*
+    pub fn eq(self: Pin<&mut Self>, other: Pin<&mut Self>) -> JSResult<bool> {
+        if self.realm.heap != other.realm.heap {
+            return Ok(false);
+        }
+        let heap = self.realm.heap.borrow();
+        match (heap.ref_to_href(self), heap.ref_to_href(other)) {
+            (None, None) => return true,
+            (Some(r1), Some(r2)) if r1 == r2 => return true,
+            (Some(r1), Some(r2))
+        }
+    }
+
+    pub fn as_object(self: Pin<&mut Self>) -> Option<Pin<&mut ObjectRef>> {
+        let heap = self.realm.heap.borrow_mut();
+        if
+    }
+    */
 }
 
 /// An opaque reference to an [`Object`].
@@ -317,7 +409,14 @@ mod test {
     #[test]
     fn realm_init() {
         let realm = Realm::init().expect("Realm::init");
-        realm.with([With::Var("global")], |[the_object]| {
+        realm.with([
+            With::Var("global"),
+            With::Var("Object"),
+            With::Var("Object.prototype"),
+            With::Var("Function"),
+            With::Var("Function.prototype"),
+        ], |[global, object, objproto, function, funcproto]| {
+            // assert_eq!( objctor, object )
             Ok(())
         }).unwrap();
     }
