@@ -1,5 +1,3 @@
-#![feature(local_key_cell_methods)]
-
 use core::fmt;
 use core::cell::RefCell;
 use slothjs::{
@@ -52,8 +50,9 @@ pub fn interpret_string(json_ast: &str) -> Result<JsValue, JsValue> {
 pub fn interpret(jsobject: &JsValue) -> Result<JsValue, JsValue> {
     let json: JSON = jsobject.into_serde().map_err(jserror)?;
     let program = Program::parse_from(&json).map_err(jserror)?;
-    let result = HEAP.with_borrow_mut(|heap| {
-        heap.evaluate(&program)?.to_json(heap)
+    let result = HEAP.with(|heapcell| {
+        let mut heap = heapcell.borrow_mut();
+        heap.evaluate(&program)?.to_json(&heap)
     }).map_err(jserror)?;
     // TODO: implement serde::Serializer directly for JSValue?
     JsValue::from_serde(&result).map_err(jserror)

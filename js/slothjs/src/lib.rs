@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(let_else)]
 #![doc = include_str!("../docs/DOC.md")]
 
 extern crate alloc;

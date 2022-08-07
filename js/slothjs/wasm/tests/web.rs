@@ -16,11 +16,11 @@ use slothjs::{
 
 #[wasm_bindgen_test]
 fn test_interpret_string() {
-    use slothjs::ast::builder::expr;
+    use slothjs::ast::expr;
 
-    let two_plus_two = sljs::Program::from([
-        expr::add(expr::lit(2), expr::lit(2)).into(),
-    ].iter()).to_estree();
+    let two_plus_two = sljs::Program::from_stmt(
+        expr::add(expr::lit(2), expr::lit(2)),
+    ).to_estree();
 
     let two_plus_two = two_plus_two.to_string();
     assert_eq!(
@@ -31,15 +31,15 @@ fn test_interpret_string() {
 
 #[wasm_bindgen_test]
 fn test_interpret() {
-    use slothjs::ast::builder::{expr, stmt};
+    use slothjs::ast::{expr, stmt};
 
-    let var_x = sljs::Program::from([
-        stmt::var([("x", expr::lit(12))].iter()).into(),
-    ].iter()).to_estree();
+    let var_x = sljs::Program::from_stmt(
+        stmt::var([("x", expr::lit(12))].iter()),
+    ).to_estree();
 
-    let x_plus = sljs::Program::from([
-        expr::add(expr::id("x"), expr::lit(8)).into(),
-    ].iter()).to_estree();
+    let x_plus = sljs::Program::from_stmt(
+        expr::add(expr::id("x"), expr::lit(8)),
+    ).to_estree();
 
     let var_x = JsValue::from_serde(&var_x).unwrap();
     slothjs_wasm::interpret(&var_x).unwrap();
