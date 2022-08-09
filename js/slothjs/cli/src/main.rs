@@ -96,7 +96,7 @@ struct Args {
     #[clap(short = 'N', long, action)]
     nodejs: bool,
 
-    /// Parse sources using an internal Esprima instance [experimental]
+    /// Parse sources using an internal Esprima instance \[experimental\]
     #[clap(short = 'E', long, action)]
     esprima: bool,
 

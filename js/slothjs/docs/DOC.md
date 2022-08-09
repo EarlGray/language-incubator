@@ -136,7 +136,7 @@ assert_eq!(&output, "4");
 [`JSObject`] contains:
 - a [`JSRef`] to its prototype object
 - optionally an [`object::ObjectValue`] encapsulatng a primitive value,
-  or a [`function::VMCall`]/[`function::Closure`], or an optimized object storage
+  or a [`function::HostFunc`]/[`function::Closure`], or an optimized object storage
   (e.g. [`object::JSArray`])
 - a hashmap from `String` keys to [`object::Property`]
 

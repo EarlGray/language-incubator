@@ -10,6 +10,7 @@ pub mod function;
 pub mod heap;
 pub mod interpret;
 pub mod object;
+pub mod value;
 mod parse;
 mod prelude;
 pub mod source;
@@ -38,11 +39,14 @@ pub use interpret::Interpretable;
 pub use object::{
     Interpreted,
     JSObject,
-    JSValue,
-    JSON,
 };
 pub use parse::{
     estree::ToESTree,
     HeapNode,
     SourceNode,
+};
+pub use value::{
+    JSNumber,
+    JSValue,
+    JSON,
 };

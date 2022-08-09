@@ -80,22 +80,25 @@ impl From<Vec<Interpreted>> for CallContext {
     }
 }
 
+/// What a host function callable from JS looks like.
 pub type HostFn = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
 
-/// A wrapper for NativeFunction to give it `fmt::Debug`.
+/// A wrapper for [`HostFn`] to give it `fmt::Debug`.
 #[derive(Clone)]
 pub struct HostFunc(HostFn);
 
 impl HostFunc {
-    pub fn from_func(f: HostFn) -> HostFunc {
-        HostFunc(f)
-    }
-
     pub fn call(self, call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         self.0(call, heap)
     }
     pub fn ptr(&self) -> usize {
         self.0 as *const () as usize
+    }
+}
+
+impl From<HostFn> for HostFunc {
+    fn from(func: HostFn) -> Self {
+        Self(func)
     }
 }
 

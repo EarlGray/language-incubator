@@ -1,13 +1,13 @@
 #[cfg(feature = "std")]
 use std::io;
 
-use crate::ast::Identifier;
-use crate::object::{
+use crate::prelude::*;
+use crate::{
     Interpreted,
     JSValue,
     JSON,
+    ast::Identifier,
 };
-use crate::prelude::*;
 
 pub type JSResult<T> = Result<T, Exception>;
 

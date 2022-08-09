@@ -201,7 +201,7 @@ impl Runtime {
     }
 }
 
-/// Not-really-a-Parser implementation that just deserializes a JSON ESTree.
+/// Not-really-a-[`Parser`] implementation that just deserializes a JSON ESTree.
 #[derive(Debug)]
 pub struct JSONParser;
 
