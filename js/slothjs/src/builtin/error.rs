@@ -1,11 +1,11 @@
 use crate::{
     function::CallContext,
+    prelude::*,
     Heap,
     Interpreted,
     JSObject,
     JSRef,
     JSResult,
-    JSValue,
 };
 
 pub fn error_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
@@ -40,7 +40,7 @@ fn error_proto_toString(call: CallContext, heap: &'_ mut Heap) -> JSResult<Inter
     Ok(Interpreted::from(match () {
         _ if message.is_empty() => name,
         _ if name.is_empty() => message,
-        _ => name + ": " + &message,
+        _ => JSString::from(name.to_string() + ": " + &message),
     }))
 }
 

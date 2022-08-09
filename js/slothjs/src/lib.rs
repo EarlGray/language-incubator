@@ -10,10 +10,10 @@ pub mod function;
 pub mod heap;
 pub mod interpret;
 pub mod object;
-pub mod value;
 mod parse;
 mod prelude;
 pub mod source;
+pub mod value;
 
 #[cfg(feature = "std")]
 pub mod runtime;
@@ -47,6 +47,7 @@ pub use parse::{
 };
 pub use value::{
     JSNumber,
+    JSString,
     JSValue,
     JSON,
 };

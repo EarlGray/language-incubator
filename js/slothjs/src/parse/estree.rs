@@ -93,7 +93,7 @@ impl ToESTree for Expression {
 
 impl ToESTree for Identifier {
     fn to_estree(&self) -> JSON {
-        json!({"type": "Identifier", "name": self.0})
+        json!({"type": "Identifier", "name": self.as_str()})
     }
 }
 

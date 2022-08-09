@@ -1,4 +1,12 @@
+use core::{
+    borrow::Borrow,
+    convert::Infallible,
+    ops::Deref,
+    str::Chars,
+};
+
 use crate::{
+    prelude::*,
     CallContext,
     Exception,
     Heap,
@@ -12,13 +20,118 @@ pub type JSON = serde_json::Value;
 
 pub type JSNumber = f64;
 
+/// A Javascript string value.
+///
+/// Why not `std::string::String`?
+/// - Javascript strings are immutable. There is no point in cloning a string content.
+/// - Ideally they should be a sequence of addressable 16-bit UTF-16 "code points" (potentially broken).
+///   TODO: Indexing a Rust `String` over chars brings an unknown overhead of linear scanning.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct JSString(Rc<str>);
+
+impl JSString {
+    pub fn as_str(&self) -> &str {
+        self.0.as_ref()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn chars(&self) -> Chars {
+        self.0.chars()
+    }
+}
+
+impl Default for JSString {
+    fn default() -> Self {
+        JSString(Rc::from(""))
+    }
+}
+
+impl Borrow<str> for JSString {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for JSString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+
+impl fmt::Display for JSString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for JSString {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<JSString, Self::Err> {
+        Ok(JSString(Rc::from(s)))
+    }
+}
+
+impl From<String> for JSString {
+    fn from(s: String) -> JSString {
+        JSString(Rc::from(s.into_boxed_str()))
+    }
+}
+
+impl From<&str> for JSString {
+    fn from(s: &str) -> JSString {
+        JSString(Rc::from(s))
+    }
+}
+
+#[cfg(test)]
+mod test_strings {
+    use core::hash::{
+        Hash,
+        Hasher,
+    };
+    use std::collections::hash_map::DefaultHasher;
+
+    use super::JSString;
+
+    #[test]
+    fn eq() {
+        let s1 = JSString::from("hello");
+        let s2 = JSString::from("hello");
+        assert_eq!(s1, s2);
+        assert_ne!(s1.as_ptr(), s2.as_ptr());
+
+        let s3 = s2.clone();
+        assert_eq!(s2.as_ptr(), s3.as_ptr());
+    }
+
+    fn get_hash<T: Hash>(t: &T) -> u64 {
+        let mut h = DefaultHasher::new();
+        t.hash(&mut h);
+        h.finish()
+    }
+
+    #[test]
+    fn hash() {
+        let s1 = JSString::from("hello");
+        let s2 = JSString::from("hello");
+        assert_eq!(get_hash(&s1), get_hash(&s2));
+    }
+}
+
 /// A `JSValue` is either a primitive value or a reference to an object.
 #[derive(Debug, Clone, PartialEq)]
 pub enum JSValue {
     Undefined,
     Bool(bool),
     Number(JSNumber),
-    String(String),
+    String(JSString),
     //Symbol(String)
     Ref(JSRef),
 }
@@ -57,29 +170,38 @@ impl JSValue {
     /// # use slothjs::{JSValue, Heap};
     /// # let mut heap = Heap::new();
     /// assert_eq!(
-    ///     JSValue::from("1").to_string(&mut heap).unwrap(),
+    ///     JSValue::from("1").to_string(&mut heap).unwrap().as_str(),
     ///     "\"1\""
     /// );
     /// assert_eq!(
-    ///     JSValue::from(1).to_string(&mut heap).unwrap(),
+    ///     JSValue::from(1).to_string(&mut heap).unwrap().as_str(),
     ///     "1"
     /// );
     ///
     /// let json_object = json!({"one": 1});
     /// let example_object = heap.object_from_json(&json_object);
     /// assert_eq!(
-    ///     example_object.to_string(&mut heap).unwrap(),
+    ///     example_object.to_string(&mut heap).unwrap().as_str(),
     ///     "{ one: 1 }"
     /// );
     ///
     /// let json_array = json!([1, 2]);
     /// let example_array = heap.object_from_json(&json_array);
-    /// assert_eq!( example_array.to_string(&mut heap).unwrap(), "[1, 2]" );
+    /// assert_eq!(
+    ///     example_array.to_string(&mut heap).unwrap().as_str(),
+    ///     "[1, 2]"
+    /// );
     /// ```
-    pub fn to_string(&self, heap: &mut Heap) -> JSResult<String> {
+    pub fn to_string(&self, heap: &mut Heap) -> JSResult<JSString> {
         match self {
-            JSValue::String(s) => Ok(JSON::from(s.as_str()).to_string()),
-            JSValue::Ref(heapref) => heap.get(*heapref).clone().to_string(heap),
+            JSValue::String(s) => {
+                let jstr = JSON::from(s.as_str());
+                Ok(JSString::from(jstr.to_string()))
+            }
+            JSValue::Ref(heapref) => {
+                // without `.clone()` `heap` cannot be borrowed in both places
+                heap.get(*heapref).clone().to_string(heap)
+            }
             _ => self.stringify(heap),
         }
     }
@@ -87,13 +209,13 @@ impl JSValue {
     /// stringify() makes everything into a string
     /// used for evaluation in a string context.
     /// It corresponds to .toString() in JavaScript
-    pub fn stringify(&self, heap: &mut Heap) -> JSResult<String> {
+    pub fn stringify(&self, heap: &mut Heap) -> JSResult<JSString> {
         match self {
-            JSValue::Undefined => Ok("undefined".to_string()),
-            JSValue::Bool(b) => Ok(b.to_string()),
-            JSValue::Number(n) => Ok(n.to_string()),
+            JSValue::Undefined => Ok("undefined".into()),
+            JSValue::Bool(b) => Ok(b.to_string().into()),
+            JSValue::Number(n) => Ok(n.to_string().into()),
             JSValue::String(s) => Ok(s.clone()),
-            JSValue::Ref(r) if r == &Heap::NULL => Ok("null".to_string()),
+            JSValue::Ref(r) if r == &Heap::NULL => Ok(JSString::from("null")),
             JSValue::Ref(r) => match heap.lookup_protochain(*r, "toString") {
                 Some(to_string) => {
                     let funcref = to_string.to_ref(heap)?;
@@ -101,14 +223,14 @@ impl JSValue {
                         funcref,
                         CallContext {
                             this_ref: *r,
-                            method_name: "toString".to_string(),
+                            method_name: "toString".into(),
                             arguments: vec![],
                             loc: None,
                         },
                     )?;
                     Ok(result.to_value(heap)?.stringify(heap)?)
                 }
-                None => Ok("[object Object]".to_string()),
+                None => Ok("[object Object]".into()),
             },
         }
     }
@@ -122,7 +244,7 @@ impl JSValue {
             JSValue::Undefined => None, // Some(f64::NAN),
             JSValue::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
             JSValue::Number(n) => Some(*n),
-            JSValue::String(s) => s.parse::<JSNumber>().ok(),
+            JSValue::String(s) => s.as_str().parse::<JSNumber>().ok(),
             JSValue::Ref(Heap::NULL) => Some(0.0),
             JSValue::Ref(r) => {
                 let object = heap.get(*r);
@@ -144,7 +266,7 @@ impl JSValue {
     pub fn boolify(&self, heap: &Heap) -> bool {
         match self {
             JSValue::Undefined => false,
-            JSValue::String(s) => !s.is_empty(),
+            JSValue::String(s) => !s.as_str().is_empty(),
             JSValue::Ref(Heap::NULL) => false,
             JSValue::Ref(_) => true,
             _ => {
@@ -243,14 +365,14 @@ impl JSValue {
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Addition>
     pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> JSResult<JSValue> {
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
-            return Ok(JSValue::from(lstr.to_string() + rstr));
+            return Ok(JSValue::from(lstr.to_string() + rstr.as_str()));
         }
         if let (Some(lnum), Some(rnum)) = (self.numberify(heap), other.numberify(heap)) {
             return Ok(JSValue::from(lnum + rnum));
         }
         let lvalstr = self.stringify(heap)?;
         let rvalstr = other.stringify(heap)?;
-        Ok(JSValue::from(lvalstr + &rvalstr))
+        Ok(JSValue::from(lvalstr.to_string() + rvalstr.as_str()))
     }
 
     /// Subtraction operator:
@@ -268,7 +390,7 @@ impl JSValue {
     ) -> JSValue {
         // TODO: Abstract Relational Comparison
         if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
-            return JSValue::from(stringly(lstr, rstr));
+            return JSValue::from(stringly(lstr.as_str(), rstr.as_str()));
         };
         let lnum = self.numberify(heap).unwrap_or(f64::NAN);
         let rnum = other.numberify(heap).unwrap_or(f64::NAN);
@@ -294,15 +416,12 @@ impl From<i64> for JSValue {
     }
 }
 
-impl From<String> for JSValue {
-    fn from(s: String) -> Self {
-        JSValue::String(s)
-    }
-}
-
-impl From<&str> for JSValue {
-    fn from(s: &str) -> Self {
-        JSValue::String(s.to_string())
+impl<S> From<S> for JSValue
+where
+    JSString: From<S>,
+{
+    fn from(s: S) -> Self {
+        JSValue::String(JSString::from(s))
     }
 }
 
@@ -321,11 +440,11 @@ impl TryFrom<&JSON> for JSValue {
         let value = if json.is_null() {
             JSValue::NULL
         } else if let Some(b) = json.as_bool() {
-            JSValue::Bool(b)
+            JSValue::from(b)
         } else if let Some(n) = json.as_f64() {
-            JSValue::Number(n)
+            JSValue::from(n)
         } else if let Some(s) = json.as_str() {
-            JSValue::String(s.to_string())
+            JSValue::from(s)
         } else {
             return Err(());
         };

@@ -4,6 +4,7 @@ use crate::{
     Heap,
     JSRef,
     JSResult,
+    JSString,
     JSValue,
 };
 
@@ -90,7 +91,7 @@ impl SourceNode for HeapNode {
         }
     }
 
-    fn get_str(&self, property: &str) -> ParseResult<String> {
+    fn get_str(&self, property: &str) -> ParseResult<JSString> {
         let value = self.property(property)?;
         match value {
             JSValue::String(s) => Ok(s),

@@ -128,7 +128,7 @@ let value: JSValue = result.to_value(&heap).expect("JSValue");
 assert_eq!(value, JSValue::from(4));
 
 let output = value.to_string(&mut heap).unwrap();
-assert_eq!(&output, "4");
+assert_eq!(output.as_str(), "4");
 ```
 
 ## More about objects
@@ -190,7 +190,7 @@ let zoomref: JSRef = heap
 // Finally, call `zoom(10)`:
 let call = CallContext::from(vec![Interpreted::from(10)])
     .with_this(Heap::GLOBAL)
-    .with_name("zoom");
+    .with_name("zoom".into());
 let result: Interpreted = heap.execute(zoomref, call).expect("call result");
 
 let result: JSValue = result.to_value(&heap).unwrap();

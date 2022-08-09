@@ -3,10 +3,10 @@ use std::io;
 
 use crate::prelude::*;
 use crate::{
+    ast::Identifier,
     Interpreted,
     JSValue,
     JSON,
-    ast::Identifier,
 };
 
 pub type JSResult<T> = Result<T, Exception>;

@@ -7,6 +7,7 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
+    JSString,
     JSValue,
 };
 
@@ -26,7 +27,7 @@ fn string_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interprete
 }
 
 impl Heap {
-    fn ref_to_string(&mut self, href: JSRef) -> JSResult<String> {
+    fn ref_to_string(&mut self, href: JSRef) -> JSResult<JSString> {
         match self.get(href).to_primitive() {
             Some(val) => val.stringify(self),
             None => JSValue::from(href).stringify(self),
@@ -129,7 +130,7 @@ fn string_proto_indexOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
     let heystack = &heystack[byte_start..];
 
     // COSTLY, but kudos to std::str for providing a fast and tested substring search
-    let byte_index = match heystack.find(&needle) {
+    let byte_index = match heystack.find(needle.as_str()) {
         None => return Ok(NOT_FOUND),
         Some(byte_index) => byte_index,
     };
@@ -152,7 +153,7 @@ fn string_proto_replace(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
     }
     let search = search.stringify(heap)?;
 
-    let (before, matched, after) = match string.split_once(&search) {
+    let (before, matched, after) = match string.split_once(search.as_str()) {
         None => return Ok(Interpreted::from(string)),
         Some((before, after)) => (before, &search, after),
     };

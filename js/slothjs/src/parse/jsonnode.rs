@@ -59,14 +59,14 @@ impl SourceNode for JSON {
             .ok_or_else(|| ParseError::want("bool", self.to_error()))
     }
 
-    fn get_str(&self, property: &str) -> ParseResult<String> {
+    fn get_str(&self, property: &str) -> ParseResult<JSString> {
         let child = self
             .get(property)
             .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         let s = child
             .as_str()
             .ok_or_else(|| ParseError::want("string", self.to_error()))?;
-        Ok(s.to_string())
+        Ok(s.into())
     }
 
     fn map_array<T, F>(&self, property: &str, func: F) -> ParseResult<Vec<T>>

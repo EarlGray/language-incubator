@@ -9,6 +9,7 @@ use crate::{
     error,
     Exception,
     Heap,
+    JSString,
     JSValue,
     Program,
     JSON,
@@ -178,7 +179,7 @@ impl Runtime {
     }
 
     /// Turn a [`JSValue`] into a human-readable string.
-    pub fn string_from(&mut self, value: JSValue) -> String {
+    pub fn string_from(&mut self, value: JSValue) -> JSString {
         value
             .to_string(&mut self.heap)
             .expect("JSValue.to_string()")

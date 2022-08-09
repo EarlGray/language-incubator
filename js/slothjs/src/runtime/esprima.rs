@@ -93,7 +93,7 @@ impl runtime::Parser for EsprimaParser {
             self.esparse,
             CallContext::from(arguments)
                 .with_this(self.object)
-                .with_name("parse"),
+                .with_name("parse".into()),
         )?;
         let node = estree.to_ref(heap)?;
 

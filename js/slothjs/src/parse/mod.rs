@@ -124,13 +124,13 @@ pub trait SourceNode: Sized {
 
     /// Get the string value of a child node with name `property`.
     /// It's a ParseError if it does not exist or does not have a string meaning.
-    fn get_str(&self, property: &str) -> ParseResult<String>;
+    fn get_str(&self, property: &str) -> ParseResult<JSString>;
 
     /// Check that the value of `property` is a string equal to `value`.
     /// Depends on [`SourceNode::get_str`].
     fn expect_str(&self, property: &str, value: &'static str) -> ParseResult<()> {
         let got = self.get_str(property)?;
-        match got == value {
+        match got.as_str() == value {
             true => Ok(()),
             false => Err(ParseError::UnexpectedValue {
                 want: value,
@@ -749,8 +749,8 @@ impl ParseFrom for ObjectExpression {
                 match keyexpr.expr {
                     Expr::Identifier(ident) => ObjectKey::Identifier(ident.0),
                     Expr::Literal(jval) => match jval.0.as_str() {
-                        Some(val) => ObjectKey::Identifier(val.to_string()),
-                        None => ObjectKey::Identifier(jval.0.to_string()),
+                        Some(val) => ObjectKey::Identifier(val.into()),
+                        None => ObjectKey::Identifier(jval.0.to_string().into()),
                     },
                     _ => {
                         return Err(ParseError::UnexpectedValue {

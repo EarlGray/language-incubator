@@ -42,7 +42,7 @@ pub(crate) use assert_exception;
 /// $ cargo -q test --lib sizes -- --nocapture
 /// ```
 #[test]
-fn test_sizes() {
+fn struct_sizes() {
     use crate::object::*;
     use crate::*;
     use std::mem::size_of;
@@ -50,6 +50,7 @@ fn test_sizes() {
     println!("============================");
     println!("size_of JSRef:  \t{}", size_of::<JSRef>());
     println!("size_of JSValue:\t{}", size_of::<JSValue>());
+    println!("size_of JSString:\t{}", size_of::<JSString>());
     println!("size_of Interpreted:\t{}", size_of::<Interpreted>());
     println!("size_of JSObject:\t{}", size_of::<JSObject>());
     println!(
@@ -68,5 +69,7 @@ fn test_sizes() {
 
 #[test]
 fn test_scratch() {
+    use crate::prelude::Rc;
     // One-off experiments, don't commit anything here.
+    println!("size_of Rc<()>:  \t{}", std::mem::size_of::<Rc<()>>());
 }

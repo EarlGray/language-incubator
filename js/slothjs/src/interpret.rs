@@ -203,14 +203,12 @@ impl Interpretable for ForInStatement {
         let mut objref = iteratee;
         while objref != Heap::NULL {
             let object = heap.get(objref);
-            let mut keys = object
-                .properties
-                .keys()
+            let mut keys = (object.properties.keys())
                 .cloned()
-                .collect::<HashSet<String>>();
+                .collect::<HashSet<JSString>>();
             if let Some(array) = object.as_array() {
                 let indices = 0..array.storage.len();
-                keys.extend(indices.map(|i| i.to_string()));
+                keys.extend(indices.map(|i| i.to_string().into()));
             }
             // TODO: strings iteration
 
@@ -348,7 +346,7 @@ impl CatchClause {
                     let errval = builtin::error::error_constructor(
                         CallContext::from(args)
                             .with_this(this_ref)
-                            .with_name("Error"),
+                            .with_name("Error".into()),
                         heap,
                     )?;
                     errval.to_value(heap)?
@@ -637,12 +635,15 @@ impl Interpretable for MemberExpression {
         };
 
         // TODO: __proto__ as (getPrototypeOf, setPrototypeOf) property
-        if &propname == "__proto__" {
+        if propname.as_str() == "__proto__" {
             let proto = heap.get(objref).proto;
             return Ok(Interpreted::from(proto));
         }
 
-        Ok(Interpreted::member(objref, &propname))
+        Ok(Interpreted::Member {
+            of: objref,
+            name: propname,
+        })
     }
 }
 
@@ -754,7 +755,7 @@ impl Interpretable for NewExpression {
             funcref,
             CallContext::from(arguments)
                 .with_this(object_ref)
-                .with_name("<constructor>"),
+                .with_name("<constructor>".into()),
         )?;
         match result {
             Interpreted::Value(JSValue::Ref(r)) if r != Heap::NULL => Ok(result),

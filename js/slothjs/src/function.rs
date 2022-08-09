@@ -37,7 +37,7 @@ use crate::{
 ///
 pub struct CallContext {
     pub this_ref: JSRef,
-    pub method_name: String,
+    pub method_name: JSString,
     pub arguments: Vec<Interpreted>,
     pub loc: Option<Box<source::Location>>,
 }
@@ -48,8 +48,8 @@ impl CallContext {
         self
     }
 
-    pub fn with_name<S: ToString>(mut self, name: S) -> Self {
-        self.method_name = name.to_string();
+    pub fn with_name(mut self, name: JSString) -> Self {
+        self.method_name = name;
         self
     }
 
@@ -73,7 +73,7 @@ impl From<Vec<Interpreted>> for CallContext {
     fn from(arguments: Vec<Interpreted>) -> CallContext {
         CallContext {
             arguments,
-            method_name: "".to_string(),
+            method_name: JSString::from(""),
             loc: None,
             this_ref: Heap::NULL,
         }

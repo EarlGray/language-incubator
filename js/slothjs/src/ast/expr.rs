@@ -138,17 +138,17 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-pub struct Identifier(pub String);
+pub struct Identifier(pub JSString);
 
 impl Identifier {
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.as_str()
     }
 }
 
 impl From<&str> for Identifier {
     fn from(s: &str) -> Identifier {
-        Identifier(s.to_string())
+        Identifier(s.into())
     }
 }
 
@@ -177,7 +177,7 @@ pub struct ObjectExpression(pub Vec<(ObjectKey, Expression)>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectKey {
     Computed(Expression),
-    Identifier(String),
+    Identifier(JSString),
 }
 
 impl<E> From<E> for ObjectKey

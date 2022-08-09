@@ -101,7 +101,7 @@ fn object_object_getOwnPropertyDescriptor(
     let propname = call.arg_value(1, heap)?.stringify(heap)?;
 
     let inspected_object = heap.get(inspected_ref);
-    let prop = match inspected_object.properties.get(&propname) {
+    let prop = match inspected_object.properties.get(propname.as_str()) {
         Some(prop) => prop.clone(),
         None => return Ok(Interpreted::VOID),
     };
@@ -118,12 +118,7 @@ fn object_object_getOwnPropertyDescriptor(
     Ok(Interpreted::from(descriptor_ref))
 }
 
-fn define_property(
-    objref: JSRef,
-    propname: String,
-    descref: JSRef,
-    heap: &mut Heap,
-) -> JSResult<()> {
+fn define_property(objref: JSRef, propname: &str, descref: JSRef, heap: &mut Heap) -> JSResult<()> {
     let get_value =
         |object: &JSObject, name: &str| object.get_own_value(name).unwrap_or(JSValue::Undefined);
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
@@ -150,8 +145,8 @@ fn define_property(
         let access = Access::new(configurable, enumerable, writable);
 
         let object = heap.get_mut(objref);
-        object.define_own_property(&propname, access)?;
-        object.set_even_nonwritable(&propname, value)?;
+        object.define_own_property(propname, access)?;
+        object.set_even_nonwritable(propname, value)?;
     }
     Ok(())
 }
@@ -162,12 +157,12 @@ fn object_object_defineProperty(call: CallContext, heap: &mut Heap) -> JSResult<
     let prop = call.arg_value(1, heap)?.stringify(heap)?;
     let descref = call.arg_value(2, heap)?.to_ref()?;
 
-    define_property(objref, prop, descref, heap)?;
+    define_property(objref, prop.as_str(), descref, heap)?;
     Ok(Interpreted::from(objref))
 }
 
 fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> JSResult<()> {
-    let mut pairs: Vec<(String, JSRef)> = (heap.get(descs_ref).properties.iter())
+    let mut pairs: Vec<(JSString, JSRef)> = (heap.get(descs_ref).properties.iter())
         .map(|(prop, desc)| {
             let descref = match desc.to_ref() {
                 Some(descref) => descref,
@@ -182,7 +177,7 @@ fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> JSResu
         .collect::<JSResult<_>>()?;
 
     while let Some((prop, descref)) = pairs.pop() {
-        define_property(objref, prop, descref, heap)?;
+        define_property(objref, prop.as_str(), descref, heap)?;
     }
     Ok(())
 }

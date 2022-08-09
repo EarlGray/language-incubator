@@ -12,11 +12,12 @@ use crate::function::{
 use crate::{
     Exception,
     Heap,
-    JSON,
     JSNumber,
     JSRef,
     JSResult,
+    JSString,
     JSValue,
+    JSON,
 };
 
 /// Javascript objects.
@@ -27,7 +28,8 @@ use crate::{
 pub struct JSObject {
     pub proto: JSRef,
     pub value: ObjectValue,
-    pub properties: HashMap<String, Property>,
+    pub properties: HashMap<JSString, Property>, // TODO: StrKey
+                                                 // TODO: make fields private
 }
 
 impl JSObject {
@@ -81,14 +83,14 @@ impl JSObject {
     }
 
     /// Wrap the given string into String
-    fn from_string(value: String) -> JSObject {
+    fn from_string(value: JSString) -> JSObject {
         let mut properties = HashMap::new();
         // TODO: String.prototype.length
         properties.insert(
-            String::from("length"),
+            JSString::from("length"),
             Property {
                 access: Access::empty(),
-                content: Content::from(value.chars().count() as i64),
+                content: Content::from(value.as_str().chars().count() as i64),
             },
         );
         JSObject {
@@ -237,7 +239,7 @@ impl JSObject {
             }
             None => {
                 let prop = Property { content, access };
-                self.properties.insert(name.to_string(), prop);
+                self.properties.insert(name.into(), prop);
             }
         }
         Ok(())
@@ -333,13 +335,13 @@ impl JSObject {
             }
 
             let jvalue = property.content.to_value()?.to_json(heap)?;
-            json[key] = jvalue;
+            json[key.to_string()] = jvalue;
         }
         Ok(json)
     }
 
     /// Create a human-readable representation of contents of an Array or an Object.
-    pub fn to_string(&self, heap: &mut Heap) -> JSResult<String> {
+    pub fn to_string(&self, heap: &mut Heap) -> JSResult<JSString> {
         fn is_valid_identifier(s: &str) -> bool {
             let is_start = |c: char| (c.is_alphabetic() || c == '_' || c == '$');
 
@@ -404,21 +406,26 @@ impl JSObject {
             }
             s.push('}');
         }
-        Ok(s)
+        Ok(JSString::from(s))
     }
 }
 
-impl From<String> for JSObject {
-    fn from(s: String) -> Self {
-        JSObject::from_string(s)
+impl<S> From<S> for JSObject
+where
+    JSString: From<S>,
+{
+    fn from(s: S) -> Self {
+        JSObject::from_string(JSString::from(s))
     }
 }
 
+/*
 impl From<&str> for JSObject {
     fn from(s: &str) -> Self {
-        JSObject::from_string(s.to_string())
+        JSObject::from_string(JSString::from(s))
     }
 }
+*/
 
 impl Default for JSObject {
     fn default() -> Self {
@@ -456,7 +463,7 @@ pub enum ObjectValue {
     // primitive values
     Boolean(bool),
     Number(JSNumber),
-    String(String),
+    String(JSString),
 
     // Function
     HostFn(HostFunc),
@@ -570,7 +577,7 @@ impl JSArray {}
 #[derive(Debug, Clone, PartialEq)]
 pub enum Interpreted {
     /// An object member; might not exist yet.
-    Member { of: JSRef, name: String },
+    Member { of: JSRef, name: JSString },
 
     /// A value
     Value(JSValue),
@@ -584,7 +591,7 @@ impl Interpreted {
     pub fn member(of: JSRef, name: &str) -> Interpreted {
         Interpreted::Member {
             of,
-            name: name.to_string(),
+            name: name.into(),
         }
     }
 
@@ -632,7 +639,7 @@ impl Interpreted {
     }
 
     /// Resolve self to: a callable JSRef, `this` JSRef and the method name.
-    pub fn resolve_call(&self, heap: &Heap) -> JSResult<(JSRef, JSRef, &str)> {
+    pub fn resolve_call(&self, heap: &Heap) -> JSResult<(JSRef, JSRef, JSString)> {
         match self {
             Interpreted::Member { of: this_ref, name } => {
                 let of = match heap.lookup_protochain(*this_ref, name) {
@@ -645,11 +652,11 @@ impl Interpreted {
                 })?;
                 let func_ref = (func_value.to_ref())
                     .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
-                Ok((func_ref, *this_ref, name))
+                Ok((func_ref, *this_ref, name.clone()))
             }
             Interpreted::Value(JSValue::Ref(func_ref)) => {
                 let this_ref = Heap::GLOBAL; // TODO: figure out what is this
-                Ok((*func_ref, this_ref, "<anonymous>"))
+                Ok((*func_ref, this_ref, "<anonymous>".into()))
             }
             _ => Err(Exception::TypeErrorNotCallable(self.clone())),
         }

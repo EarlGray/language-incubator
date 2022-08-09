@@ -23,11 +23,13 @@ fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     })?;
     let array = array.storage.clone();
 
-    let reprs = (array.iter())
-        .map(|val| val.stringify(heap))
-        .collect::<JSResult<Vec<_>>>()?;
-
-    let s = reprs.join(",");
+    let mut s = String::new();
+    for val in array.iter() {
+        if !s.is_empty() {
+            s += ",";
+        }
+        s += val.stringify(heap)?.as_ref();
+    }
     Ok(Interpreted::from(s))
 }
 

@@ -28,3 +28,10 @@ pub use hashbrown::{
     hash_map::HashMap,
     hash_set::HashSet,
 };
+
+pub use crate::{
+    JSNumber,
+    JSString,
+    JSValue,
+    JSON,
+};
