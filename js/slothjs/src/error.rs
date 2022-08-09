@@ -39,6 +39,20 @@ impl ParseError {
     }
 }
 
+impl From<&str> for ParseError {
+    fn from(err: &str) -> Self {
+        // This assumes nodejs-formatted Esprima error output.
+        let mut err = unescape(err);
+        if err.ends_with('}') {
+            if let Some(at) = err.rfind('{') {
+                // let jerr = err.split_off(at); // TODO: parse the error JSON
+                err.truncate(at)
+            }
+        }
+        Self::InvalidJSON { err }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Exception {
     SyntaxTreeError(ParseError),
@@ -100,4 +114,33 @@ pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
         Exception::TypeErrorSetReadonly(_, _) => Ok(()),
         _ => Err(e),
     }
+}
+
+pub fn unescape(input: &str) -> String {
+    struct Unescape<C>(C);
+
+    impl<C> Iterator for Unescape<C>
+    where
+        C: Iterator<Item = char>,
+    {
+        type Item = char;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.0.next() {
+                Some('\\') => {
+                    let c = self.0.next();
+                    match c {
+                        Some('n') => Some('\n'),
+                        Some('t') => Some('\t'),
+                        Some(_) => c,
+                        None => Some('\\'),
+                    }
+                }
+                other => other,
+            }
+        }
+    }
+
+    let input = input.trim_matches('"').trim();
+    String::from_iter(Unescape(input.chars()))
 }

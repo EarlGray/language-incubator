@@ -72,8 +72,10 @@ struct Callstack<'heap> {
 
 impl<'heap> fmt::Display for Callstack<'heap> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let loc = self.heap.loc.clone();
-        writeln!(f, "{:?}", loc)?;
+        match self.heap.loc.as_ref() {
+            None => return Ok(()),
+            Some(loc) => writeln!(f, "{:?}", loc)?,
+        };
 
         let mut scoperef = self.heap.local_scope().unwrap_or(Heap::NULL);
         while scoperef != Heap::NULL {

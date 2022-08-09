@@ -10,7 +10,8 @@ use slothjs::runtime::{
 };
 
 fn esprima_eval() {
-    Runtime::<EsprimaParser>::load().expect("Runtime::load");
+    let parser = EsprimaParser::new();
+    Runtime::load(Box::new(parser)).expect("Runtime::load");
 }
 
 fn benchmark_esprimaparser(c: &mut Criterion) {

@@ -12,6 +12,7 @@ use crate::runtime::{
 };
 use crate::{
     error::ParseError,
+    runtime::Parser,
     CallContext,
     Exception,
     Heap,
@@ -22,7 +23,19 @@ use crate::{
     JSON,
 };
 
+fn nodejs_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let code = call.arg_value(0, heap)?.stringify(heap)?;
+
+    let tmpdir = env::temp_dir().join(NodejsParser::TMPDIRNAME);
+    let espath = tmpdir.join("esparse.js");
+    let parser = NodejsParser { espath };
+
+    let program = parser.parse(&code, heap)?;
+    program.interpret(heap)
+}
+
 /// [`NodejsParser`] runs Esprima in an external nodejs process, consumes JSON AST.
+#[derive(Debug)]
 pub struct NodejsParser {
     espath: PathBuf,
 }
@@ -56,23 +69,35 @@ impl NodejsParser {
 
         let esparse_output = esparse.wait_with_output()?;
 
-        let stdout = String::from_utf8(esparse_output.stdout)?;
-        let stderr = String::from_utf8(esparse_output.stderr)?;
         let status = esparse_output.status;
+        let stdout = String::from_utf8(esparse_output.stdout)?;
+        let stderr = core::str::from_utf8(&esparse_output.stderr)?;
         if !status.success() {
-            return Err(EvalError::from(Exception::from(ParseError::invalid_ast(
-                stderr,
-            ))));
+            let perr = ParseError::from(stderr);
+            return Err(EvalError::from(Exception::from(perr)));
         }
         if !stderr.is_empty() {
             eprintln!("{}", stderr);
         }
         Ok(stdout)
     }
+
+    pub fn works() -> EvalResult<bool> {
+        let output = proc::Command::new(Self::NODE).arg("-v").output()?;
+        Ok(output.status.success())
+    }
+}
+
+impl NodejsParser {
+    pub fn new() -> Self {
+        NodejsParser {
+            espath: PathBuf::default(),
+        }
+    }
 }
 
 impl runtime::Parser for NodejsParser {
-    fn load(_: &mut Heap) -> EvalResult<Self> {
+    fn load(&mut self, _: &mut Heap) -> EvalResult<()> {
         let tmpdir = env::temp_dir().join(Self::TMPDIRNAME);
 
         let tmpdir = tmpdir.as_path();
@@ -88,7 +113,8 @@ impl runtime::Parser for NodejsParser {
             fs::File::create(&espath)?.write_all(Self::ESPARSE.as_bytes())?;
         }
 
-        Ok(NodejsParser { espath })
+        self.espath = espath;
+        Ok(())
     }
 
     fn parse(&self, input: &str, _heap: &mut Heap) -> EvalResult<Program> {
@@ -99,14 +125,7 @@ impl runtime::Parser for NodejsParser {
         Ok(program)
     }
 
-    fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-        let code = call.arg_value(0, heap)?.stringify(heap)?;
-
-        let tmpdir = env::temp_dir().join(NodejsParser::TMPDIRNAME);
-        let espath = tmpdir.join("esparse.js");
-        let parser = NodejsParser { espath };
-
-        let program = parser.parse(&code, heap)?;
-        program.interpret(heap)
+    fn eval_func(&self) -> crate::HostFn {
+        nodejs_eval
     }
 }

@@ -9,7 +9,6 @@ const ESPRIMA: &str = "./node_modules/esprima/dist/esprima.js";
 const ESJSON: &str = "./tmp/esprima.json";
 
 fn decode_utf16(bytes: &[u8]) -> Result<String, io::Error> {
-    use std::convert::TryInto;
     let codepoints = bytes
         .chunks_exact(2)
         .map(|b| u16::from_le_bytes(b.try_into().unwrap()));

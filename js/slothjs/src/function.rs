@@ -80,15 +80,15 @@ impl From<Vec<Interpreted>> for CallContext {
     }
 }
 
-pub type NativeFunction = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
+pub type HostFn = fn(ctx: CallContext, heap: &'_ mut Heap) -> JSResult<Interpreted>;
 
 /// A wrapper for NativeFunction to give it `fmt::Debug`.
 #[derive(Clone)]
-pub struct VMCall(NativeFunction);
+pub struct HostFunc(HostFn);
 
-impl VMCall {
-    pub fn from_func(f: NativeFunction) -> VMCall {
-        VMCall(f)
+impl HostFunc {
+    pub fn from_func(f: HostFn) -> HostFunc {
+        HostFunc(f)
     }
 
     pub fn call(self, call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
@@ -99,7 +99,7 @@ impl VMCall {
     }
 }
 
-impl fmt::Debug for VMCall {
+impl fmt::Debug for HostFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "VMCall(*{:x})", self.ptr())
     }

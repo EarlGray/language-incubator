@@ -7,8 +7,8 @@ use crate::ast;
 use crate::function::{
     CallContext,
     Closure,
-    NativeFunction,
-    VMCall,
+    HostFn,
+    HostFunc,
 };
 use crate::{
     Exception,
@@ -191,7 +191,7 @@ impl JSValue {
             JSValue::Number(_) => "number",
             JSValue::Bool(_) => "boolean",
             JSValue::Ref(r) => match heap.get(*r).value {
-                ObjectValue::Closure(_) | ObjectValue::VMCall(_) => "function",
+                ObjectValue::Closure(_) | ObjectValue::HostFn(_) => "function",
                 _ => "object",
             },
         }
@@ -387,7 +387,7 @@ impl JSObject {
     }
 
     /// Wrap the given native call into a Function.
-    pub fn from_func(f: NativeFunction) -> JSObject {
+    pub fn from_func(f: HostFn) -> JSObject {
         JSObject {
             proto: Heap::FUNCTION_PROTO,
             value: ObjectValue::from_func(f),
@@ -799,7 +799,7 @@ pub enum ObjectValue {
     String(String),
 
     // Function
-    VMCall(VMCall),
+    HostFn(HostFunc),
     Closure(Closure),
 
     // Array
@@ -807,8 +807,8 @@ pub enum ObjectValue {
 }
 
 impl ObjectValue {
-    pub fn from_func(func: NativeFunction) -> ObjectValue {
-        ObjectValue::VMCall(VMCall::from_func(func))
+    pub fn from_func(func: HostFn) -> ObjectValue {
+        ObjectValue::HostFn(HostFunc::from_func(func))
     }
 }
 

@@ -4,7 +4,7 @@ use crate::ast::{
 };
 use crate::function::{
     CallContext,
-    NativeFunction,
+    HostFn,
 };
 use crate::prelude::*;
 use crate::{
@@ -126,7 +126,7 @@ impl Heap {
         JSRef(ind)
     }
 
-    pub fn alloc_func(&mut self, func: NativeFunction) -> JSRef {
+    pub fn alloc_func(&mut self, func: HostFn) -> JSRef {
         let func_obj = JSObject::from_func(func);
         self.alloc(func_obj)
     }
@@ -354,7 +354,7 @@ impl Heap {
         }
         // Yes, we do need a clone() to workaround borrow checker:
         match &self.get(func_ref).value {
-            ObjectValue::VMCall(vmcall) => vmcall.clone().call(call, self),
+            ObjectValue::HostFn(vmcall) => vmcall.clone().call(call, self),
             ObjectValue::Closure(closure) => closure.clone().call(call, self),
             _ => {
                 let callee = Interpreted::Member {

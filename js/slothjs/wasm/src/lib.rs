@@ -1,10 +1,10 @@
-use core::fmt;
 use core::cell::RefCell;
+use core::fmt;
 use slothjs::{
-    //Interpretable,
-    JSON,
     Heap,
     Program,
+    //Interpretable,
+    JSON,
 };
 
 use wasm_bindgen::prelude::*;
@@ -18,7 +18,7 @@ thread_local! {
 }
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     fn alert(s: &str);
 }
 
@@ -34,15 +34,16 @@ fn jserror<E: fmt::Debug>(e: E) -> JsValue {
 
 #[wasm_bindgen]
 pub fn interpret_string(json_ast: &str) -> Result<JsValue, JsValue> {
-    let json: JSON = serde_json::from_str(json_ast)
-        .map_err(jserror)?;
-    let program = Program::parse_from(&json)
-        .map_err(jserror)?;
+    let json: JSON = serde_json::from_str(json_ast).map_err(jserror)?;
+    let program = Program::parse_from(&json).map_err(jserror)?;
 
     let mut heap = Heap::new();
-    let result = heap.evaluate(&program).map_err(jserror)?
+    let result = heap
+        .evaluate(&program)
+        .map_err(jserror)?
         // TODO: implement serde::Serializer directly for JSValue?
-        .to_json(&heap).map_err(jserror)?;
+        .to_json(&heap)
+        .map_err(jserror)?;
     JsValue::from_serde(&result).map_err(jserror)
 }
 
@@ -50,10 +51,12 @@ pub fn interpret_string(json_ast: &str) -> Result<JsValue, JsValue> {
 pub fn interpret(jsobject: &JsValue) -> Result<JsValue, JsValue> {
     let json: JSON = jsobject.into_serde().map_err(jserror)?;
     let program = Program::parse_from(&json).map_err(jserror)?;
-    let result = HEAP.with(|heapcell| {
-        let mut heap = heapcell.borrow_mut();
-        heap.evaluate(&program)?.to_json(&heap)
-    }).map_err(jserror)?;
+    let result = HEAP
+        .with(|heapcell| {
+            let mut heap = heapcell.borrow_mut();
+            heap.evaluate(&program)?.to_json(&heap)
+        })
+        .map_err(jserror)?;
     // TODO: implement serde::Serializer directly for JSValue?
     JsValue::from_serde(&result).map_err(jserror)
 }

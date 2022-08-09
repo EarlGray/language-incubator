@@ -58,10 +58,7 @@ fn test_sizes() {
     );
     println!("size_of   ObjectValue:\t{}", size_of::<ObjectValue>());
     println!("size_of     JSArray:\t{}", size_of::<object::JSArray>());
-    println!(
-        "size_of     NativeFunc:\t{}",
-        size_of::<function::NativeFunction>()
-    );
+    println!("size_of     NativeFunc:\t{}", size_of::<function::HostFn>());
     println!("size_of     Closure:\t{}", size_of::<function::Closure>());
     println!("size_of Property:\t{}", size_of::<Property>());
     println!("size_of   Access:\t{}", size_of::<Access>());

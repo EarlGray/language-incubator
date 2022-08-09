@@ -6,16 +6,15 @@ use serde_json::json;
 use slothjs::{
     Exception,
     Program,
-    runtime::EvalError,
+    runtime::{self, Runtime, EvalError},
     ast::{expr, stmt},
 };
 
-type Runtime = slothjs::runtime::Runtime<
-    slothjs::runtime::NodejsParser,
->;
+type Parser = runtime::NodejsParser;
 
 fn evalbool(input: &str) -> bool {
-    let mut js = Runtime::load().unwrap();
+    let parser = Parser::new();
+    let mut js = Runtime::load(Box::new(parser)).unwrap();
     let result = js.evaluate(input).unwrap();
     result.boolify(&js.heap)
 }
@@ -26,7 +25,7 @@ macro_rules! assert_parse {
         assert_parse!($code, $program, "");
     };
     ($code:literal, $program:expr, $desc:literal) => {
-        let mut sljs = Runtime::load().expect("Runtime::load");
+        let mut sljs = Runtime::load(Box::new(Parser::new())).expect("Runtime::load");
         let want = Program::from_stmt($program);
         let got = sljs.parse($code).expect("Runtime::parse");
         assert_eq!(got, want, $desc);
@@ -38,7 +37,7 @@ macro_rules! assert_parse {
 /// understands).
 macro_rules! assert_eval {
     ($js:literal, $json:tt) => {
-        let mut js = Runtime::load().expect("Runtime::load");
+        let mut js = Runtime::load(Box::new(Parser::new())).expect("Runtime::load");
         let expected = json!($json);
         match js.evaluate($js) {
             Ok(result) => {
@@ -62,7 +61,7 @@ macro_rules! assert_eval {
 // ```
 macro_rules! assert_exception {
     ($js:literal, $exc:path) => {
-        let mut js = Runtime::load().expect("Runtime::load");
+        let mut js = Runtime::load(Box::new(Parser::new())).expect("Runtime::load");
         match js.evaluate($js) {
             Err(EvalError::Exception($exc(_))) => (),
             other => {

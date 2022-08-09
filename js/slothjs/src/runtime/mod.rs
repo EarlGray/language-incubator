@@ -1,26 +1,27 @@
 mod esprima;
 mod nodejs;
 
+use core::str::Utf8Error;
 use std::io;
-use std::io::prelude::*;
 
-use crate::prelude::*;
+use crate::function::HostFn;
 use crate::{
     error,
-    source,
-    CallContext,
     Exception,
     Heap,
-    //Interpretable,
-    Interpreted,
-    JSResult,
     JSValue,
     Program,
     JSON,
 };
+use crate::{
+    prelude::*,
+    CallContext,
+    Interpreted,
+    JSResult,
+};
 
-pub use self::nodejs::NodejsParser;
 pub use self::esprima::EsprimaParser;
+pub use self::nodejs::NodejsParser;
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -39,11 +40,11 @@ impl fmt::Display for EvalError {
         match self {
             EvalError::Exception(exc) => match exc {
                 Exception::SyntaxTreeError(error::ParseError::InvalidJSON { err }) => {
-                    writeln!(f, "syntax error:\n{}", err)
+                    writeln!(f, "Syntax error:{}", err.as_str())
                 }
-                _ => write!(f, "sljs error: {:?}", exc),
+                _ => write!(f, "Error: {:?}", exc),
             },
-            EvalError::Serialization(e) => writeln!(f, "serializaiton error:\n{}", e),
+            EvalError::Serialization(e) => writeln!(f, "Serialization error:\n{}", e),
             EvalError::Io(e) => writeln!(f, "{}", e),
         }
     }
@@ -58,6 +59,13 @@ impl From<Exception> for EvalError {
 impl From<serde_json::Error> for EvalError {
     fn from(err: serde_json::Error) -> Self {
         EvalError::Serialization(err)
+    }
+}
+
+impl From<Utf8Error> for EvalError {
+    fn from(err: Utf8Error) -> Self {
+        let err = io::Error::new(io::ErrorKind::InvalidData, err);
+        EvalError::Io(err)
     }
 }
 
@@ -95,15 +103,15 @@ impl From<EvalError> for Exception {
 pub type EvalResult<T> = Result<T, EvalError>;
 
 /// Describes anything that can parse JS code.
-pub trait Parser: Sized {
+pub trait Parser: fmt::Debug {
     /// Creates a Parser
-    fn load(heap: &mut Heap) -> EvalResult<Self>;
+    fn load(&mut self, heap: &mut Heap) -> EvalResult<()>;
 
     /// Parses an input into a `Program` (potentially using the `heap`)
     fn parse(&self, input: &str, heap: &mut Heap) -> EvalResult<Program>;
 
-    /// The native callback for `eval()` in JavaScript provided by this parser
-    fn eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted>;
+    /// Get the native callback for `eval()` in JavaScript provided by this parser
+    fn eval_func(&self) -> HostFn;
 }
 
 /// The sljs JavaScript runtime.
@@ -115,7 +123,8 @@ pub trait Parser: Sized {
 /// use slothjs::JSON;
 /// use slothjs::runtime::{Runtime, NodejsParser};
 ///
-/// let mut sljs = Runtime::<NodejsParser>::load()
+/// let parser = Box::new(NodejsParser::new());
+/// let mut sljs = Runtime::load(parser)
 ///     .expect("Runtime::load");
 /// ```
 ///
@@ -124,7 +133,8 @@ pub trait Parser: Sized {
 /// ```
 /// # use slothjs::JSON;
 /// # use slothjs::runtime::{Runtime, NodejsParser};
-/// # let mut sljs = Runtime::<NodejsParser>::load().expect("Runtime::load");
+/// # let parser = Box::new(NodejsParser::new());
+/// # let mut sljs = Runtime::load(parser).expect("Runtime::load");
 ///
 /// sljs.evaluate("var x = 12")
 ///     .expect("eval: var x");
@@ -134,18 +144,18 @@ pub trait Parser: Sized {
 /// assert_eq!(sljs.json_from(x), JSON::from(12.0));
 /// ```
 ///
-pub struct Runtime<P> {
+pub struct Runtime {
     pub heap: Heap,
-    parser: P,
+    parser: Box<dyn Parser>,
 }
 
-impl<P: Parser> Runtime<P> {
+impl Runtime {
     /// Creates a sljs runtime.
-    pub fn load() -> EvalResult<Self> {
+    pub fn load(mut parser: Box<dyn Parser>) -> EvalResult<Self> {
         let mut heap = Heap::new();
-        let parser = P::load(&mut heap)?;
+        parser.load(&mut heap)?;
 
-        let eval_ref = heap.alloc_func(P::eval);
+        let eval_ref = heap.alloc_func(parser.eval_func());
         heap.get_mut(Heap::GLOBAL).set_hidden("eval", eval_ref)?;
 
         Ok(Runtime { heap, parser })
@@ -174,7 +184,7 @@ impl<P: Parser> Runtime<P> {
             .expect("JSValue.to_string()")
     }
 
-    fn dbg(&mut self, refstr: &str) {
+    pub fn dbg(&mut self, refstr: &str) {
         if let Ok(refnum) = usize::from_str(refstr) {
             match self.heap.get_index(refnum) {
                 Some(object) => {
@@ -191,51 +201,29 @@ impl<P: Parser> Runtime<P> {
     }
 }
 
-/// Reads stdin, parses and interprets it as one block.
-pub fn batch_main<P: Parser>(sljs: &mut Runtime<P>) -> io::Result<()> {
-    let mut input = String::new();
-    io::stdin().lock().read_to_string(&mut input)?;
+/// Not-really-a-Parser implementation that just deserializes a JSON ESTree.
+#[derive(Debug)]
+pub struct JSONParser;
 
-    let result = sljs.evaluate(&input)?;
-    println!("{}", sljs.string_from(result));
-    Ok(())
+impl JSONParser {
+    fn json_eval(_: CallContext, _: &mut Heap) -> JSResult<Interpreted> {
+        unimplemented!("JSONParser does not support eval()")
+    }
 }
 
-/// Provides a simple command line using stdin/stdout.
-pub fn repl_main<P: Parser>(sljs: &mut Runtime<P>) -> io::Result<()> {
-    let stdin = io::stdin();
-    let mut input_iter = stdin.lock().lines();
-
-    loop {
-        // prompt
-        eprint!("sljs> ");
-        io::stderr().flush()?;
-
-        // get input
-        let maybe_input = input_iter.next();
-        let input = match maybe_input {
-            None => break,
-            Some(input) => input?,
-        };
-        if input.is_empty() {
-            continue;
-        }
-
-        if let Some(refstr) = input.strip_prefix(":dbg ") {
-            sljs.dbg(refstr);
-            continue;
-        }
-
-        match sljs.evaluate(&input) {
-            Ok(result) => println!("{}", sljs.string_from(result)),
-            Err(err) => {
-                eprintln!("{}", err);
-                if let Err(e) = source::print_callstack(&sljs.heap) {
-                    eprintln!("   Exception thrown while getting stack trace: {:?}", e);
-                }
-            }
-        }
+impl Parser for JSONParser {
+    fn load(&mut self, _heap: &mut Heap) -> EvalResult<()> {
+        Ok(())
     }
 
-    Ok(())
+    fn parse(&self, input: &str, _heap: &mut Heap) -> EvalResult<Program> {
+        // It's not much, but it's honest work.
+        let estree: JSON = serde_json::from_str(input)?;
+        let program = Program::parse_from(&estree).map_err(Exception::from)?;
+        Ok(program)
+    }
+
+    fn eval_func(&self) -> HostFn {
+        Self::json_eval
+    }
 }

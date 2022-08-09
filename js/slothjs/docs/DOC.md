@@ -24,7 +24,8 @@ JavaScript called [Esprima](https://esprima.org/):
 use slothjs::JSValue;
 use slothjs::runtime::{Runtime, EsprimaParser};
 
-let mut runtime = Runtime::<EsprimaParser>::load().expect("Runtime::load");
+let parser = Box::new(EsprimaParser::new());
+let mut runtime = Runtime::load(parser).expect("Runtime::load");
 
 runtime.evaluate("var x = 2, y = 2").expect("eval: var x, y");
 runtime.evaluate("function add(a, b) { return a + b }").expect("eval: add");

@@ -25,7 +25,11 @@ pub use error::{
     Exception,
     JSResult,
 };
-pub use function::CallContext;
+pub use function::{
+    CallContext,
+    HostFn,
+    HostFunc,
+};
 pub use heap::{
     Heap,
     JSRef,
