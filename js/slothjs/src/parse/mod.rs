@@ -748,9 +748,9 @@ impl ParseFrom for ObjectExpression {
             } else {
                 match keyexpr.expr {
                     Expr::Identifier(ident) => ObjectKey::Identifier(ident.0),
-                    Expr::Literal(jval) => match jval.0.as_str() {
+                    Expr::Literal(lit) => match lit.to_json().as_str() {
                         Some(val) => ObjectKey::Identifier(val.into()),
-                        None => ObjectKey::Identifier(jval.0.to_string().into()),
+                        None => ObjectKey::Identifier(lit.to_string().into()),
                     },
                     _ => {
                         return Err(ParseError::UnexpectedValue {

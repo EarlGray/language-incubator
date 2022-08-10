@@ -153,9 +153,11 @@ impl Heap {
         }
 
         let ctor_ref = self.alloc(ctor_object);
-        self.get_mut(proto).set_hidden(JSString::from("constructor"), ctor_ref)?;
+        self.get_mut(proto)
+            .set_hidden(JSString::from("constructor"), ctor_ref)?;
 
-        self.get_mut(Heap::GLOBAL).set_hidden(JSString::from(class.name), ctor_ref)?;
+        self.get_mut(Heap::GLOBAL)
+            .set_hidden(JSString::from(class.name), ctor_ref)?;
         Ok(())
     }
 

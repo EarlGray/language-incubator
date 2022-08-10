@@ -80,7 +80,7 @@ impl SourceNode for HeapNode {
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {
         let child = self.property(property)?;
         let json = child.to_json(&self.heap).map_err(ParseError::invalid_ast)?;
-        Ok(Literal(json))
+        Ok(Literal::from(json))
     }
 
     fn get_bool(&self, property: &str) -> ParseResult<bool> {

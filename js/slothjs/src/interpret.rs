@@ -444,8 +444,8 @@ impl Interpretable for Expression {
 }
 
 impl Interpretable for Literal {
-    fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
-        let value = heap.object_from_json(&self.0);
+    fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
+        let value = self.to_value();
         Ok(Interpreted::Value(value))
     }
 }

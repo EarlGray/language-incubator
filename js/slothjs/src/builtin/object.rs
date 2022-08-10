@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::{
     object::Access,
+    object::HostClass,
     CallContext,
     Exception,
     Heap,
@@ -8,24 +9,26 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
-    object::HostClass,
 };
 
 pub static CLASS: HostClass = HostClass {
     name: "Object",
     constructor: object_constructor,
     methods: &[
-        ("hasOwnProperty",      object_proto_hasOwnProperty),
-        ("toString",            object_proto_toString),
-        ("valueOf",             object_proto_valueOf),
+        ("hasOwnProperty", object_proto_hasOwnProperty),
+        ("toString", object_proto_toString),
+        ("valueOf", object_proto_valueOf),
     ],
     static_methods: &[
-        ("create",                      object_object_create),
-        ("defineProperties",            object_object_defineProperties),
-        ("defineProperty",              object_object_defineProperty),
-        ("getOwnPropertyDescriptor",    object_object_getOwnPropertyDescriptor),
-        ("is",                          object_object_is),
-        ("setPrototypeOf",              object_object_setPrototypeOf),
+        ("create", object_object_create),
+        ("defineProperties", object_object_defineProperties),
+        ("defineProperty", object_object_defineProperty),
+        (
+            "getOwnPropertyDescriptor",
+            object_object_getOwnPropertyDescriptor,
+        ),
+        ("is", object_object_is),
+        ("setPrototypeOf", object_object_setPrototypeOf),
     ],
 };
 
@@ -136,7 +139,12 @@ fn object_object_getOwnPropertyDescriptor(
     Ok(Interpreted::from(descriptor_ref))
 }
 
-fn define_property(objref: JSRef, propname: JSString, descref: JSRef, heap: &mut Heap) -> JSResult<()> {
+fn define_property(
+    objref: JSRef,
+    propname: JSString,
+    descref: JSRef,
+    heap: &mut Heap,
+) -> JSResult<()> {
     let get_value =
         |object: &JSObject, name: &str| object.get_own_value(name).unwrap_or(JSValue::Undefined);
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);

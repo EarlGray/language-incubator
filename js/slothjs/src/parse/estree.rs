@@ -77,7 +77,7 @@ impl ToESTree for Statement {
 impl ToESTree for Expression {
     fn to_estree(&self) -> JSON {
         match &self.expr {
-            Expr::Literal(lit) => json!({"type": "Literal", "value": lit.0}),
+            Expr::Literal(lit) => lit.to_estree(),
             Expr::Identifier(id) => id.to_estree(),
             Expr::BinaryOp(binop) => {
                 let BinaryExpression(left, op, right) = binop.as_ref();
@@ -88,6 +88,12 @@ impl ToESTree for Expression {
             }
             _ => todo!(),
         }
+    }
+}
+
+impl ToESTree for Literal {
+    fn to_estree(&self) -> JSON {
+        json!({"type": "Literal", "value": self.to_json()})
     }
 }
 

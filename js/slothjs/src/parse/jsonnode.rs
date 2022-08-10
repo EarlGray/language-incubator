@@ -1,5 +1,3 @@
-use serde_json::json;
-
 use crate::ast::*;
 use crate::parse::{
     ParseResult,
@@ -15,26 +13,33 @@ use crate::source;
 
 impl SourceNode for JSON {
     fn to_error(&self) -> JSON {
-        self.clone()
+        // .clone() in a hot path bites again.
+        // It was called by .get_location() for pretty much every node. When there's no
+        // "loc" in the field, it was cloning the entire JSON tree.
+        //self.clone()
+        JSON::Null
     }
 
     fn get_location(&self) -> Option<source::Location> {
-        let start = match self.map_node("start", |child| Ok(child.clone())) {
-            Err(_) => return None,
-            Ok(node) => node,
-        };
-        let end = match self.map_node("end", |child| Ok(child.clone())) {
-            Err(_) => return None,
-            Ok(node) => node,
-        };
-        let jloc = json!({"start": start, "end": end});
-        serde_json::from_value::<source::Location>(jloc).ok()
+        self.map_opt_node("loc", |loc| {
+            if let Ok(start) = loc.map_node("start", |child| Ok(child.clone())) {
+                if let Ok(end) = loc.map_node("end", |child| Ok(child.clone())) {
+                    if let Ok(start) = serde_json::from_value::<source::Position>(start) {
+                        if let Ok(end) = serde_json::from_value::<source::Position>(end) {
+                            return Ok(source::Location::new(start, end));
+                        }
+                    }
+                }
+            }
+            Err(ParseError::no_attr("", JSON::Null))    // empty String does not allocate
+        })
+        .unwrap_or(None)
     }
 
     fn get_literal(&self, property: &str) -> ParseResult<Literal> {
         let node =
             (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        Ok(Literal(node.clone()))
+        Ok(Literal::from(node.clone()))
     }
 
     fn map_node<T, F>(&self, property: &str, mut action: F) -> ParseResult<T>
@@ -43,9 +48,9 @@ impl SourceNode for JSON {
     {
         let child = self
             .get(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.clone()))?;
+            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
         if child.is_null() {
-            return Err(ParseError::no_attr(property, self.clone()))?;
+            return Err(ParseError::no_attr(property, self.to_error()))?;
         }
         action(child)
     }
@@ -60,12 +65,9 @@ impl SourceNode for JSON {
     }
 
     fn get_str(&self, property: &str) -> ParseResult<JSString> {
-        let child = self
-            .get(property)
-            .ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
-        let s = child
-            .as_str()
-            .ok_or_else(|| ParseError::want("string", self.to_error()))?;
+        let child =
+            (self.get(property)).ok_or_else(|| ParseError::no_attr(property, self.to_error()))?;
+        let s = (child.as_str()).ok_or_else(|| ParseError::want("string", self.to_error()))?;
         Ok(s.into())
     }
 

@@ -1,5 +1,6 @@
 //use crate::prelude::*;
 use crate::{
+    object::HostClass,
     CallContext,
     Exception,
     Heap,
@@ -7,7 +8,7 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
-    JSValue, object::HostClass,
+    JSValue,
 };
 
 pub static CLASS: HostClass = HostClass {

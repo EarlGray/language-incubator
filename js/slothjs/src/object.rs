@@ -620,7 +620,7 @@ impl Interpreted {
                     let ident = ast::Identifier(name.clone());
                     Err(Exception::ReferenceNotFound(ident))
                 }
-                _ => Err(Exception::TypeErrorGetProperty( self.clone(), name.clone())),
+                _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.clone())),
             },
             _ => Err(Exception::ReferenceNotAnObject(self.clone())),
         }

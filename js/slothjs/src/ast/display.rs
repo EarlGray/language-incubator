@@ -41,7 +41,7 @@ trait ToSource {
 
 impl ToSource for Literal {
     fn to_source(&self) -> Vec<String> {
-        vec![self.0.to_string()]
+        vec![self.to_string()]
     }
 }
 

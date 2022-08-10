@@ -68,9 +68,9 @@ pub enum Expr {
     New(Box<NewExpression>),
 }
 
-impl From<Literal> for Expr {
-    fn from(lit: Literal) -> Expr {
-        Expr::Literal(lit)
+impl<T> From<T> for Expr where Literal: From<T> {
+    fn from(lit: T) -> Expr {
+        Expr::Literal(Literal::from(lit))
     }
 }
 
@@ -117,24 +117,48 @@ impl From<CallExpression> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Literal(pub JSON);  // TODO: change to JSValue
+pub struct Literal(JSON); // TODO: change to JSValue
 
-impl<V> From<V> for Literal
-where
-    JSON: From<V>,
-{
-    fn from(val: V) -> Literal {
-        Literal(JSON::from(val))
+impl Literal {
+    pub fn to_value(&self) -> JSValue {
+        JSValue::try_from(&self.0).expect("primitive JSON")
+    }
+
+    pub fn to_json(&self) -> JSON {
+        self.0.clone()
     }
 }
 
-impl<V> From<V> for Expr
-where
-    JSON: From<V>,
-{
-    fn from(val: V) -> Expr {
-        Expr::Literal(Literal::from(val))
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.is_null() {
+            write!(f, "null")
+        } else if let Some(b) = self.0.as_bool() {
+            write!(f, "{}", b)
+        } else if let Some(n) = self.0.as_f64() {
+            write!(f, "{}", n)
+        } else if let Some(s) = self.0.as_str() {
+            write!(f, "\"{}\"", s.escape_default())
+        } else {
+            panic!("Literal cannot be {:?}", self)
+        }
     }
+}
+
+impl From<JSON> for Literal {
+    fn from(json: JSON) -> Literal {
+        assert!(!json.is_array());
+        assert!(!json.is_object());
+        Literal(json.clone())
+    }
+}
+
+impl From<bool> for Literal { fn from(b: bool) -> Self { Literal(JSON::from(b)) }}
+impl From<f64> for Literal { fn from(n: f64) -> Self { Literal(JSON::from(n)) }}
+impl From<i64> for Literal { fn from(n: i64) -> Self { Literal(JSON::from(n)) }}
+impl From<&str> for Literal { fn from(s: &str) -> Self { Literal(JSON::from(s)) }}
+impl From<JSString> for Literal {
+    fn from(s: JSString) -> Self { Literal(JSON::String(s.to_string())) }
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]

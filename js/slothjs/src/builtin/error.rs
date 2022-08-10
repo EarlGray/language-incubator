@@ -1,19 +1,17 @@
 use crate::{
     function::CallContext,
+    object::HostClass,
     prelude::*,
     Heap,
     Interpreted,
     JSObject,
     JSResult,
-    object::HostClass,
 };
 
 pub static CLASS: HostClass = HostClass {
     name: "Error",
     constructor: error_constructor,
-    methods: &[
-        ("toString", error_proto_toString),
-    ],
+    methods: &[("toString", error_proto_toString)],
     static_methods: &[],
 };
 

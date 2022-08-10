@@ -22,6 +22,12 @@ pub struct Position {
     column: u32,
 }
 
+impl Position {
+    pub fn new(line: u32, column: u32) -> Position {
+        Position { line, column }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Location {
     start: Position,
@@ -29,6 +35,10 @@ pub struct Location {
 }
 
 impl Location {
+    pub fn new(start: Position, end: Position) -> Location {
+        Location { start, end }
+    }
+
     fn from_saved(object: &JSObject, heap: &Heap) -> Result<Location, Exception> {
         if let Some(array) = object.as_array() {
             let line = array.storage[0].numberify(heap).unwrap() as u32;
@@ -60,7 +70,8 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
             JSValue::from(loc.end.column as f64),
         ];
         let loc_ref = heap.alloc(JSObject::from_array(array));
-        heap.scope_mut().set_system(CALLER_LOCATION.into(), loc_ref)?;
+        heap.scope_mut()
+            .set_system(CALLER_LOCATION.into(), loc_ref)?;
     }
     Ok(())
 }
