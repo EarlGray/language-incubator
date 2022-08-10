@@ -24,7 +24,7 @@ pub fn error_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpr
     let mut error_object = JSObject::new();
     error_object.proto = Heap::ERROR_PROTO;
 
-    error_object.set_hidden(JSString::from("message"), message)?;
+    error_object.set_hidden("message", message)?;
 
     let objref = heap.alloc(error_object);
     Ok(Interpreted::from(objref))

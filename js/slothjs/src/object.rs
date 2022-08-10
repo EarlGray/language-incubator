@@ -59,7 +59,7 @@ impl JSObject {
             properties: HashMap::new(),
         };
         function_object
-            .set_nonconf(JSString::from("length"), Content::from(params_count))
+            .set_nonconf("length", Content::from(params_count))
             .unwrap();
         function_object
     }
@@ -203,12 +203,12 @@ impl JSObject {
 
     fn set_maybe_nonwritable(
         &mut self,
-        name: JSString,
+        name: &str,
         content: Content,
         access: Access,
         even_nonwritable: bool,
     ) -> JSResult<()> {
-        if let Ok(index) = usize::from_str(name.as_str()) {
+        if let Ok(index) = usize::from_str(name) {
             if let Some(array) = self.as_array_mut() {
                 // TODO: a[100500] will be interesting.
                 while array.storage.len() <= index {
@@ -220,16 +220,16 @@ impl JSObject {
             }
         }
 
-        match self.properties.get_mut(name.as_str()) {
+        match self.properties.get_mut(name) {
             Some(property) => {
                 if property.access != access && !property.access.configurable() {
                     let what = Interpreted::from("???"); // TODO
-                    return Err(Exception::TypeErrorNotConfigurable(what, name));
+                    return Err(Exception::TypeErrorNotConfigurable(what, JSString::from(name)));
                 }
 
                 if !(even_nonwritable || property.access.writable()) {
                     let what = Interpreted::from("???"); // TODO
-                    return Err(Exception::TypeErrorSetReadonly(what, name));
+                    return Err(Exception::TypeErrorSetReadonly(what, JSString::from(name)));
                 }
 
                 property.access = access;
@@ -237,13 +237,13 @@ impl JSObject {
             }
             None => {
                 let prop = Property { content, access };
-                self.properties.insert(name, prop);
+                self.properties.insert(JSString::from(name), prop);
             }
         }
         Ok(())
     }
 
-    pub fn define_own_property(&mut self, name: JSString, access: Access) -> JSResult<()> {
+    pub fn define_own_property(&mut self, name: &str, access: Access) -> JSResult<()> {
         let content = Content::from(JSValue::Undefined);
         self.set_maybe_nonwritable(name, content, access, true)
     }
@@ -253,7 +253,7 @@ impl JSObject {
     /// - if the existing own property is not configurable and the given `access` differs, fail.
     /// - if the existing own property is not writable, fail
     /// - else: replace `content` and `access` of the property.
-    fn set(&mut self, name: JSString, content: Content, access: Access) -> JSResult<()> {
+    fn set(&mut self, name: &str, content: Content, access: Access) -> JSResult<()> {
         self.set_maybe_nonwritable(name, content, access, false)
     }
 
@@ -263,22 +263,22 @@ impl JSObject {
     /// If the own property exists already, call `.set()` with its current access. This will fail
     /// to update non-writable properties.
     /// ES5: \[\[Put\]\] with strict error handing
-    pub fn set_property<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_property<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
-        let access = (self.properties.get(name.as_str()))
+        let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
         self.set(name, Content::from(value), access)
     }
 
     /// Just like `.set_property()`, but updates even non-writable properties.
-    pub fn set_even_nonwritable<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_even_nonwritable<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
-        let access = (self.properties.get(name.as_str()))
+        let access = (self.properties.get(name))
             .map(|prop| prop.access)
             .unwrap_or(Access::all());
         self.set_maybe_nonwritable(name, Content::from(value), access, true)
@@ -286,7 +286,7 @@ impl JSObject {
 
     // are these shortcuts a good idea?
     /// A shortcut for `define_own_property(Access::NONE)` and assigning the value.
-    pub fn set_system<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_system<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -294,7 +294,7 @@ impl JSObject {
     }
 
     /// A shortcut for defining a non-enumerable property and setting its value.
-    pub fn set_hidden<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_hidden<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -302,7 +302,7 @@ impl JSObject {
     }
 
     /// A shortcut for defining a non-configurable property and setting its value.
-    pub fn set_nonconf<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_nonconf<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -310,7 +310,7 @@ impl JSObject {
     }
 
     /// A shortcut for defining a non-writable property and setting its value.
-    pub fn set_readonly<V>(&mut self, name: JSString, value: V) -> JSResult<()>
+    pub fn set_readonly<V>(&mut self, name: &str, value: V) -> JSResult<()>
     where
         Content: From<V>,
     {
@@ -628,7 +628,7 @@ impl Interpreted {
 
     pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> JSResult<()> {
         match self {
-            Interpreted::Member { of, name } => heap.get_mut(*of).set_property(name.clone(), value),
+            Interpreted::Member { of, name } => heap.get_mut(*of).set_property(name.as_str(), value),
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
         }
     }

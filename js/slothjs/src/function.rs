@@ -130,7 +130,7 @@ impl Closure {
                 let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
-                heap.scope_mut().set_nonconf(param.0.clone(), value)?;
+                heap.scope_mut().set_nonconf(param.0.as_str(), value)?;
             }
 
             let _ = source::save_caller(call.loc.clone(), heap);

@@ -136,7 +136,7 @@ impl Heap {
         let mut proto_object = JSObject::new();
 
         for &(name, func) in class.methods.iter() {
-            let name = JSString::from(name);
+            //let name = JSString::from(name);
             let func = self.alloc_func(func);
             proto_object.set_hidden(name, func)?;
         }
@@ -144,20 +144,20 @@ impl Heap {
         *self.get_mut(proto) = proto_object;
 
         let mut ctor_object = JSObject::from_func(class.constructor);
-        ctor_object.set_system(JSString::from("prototype"), proto)?;
+        ctor_object.set_system("prototype", proto)?;
 
         for &(name, func) in class.static_methods.iter() {
-            let name = JSString::from(name);
+            //let name = JSString::from(name);
             let func = self.alloc_func(func);
             ctor_object.set_hidden(name, func)?;
         }
 
         let ctor_ref = self.alloc(ctor_object);
         self.get_mut(proto)
-            .set_hidden(JSString::from("constructor"), ctor_ref)?;
+            .set_hidden("constructor", ctor_ref)?;
 
         self.get_mut(Heap::GLOBAL)
-            .set_hidden(JSString::from(class.name), ctor_ref)?;
+            .set_hidden(class.name, ctor_ref)?;
         Ok(())
     }
 
@@ -182,7 +182,7 @@ impl Heap {
         if let Some(jobj) = json.as_object() {
             let mut object = JSObject::new();
             for (key, jval) in jobj.iter() {
-                let key = JSString::from(key.clone());
+                //let key = JSString::from(key.clone());
                 let value = self.object_from_json(jval);
                 object.set_property(key, value).unwrap();
             }
@@ -230,7 +230,7 @@ impl Heap {
 
     fn declare_variable(&mut self, var: &Identifier) -> JSResult<()> {
         if !self.scope().properties.contains_key(var.as_str()) {
-            let name = var.0.clone();
+            let name = var.as_str();
             self.scope_mut().set_nonconf(name, JSValue::Undefined)?;
         }
         Ok(())
@@ -250,7 +250,7 @@ impl Heap {
 
             let closure = func.function.interpret(self)?;
             let closure = closure.to_value(self)?;
-            self.scope_mut().set_property(name.0.clone(), closure)?;
+            self.scope_mut().set_property(name.as_str(), closure)?;
         }
         Ok(())
     }
@@ -318,7 +318,7 @@ impl Heap {
     {
         self.push_scope(this_ref)?;
         if captured_scope != Heap::NULL {
-            let name = JSString::from(Self::CAPTURED_SCOPE); // TODO: avoid re-creating it
+            let name = Self::CAPTURED_SCOPE;
             self.scope_mut().set_system(name, captured_scope)?;
         }
         let result = action(self);

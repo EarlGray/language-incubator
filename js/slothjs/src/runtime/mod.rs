@@ -158,7 +158,7 @@ impl Runtime {
 
         let eval_ref = heap.alloc_func(parser.eval_func());
         heap.get_mut(Heap::GLOBAL)
-            .set_hidden(JSString::from("eval"), eval_ref)?;
+            .set_hidden("eval", eval_ref)?;
 
         Ok(Runtime { heap, parser })
     }

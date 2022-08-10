@@ -171,8 +171,8 @@ fn define_property(
         let access = Access::new(configurable, enumerable, writable);
 
         let object = heap.get_mut(objref);
-        object.define_own_property(propname.clone(), access)?;
-        object.set_even_nonwritable(propname, value)?;
+        object.define_own_property(propname.as_str(), access)?;
+        object.set_even_nonwritable(propname.as_str(), value)?;
     }
     Ok(())
 }

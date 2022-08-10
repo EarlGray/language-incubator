@@ -354,7 +354,7 @@ impl CatchClause {
             };
 
             heap.scope_mut()
-                .set_nonconf(self.param.0.clone(), error_value)?;
+                .set_nonconf(self.param.0.as_str(), error_value)?;
             self.body.interpret(heap)
         })
     }
@@ -401,7 +401,7 @@ impl Interpretable for VariableDeclaration {
                 match heap.lookup_var(name) {
                     Some(Interpreted::Member { of, name }) => {
                         heap.get_mut(of)
-                            .set_property(name, value)
+                            .set_property(name.as_str(), value)
                             .or_else(crate::error::ignore_set_readonly)?;
                     }
                     _ => panic!("variable not declared: {}", name),
@@ -661,7 +661,7 @@ impl Interpretable for ObjectExpression {
             };
             let valresult = valexpr.interpret(heap)?;
             let value = valresult.to_value(heap)?;
-            object.set_property(keyname, value)?;
+            object.set_property(keyname.as_str(), value)?;
         }
 
         let object_ref = heap.alloc(object);
