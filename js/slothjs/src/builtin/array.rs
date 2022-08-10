@@ -1,3 +1,4 @@
+use crate::object::HostClass;
 use crate::prelude::*;
 use crate::{
     object::ObjectValue,
@@ -5,10 +6,7 @@ use crate::{
     Exception,
     Heap,
     Interpreted,
-    JSObject,
-    JSRef,
     JSResult,
-    JSValue,
 };
 
 fn array_object_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
@@ -19,7 +17,7 @@ fn array_object_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<In
 fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let array_object = heap.get(call.this_ref);
     let array = array_object.as_array().ok_or_else(|| {
-        Exception::TypeErrorInstanceRequired(Interpreted::from(call.this_ref), "Array".to_string())
+        Exception::TypeErrorInstanceRequired(Interpreted::from(call.this_ref), "Array".into())
     })?;
     let array = array.storage.clone();
 
@@ -67,22 +65,13 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> 
     }
 }
 
-pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
-    let mut array_proto = JSObject::new();
-    array_proto.set_hidden("toString", heap.alloc_func(array_toString))?;
-    array_proto.set_hidden("push", heap.alloc_func(array_proto_push))?;
-    array_proto.set_hidden("pop", heap.alloc_func(array_proto_pop))?;
-
-    *heap.get_mut(Heap::ARRAY_PROTO) = array_proto;
-
-    let mut array_object = JSObject::from_func(array_object_constructor);
-
-    // Array.prototype
-    array_object.set_system("prototype", Heap::ARRAY_PROTO)?;
-
-    let array_ref = heap.alloc(array_object);
-    heap.get_mut(Heap::ARRAY_PROTO)
-        .set_system("constructor", array_ref)?;
-
-    Ok(array_ref)
-}
+pub static CLASS: HostClass = HostClass {
+    name: "Array",
+    constructor: array_object_constructor,
+    methods: &[
+        ("pop", array_proto_pop),
+        ("push", array_proto_push),
+        ("toString", array_toString),
+    ],
+    static_methods: &[],
+};

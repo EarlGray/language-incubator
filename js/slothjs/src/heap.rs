@@ -6,6 +6,7 @@ use crate::function::{
     CallContext,
     HostFn,
 };
+use crate::object::HostClass;
 use crate::prelude::*;
 use crate::{
     builtin,
@@ -55,7 +56,7 @@ impl JSRef {
             true => Ok(()),
             false => {
                 let what = Interpreted::from(*self);
-                let of = constructor.to_string();
+                let of = constructor.into();
                 Err(Exception::TypeErrorInstanceRequired(what, of))
             }
         }
@@ -131,6 +132,33 @@ impl Heap {
         self.alloc(func_obj)
     }
 
+    pub fn init_class(&mut self, proto: JSRef, class: &HostClass) -> JSResult<()> {
+        let mut proto_object = JSObject::new();
+
+        for &(name, func) in class.methods.iter() {
+            let name = JSString::from(name);
+            let func = self.alloc_func(func);
+            proto_object.set_hidden(name, func)?;
+        }
+
+        *self.get_mut(proto) = proto_object;
+
+        let mut ctor_object = JSObject::from_func(class.constructor);
+        ctor_object.set_system(JSString::from("prototype"), proto)?;
+
+        for &(name, func) in class.static_methods.iter() {
+            let name = JSString::from(name);
+            let func = self.alloc_func(func);
+            ctor_object.set_hidden(name, func)?;
+        }
+
+        let ctor_ref = self.alloc(ctor_object);
+        self.get_mut(proto).set_hidden(JSString::from("constructor"), ctor_ref)?;
+
+        self.get_mut(Heap::GLOBAL).set_hidden(JSString::from(class.name), ctor_ref)?;
+        Ok(())
+    }
+
     /// this is a hack to distingiush e.g. `new Boolean(true)` and `Boolean(true)` calls.
     #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn smells_fresh(&self, objref: JSRef) -> bool {
@@ -152,6 +180,7 @@ impl Heap {
         if let Some(jobj) = json.as_object() {
             let mut object = JSObject::new();
             for (key, jval) in jobj.iter() {
+                let key = JSString::from(key.clone());
                 let value = self.object_from_json(jval);
                 object.set_property(key, value).unwrap();
             }
@@ -198,8 +227,8 @@ impl Heap {
     }
 
     fn declare_variable(&mut self, var: &Identifier) -> JSResult<()> {
-        let name = var.as_str();
-        if !self.scope().properties.contains_key(name) {
+        if !self.scope().properties.contains_key(var.as_str()) {
+            let name = var.0.clone();
             self.scope_mut().set_nonconf(name, JSValue::Undefined)?;
         }
         Ok(())
@@ -219,7 +248,7 @@ impl Heap {
 
             let closure = func.function.interpret(self)?;
             let closure = closure.to_value(self)?;
-            self.scope_mut().set_property(name.as_str(), closure)?;
+            self.scope_mut().set_property(name.0.clone(), closure)?;
         }
         Ok(())
     }
@@ -265,11 +294,11 @@ impl Heap {
     /// ```
     pub fn lookup_path(&self, mut names: &[&str]) -> JSResult<Interpreted> {
         let mut scoperef = self.local_scope().unwrap_or(Heap::GLOBAL);
-        while let Some((name, rest)) = names.split_first() {
+        while let Some((&name, rest)) = names.split_first() {
             names = rest;
             let nameval = self.get(scoperef).get_own_value(name).ok_or_else(|| {
                 let what = Interpreted::from(scoperef);
-                Exception::TypeErrorGetProperty(what, name.to_string())
+                Exception::TypeErrorGetProperty(what, name.into())
             })?;
             scoperef = nameval.to_ref()?;
         }
@@ -287,8 +316,8 @@ impl Heap {
     {
         self.push_scope(this_ref)?;
         if captured_scope != Heap::NULL {
-            self.scope_mut()
-                .set_system(Self::CAPTURED_SCOPE, captured_scope)?;
+            let name = JSString::from(Self::CAPTURED_SCOPE); // TODO: avoid re-creating it
+            self.scope_mut().set_system(name, captured_scope)?;
         }
         let result = action(self);
         self.pop_scope()?;
@@ -300,12 +329,12 @@ impl Heap {
 
         let mut scope_object = JSObject::new();
 
-        scope_object.set_system(Self::SAVED_SCOPE, old_scope_ref)?;
-        scope_object.set_system(Self::SCOPE_THIS, this_ref)?;
+        scope_object.set_system(Self::SAVED_SCOPE.into(), old_scope_ref)?;
+        scope_object.set_system(Self::SCOPE_THIS.into(), this_ref)?;
 
         let new_scope_ref = self.alloc(scope_object);
         self.get_mut(Heap::GLOBAL)
-            .set_even_nonwritable(Self::LOCAL_SCOPE, new_scope_ref)?;
+            .set_even_nonwritable(Self::LOCAL_SCOPE.into(), new_scope_ref)?;
         Ok(new_scope_ref)
     }
 
@@ -321,7 +350,7 @@ impl Heap {
         if saved_scope_ref == Heap::GLOBAL {
             global.properties.remove(Self::LOCAL_SCOPE);
         } else {
-            global.set_even_nonwritable(Self::LOCAL_SCOPE, saved_scope_ref)?;
+            global.set_even_nonwritable(Self::LOCAL_SCOPE.into(), saved_scope_ref)?;
         }
 
         Ok(())

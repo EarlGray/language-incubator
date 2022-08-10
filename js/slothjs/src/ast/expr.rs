@@ -117,7 +117,7 @@ impl From<CallExpression> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Literal(pub JSON);
+pub struct Literal(pub JSON);  // TODO: change to JSValue
 
 impl<V> From<V> for Literal
 where

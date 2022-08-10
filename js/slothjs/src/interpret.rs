@@ -354,7 +354,7 @@ impl CatchClause {
             };
 
             heap.scope_mut()
-                .set_nonconf(self.param.as_str(), error_value)?;
+                .set_nonconf(self.param.0.clone(), error_value)?;
             self.body.interpret(heap)
         })
     }
@@ -401,7 +401,7 @@ impl Interpretable for VariableDeclaration {
                 match heap.lookup_var(name) {
                     Some(Interpreted::Member { of, name }) => {
                         heap.get_mut(of)
-                            .set_property(&name, value)
+                            .set_property(name, value)
                             .or_else(crate::error::ignore_set_readonly)?;
                     }
                     _ => panic!("variable not declared: {}", name),
@@ -661,7 +661,7 @@ impl Interpretable for ObjectExpression {
             };
             let valresult = valexpr.interpret(heap)?;
             let value = valresult.to_value(heap)?;
-            object.set_property(&keyname, value)?;
+            object.set_property(keyname, value)?;
         }
 
         let object_ref = heap.alloc(object);
@@ -741,7 +741,7 @@ impl Interpretable for NewExpression {
         let funcref = callee.to_ref(heap)?;
         let prototype_ref = (heap.get_mut(funcref))
             .get_own_value("prototype")
-            .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".to_string()))?
+            .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".into()))?
             .to_ref()?;
 
         // allocate the object
@@ -776,11 +776,11 @@ impl Interpretable for FunctionExpression {
 
         let prototype_ref = heap.alloc(JSObject::new());
         heap.get_mut(function_ref)
-            .define_own_property("prototype", Access::WRITE)?;
+            .define_own_property("prototype".into(), Access::WRITE)?;
         heap.get_mut(function_ref)
-            .set_property("prototype", prototype_ref)?;
+            .set_property("prototype".into(), prototype_ref)?;
         heap.get_mut(prototype_ref)
-            .set_hidden("constructor", function_ref)?;
+            .set_hidden("constructor".into(), function_ref)?;
 
         Ok(Interpreted::from(function_ref))
     }

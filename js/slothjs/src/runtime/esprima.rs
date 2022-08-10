@@ -38,7 +38,7 @@ fn esprima_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         .to_ref()?;
     let parse_ref = (heap.get(esprima_ref).get_own_value("parse"))
         .ok_or_else(|| {
-            Exception::TypeErrorGetProperty(Interpreted::from(esprima_ref), "parse".to_string())
+            Exception::TypeErrorGetProperty(Interpreted::from(esprima_ref), "parse".into())
         })?
         .to_ref()?;
 

@@ -7,8 +7,23 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
-    JSString,
-    JSValue,
+    object::HostClass,
+};
+
+pub static CLASS: HostClass = HostClass {
+    name: "String",
+    constructor: string_constructor,
+    methods: &[
+        ("charAt",      string_proto_charAt),
+        ("charCodeAt",  string_proto_charCodeAt),
+        ("indexOf",     string_proto_indexOf),
+        ("replace",     string_proto_replace),
+        ("slice",       string_proto_slice),
+        ("substr",      string_proto_substr),
+        ("toString",    string_proto_valueOf),
+        ("valueOf",     string_proto_valueOf),
+    ],
+    static_methods: &[],
 };
 
 fn string_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
@@ -184,27 +199,4 @@ fn string_proto_replace(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
     }
     result.push_str(after);
     Ok(Interpreted::from(result))
-}
-
-pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
-    let mut string_proto = JSObject::new();
-    string_proto.set_hidden("charAt", heap.alloc_func(string_proto_charAt))?;
-    string_proto.set_hidden("charCodeAt", heap.alloc_func(string_proto_charCodeAt))?;
-    string_proto.set_hidden("indexOf", heap.alloc_func(string_proto_indexOf))?;
-    string_proto.set_hidden("replace", heap.alloc_func(string_proto_replace))?;
-    string_proto.set_hidden("slice", heap.alloc_func(string_proto_slice))?;
-    string_proto.set_hidden("substr", heap.alloc_func(string_proto_substr))?;
-    string_proto.set_hidden("toString", heap.alloc_func(string_proto_valueOf))?;
-    string_proto.set_hidden("valueOf", heap.alloc_func(string_proto_valueOf))?;
-
-    *heap.get_mut(Heap::STRING_PROTO) = string_proto;
-
-    let mut the_string = JSObject::from_func(string_constructor);
-    the_string.set_system("prototype", Heap::STRING_PROTO)?;
-
-    let the_string_ref = heap.alloc(the_string);
-    heap.get_mut(Heap::STRING_PROTO)
-        .set_hidden("constructor", the_string_ref)?;
-
-    Ok(the_string_ref)
 }

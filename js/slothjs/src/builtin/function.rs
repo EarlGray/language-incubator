@@ -1,3 +1,4 @@
+use crate::object::HostClass;
 /// The implementation of the builtin Function object.
 use crate::prelude::*;
 use crate::{
@@ -5,12 +6,21 @@ use crate::{
     Exception,
     Heap,
     Interpreted,
-    JSObject,
-    JSRef,
     JSResult,
 };
 
+pub static CLASS: HostClass = HostClass {
+    name: "Function",
+    constructor: function_constructor,
+    methods: &[
+        ("call", function_proto_call),
+        ("apply", function_proto_apply),
+    ],
+    static_methods: &[],
+};
+
 fn function_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
+    // TODO: eval arguments
     todo!()
 }
 
@@ -49,24 +59,4 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
             .with_this(bound_this)
             .with_name(call.method_name),
     )
-}
-
-pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
-    /* the Function.prototype */
-    let mut function_proto = JSObject::new();
-    function_proto.set_hidden("call", heap.alloc_func(function_proto_call))?;
-    function_proto.set_hidden("apply", heap.alloc_func(function_proto_apply))?;
-
-    *heap.get_mut(Heap::FUNCTION_PROTO) = function_proto;
-
-    /* the Function object */
-    let mut function_object = JSObject::from_func(function_constructor);
-
-    function_object.set_system("prototype", Heap::FUNCTION_PROTO)?;
-
-    let the_function_ref = heap.alloc(function_object);
-    heap.get_mut(Heap::FUNCTION_PROTO)
-        .set_hidden("constructor", the_function_ref)?;
-
-    Ok(the_function_ref)
 }

@@ -61,14 +61,14 @@ pub enum Exception {
 
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(Identifier),
-    TypeErrorSetReadonly(Interpreted, String),
-    TypeErrorNotConfigurable(Interpreted, String),
-    TypeErrorGetProperty(Interpreted, String),
+    TypeErrorSetReadonly(Interpreted, JSString),
+    TypeErrorNotConfigurable(Interpreted, JSString),
+    TypeErrorGetProperty(Interpreted, JSString),
     TypeErrorCannotAssign(Interpreted),
     TypeErrorConstAssign(Interpreted),
     TypeErrorNotCallable(Interpreted),
     TypeErrorNotArraylike(Interpreted),
-    TypeErrorInstanceRequired(Interpreted, String),
+    TypeErrorInstanceRequired(Interpreted, JSString),
     TypeErrorInvalidDescriptor(Interpreted),
     TypeErrorInvalidPrototype(Interpreted),
 
@@ -90,7 +90,7 @@ impl Exception {
         Interpreted: From<V>,
     {
         let arg = Interpreted::from(arg);
-        Exception::TypeErrorInstanceRequired(arg, of.to_string())
+        Exception::TypeErrorInstanceRequired(arg, of.into())
     }
 }
 

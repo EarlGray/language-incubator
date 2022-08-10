@@ -63,14 +63,14 @@ fn global_parseFloat(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted
 pub fn init(heap: &mut Heap) -> JSResult<()> {
     let mut global = JSObject::new();
 
-    global.set_system("NaN", f64::NAN)?;
-    global.set_system("undefined", JSValue::Undefined)?;
+    global.set_system("NaN".into(), f64::NAN)?;
+    global.set_system("undefined".into(), JSValue::Undefined)?;
 
-    global.set_hidden("global", Heap::GLOBAL)?;
-    global.set_system(Heap::SCOPE_THIS, Heap::GLOBAL)?;
+    global.set_hidden("global".into(), Heap::GLOBAL)?;
+    global.set_system(Heap::SCOPE_THIS.into(), Heap::GLOBAL)?;
 
-    global.set_hidden("parseInt", heap.alloc_func(parse_int))?;
-    global.set_hidden("parseFloat", heap.alloc_func(global_parseFloat))?;
+    global.set_hidden("parseInt".into(), heap.alloc_func(parse_int))?;
+    global.set_hidden("parseFloat".into(), heap.alloc_func(global_parseFloat))?;
 
     *heap.get_mut(Heap::GLOBAL) = global;
 

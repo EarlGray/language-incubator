@@ -7,7 +7,17 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
-    JSValue,
+    JSValue, object::HostClass,
+};
+
+pub static CLASS: HostClass = HostClass {
+    name: "Boolean",
+    constructor: boolean_constructor,
+    methods: &[
+        ("toString", boolean_proto_toString),
+        ("valueOf", boolean_proto_valueOf),
+    ],
+    static_methods: &[],
 };
 
 fn boolean_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
@@ -38,24 +48,4 @@ fn boolean_proto_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interp
 fn boolean_proto_valueOf(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let b = object_to_bool(call.this_ref, heap)?;
     Ok(Interpreted::from(b))
-}
-
-pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
-    /* Boolean.prototype */
-    let mut boolean_proto = JSObject::new();
-    boolean_proto.set_hidden("valueOf", heap.alloc_func(boolean_proto_valueOf))?;
-    boolean_proto.set_hidden("toString", heap.alloc_func(boolean_proto_toString))?;
-
-    *heap.get_mut(Heap::BOOLEAN_PROTO) = boolean_proto;
-
-    /* the Boolean object */
-    let mut the_boolean = JSObject::from_func(boolean_constructor);
-    the_boolean.set_system("prototype", Heap::BOOLEAN_PROTO)?;
-
-    let the_boolean_ref = heap.alloc(the_boolean);
-
-    heap.get_mut(Heap::BOOLEAN_PROTO)
-        .set_hidden("constructor", the_boolean_ref)?;
-
-    Ok(the_boolean_ref)
 }

@@ -8,7 +8,25 @@ use crate::{
     JSObject,
     JSRef,
     JSResult,
-    JSValue,
+    object::HostClass,
+};
+
+pub static CLASS: HostClass = HostClass {
+    name: "Object",
+    constructor: object_constructor,
+    methods: &[
+        ("hasOwnProperty",      object_proto_hasOwnProperty),
+        ("toString",            object_proto_toString),
+        ("valueOf",             object_proto_valueOf),
+    ],
+    static_methods: &[
+        ("create",                      object_object_create),
+        ("defineProperties",            object_object_defineProperties),
+        ("defineProperty",              object_object_defineProperty),
+        ("getOwnPropertyDescriptor",    object_object_getOwnPropertyDescriptor),
+        ("is",                          object_object_is),
+        ("setPrototypeOf",              object_object_setPrototypeOf),
+    ],
 };
 
 fn object_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
@@ -34,7 +52,7 @@ fn object_proto_toString(_call: CallContext, _heap: &mut Heap) -> JSResult<Inter
 }
 
 #[cfg(feature = "std")]
-fn object_proto_dbg(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+pub fn object_proto_dbg(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     dbg!(call.this_ref);
     dbg!(heap.get(call.this_ref));
     Ok(Interpreted::VOID)
@@ -109,16 +127,16 @@ fn object_object_getOwnPropertyDescriptor(
     let value = prop.content.to_value()?;
 
     let mut descriptor_object = JSObject::new();
-    descriptor_object.set_property("value", value)?;
-    descriptor_object.set_property("configurable", prop.access.configurable())?;
-    descriptor_object.set_property("enumerable", prop.access.enumerable())?;
-    descriptor_object.set_property("writable", prop.access.writable())?;
+    descriptor_object.set_property("value".into(), value)?;
+    descriptor_object.set_property("configurable".into(), prop.access.configurable())?;
+    descriptor_object.set_property("enumerable".into(), prop.access.enumerable())?;
+    descriptor_object.set_property("writable".into(), prop.access.writable())?;
 
     let descriptor_ref = heap.alloc(descriptor_object);
     Ok(Interpreted::from(descriptor_ref))
 }
 
-fn define_property(objref: JSRef, propname: &str, descref: JSRef, heap: &mut Heap) -> JSResult<()> {
+fn define_property(objref: JSRef, propname: JSString, descref: JSRef, heap: &mut Heap) -> JSResult<()> {
     let get_value =
         |object: &JSObject, name: &str| object.get_own_value(name).unwrap_or(JSValue::Undefined);
     let get_bool = |object: &JSObject, name: &str| get_value(object, name).boolify(heap);
@@ -145,7 +163,7 @@ fn define_property(objref: JSRef, propname: &str, descref: JSRef, heap: &mut Hea
         let access = Access::new(configurable, enumerable, writable);
 
         let object = heap.get_mut(objref);
-        object.define_own_property(propname, access)?;
+        object.define_own_property(propname.clone(), access)?;
         object.set_even_nonwritable(propname, value)?;
     }
     Ok(())
@@ -157,7 +175,7 @@ fn object_object_defineProperty(call: CallContext, heap: &mut Heap) -> JSResult<
     let prop = call.arg_value(1, heap)?.stringify(heap)?;
     let descref = call.arg_value(2, heap)?.to_ref()?;
 
-    define_property(objref, prop.as_str(), descref, heap)?;
+    define_property(objref, prop, descref, heap)?;
     Ok(Interpreted::from(objref))
 }
 
@@ -177,7 +195,7 @@ fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> JSResu
         .collect::<JSResult<_>>()?;
 
     while let Some((prop, descref)) = pairs.pop() {
-        define_property(objref, prop.as_str(), descref, heap)?;
+        define_property(objref, prop, descref, heap)?;
     }
     Ok(())
 }
@@ -202,52 +220,4 @@ fn object_object_setPrototypeOf(call: CallContext, heap: &mut Heap) -> JSResult<
     }
 
     Ok(Interpreted::from(objref))
-}
-
-pub fn init(heap: &mut Heap) -> JSResult<JSRef> {
-    /* Object.prototype */
-    let mut object_proto = JSObject::new();
-    object_proto.proto = Heap::NULL;
-
-    #[cfg(feature = "std")]
-    object_proto.set_system("dbg", heap.alloc_func(object_proto_dbg))?;
-
-    object_proto.set_hidden(
-        "hasOwnProperty",
-        heap.alloc_func(object_proto_hasOwnProperty),
-    )?;
-    object_proto.set_hidden("toString", heap.alloc_func(object_proto_toString))?;
-    object_proto.set_hidden("valueOf", heap.alloc_func(object_proto_valueOf))?;
-
-    *heap.get_mut(Heap::OBJECT_PROTO) = object_proto;
-
-    /* the Object */
-    let mut object_object = JSObject::from_func(object_constructor);
-
-    object_object.set_system("prototype", Heap::OBJECT_PROTO)?;
-
-    object_object.set_hidden("create", heap.alloc_func(object_object_create))?;
-    object_object.set_hidden("is", heap.alloc_func(object_object_is))?;
-    object_object.set_hidden(
-        "defineProperty",
-        heap.alloc_func(object_object_defineProperty),
-    )?;
-    object_object.set_hidden(
-        "defineProperties",
-        heap.alloc_func(object_object_defineProperties),
-    )?;
-    object_object.set_hidden(
-        "getOwnPropertyDescriptor",
-        heap.alloc_func(object_object_getOwnPropertyDescriptor),
-    )?;
-    object_object.set_hidden(
-        "setPrototypeOf",
-        heap.alloc_func(object_object_setPrototypeOf),
-    )?;
-
-    let the_object_ref = heap.alloc(object_object);
-    heap.get_mut(Heap::OBJECT_PROTO)
-        .set_hidden("constructor", the_object_ref)?;
-
-    Ok(the_object_ref)
 }

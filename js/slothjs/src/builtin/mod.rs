@@ -13,28 +13,27 @@ use crate::{
 
 pub fn init(heap: &mut Heap) -> JSResult<()> {
     global::init(heap)?;
+    heap.init_class(Heap::OBJECT_PROTO, &object::CLASS)?;
+    {
+        #[cfg(feature = "std")]
+        let proto_dbg = heap.alloc_func(object::object_proto_dbg);
 
-    let the_object = object::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Object", the_object)?;
+        let proto_object = heap.get_mut(Heap::OBJECT_PROTO);
+        proto_object.proto = Heap::NULL;
 
-    let the_function = function::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Function", the_function)?;
+        #[cfg(feature = "std")]
+        proto_object.set_system("dbg".into(), proto_dbg)?;
+    }
 
-    let the_array = array::init(heap)?;
-    heap.get_mut(Heap::GLOBAL).set_hidden("Array", the_array)?;
-
-    let the_boolean = boolean::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("Boolean", the_boolean)?;
-
-    let the_string = string::init(heap)?;
-    heap.get_mut(Heap::GLOBAL)
-        .set_hidden("String", the_string)?;
-
-    let the_error = error::init(heap)?;
-    heap.get_mut(Heap::GLOBAL).set_hidden("Error", the_error)?;
-
+    heap.init_class(Heap::FUNCTION_PROTO, &function::CLASS)?;
+    heap.init_class(Heap::ARRAY_PROTO, &array::CLASS)?;
+    heap.init_class(Heap::BOOLEAN_PROTO, &boolean::CLASS)?;
+    heap.init_class(Heap::STRING_PROTO, &string::CLASS)?;
+    heap.init_class(Heap::ERROR_PROTO, &error::CLASS)?;
+    {
+        let error_proto = heap.get_mut(Heap::ERROR_PROTO);
+        error_proto.set_hidden("name".into(), "Error")?;
+        error_proto.set_hidden("message".into(), "")?;
+    }
     Ok(())
 }

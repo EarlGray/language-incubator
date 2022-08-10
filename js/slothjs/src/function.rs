@@ -122,14 +122,14 @@ impl Closure {
                 .map(|v| v.to_value(heap))
                 .collect::<JSResult<Vec<JSValue>>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
-            heap.scope_mut().set_nonconf("arguments", arguments_ref)?;
+            heap.scope_mut().set_nonconf("arguments".into(), arguments_ref)?;
 
             // set each argument
             for (i, param) in self.function.params.iter().enumerate() {
                 let value = (call.arguments.get(i))
                     .unwrap_or(&Interpreted::VOID)
                     .to_value(heap)?;
-                heap.scope_mut().set_nonconf(param.as_str(), value)?;
+                heap.scope_mut().set_nonconf(param.0.clone(), value)?;
             }
 
             let _ = source::save_caller(call.loc.clone(), heap);
