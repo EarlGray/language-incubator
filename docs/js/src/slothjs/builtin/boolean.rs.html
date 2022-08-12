@@ -56,17 +56,9 @@
 <span id="50">50</span>
 <span id="51">51</span>
 <span id="52">52</span>
-<span id="53">53</span>
-<span id="54">54</span>
-<span id="55">55</span>
-<span id="56">56</span>
-<span id="57">57</span>
-<span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
-<span id="61">61</span>
 </pre><pre class="rust"><code><span class="comment">//use crate::prelude::*;</span>
 <span class="kw">use</span> <span class="kw">crate</span>::{
+    <span class="ident">object::HostClass</span>,
     <span class="ident">CallContext</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
@@ -75,6 +67,16 @@
     <span class="ident">JSRef</span>,
     <span class="ident">JSResult</span>,
     <span class="ident">JSValue</span>,
+};
+
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CLASS</span>: <span class="ident">HostClass</span> <span class="op">=</span> <span class="ident">HostClass</span> {
+    <span class="ident">name</span>: <span class="string">&quot;Boolean&quot;</span>,
+    <span class="ident">constructor</span>: <span class="ident">boolean_constructor</span>,
+    <span class="ident">methods</span>: <span class="kw-2">&amp;</span>[
+        (<span class="string">&quot;toString&quot;</span>, <span class="ident">boolean_proto_toString</span>),
+        (<span class="string">&quot;valueOf&quot;</span>, <span class="ident">boolean_proto_valueOf</span>),
+    ],
+    <span class="ident">static_methods</span>: <span class="kw-2">&amp;</span>[],
 };
 
 <span class="kw">fn</span> <span class="ident">boolean_constructor</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
@@ -106,26 +108,6 @@
     <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">object_to_bool</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">b</span>))
 }
-
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> {
-    <span class="comment">/* Boolean.prototype */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">boolean_proto</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
-    <span class="ident">boolean_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;valueOf&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">boolean_proto_valueOf</span>))<span class="question-mark">?</span>;
-    <span class="ident">boolean_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;toString&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">boolean_proto_toString</span>))<span class="question-mark">?</span>;
-
-    <span class="kw-2">*</span><span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::BOOLEAN_PROTO</span>) <span class="op">=</span> <span class="ident">boolean_proto</span>;
-
-    <span class="comment">/* the Boolean object */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">the_boolean</span> <span class="op">=</span> <span class="ident">JSObject::from_func</span>(<span class="ident">boolean_constructor</span>);
-    <span class="ident">the_boolean</span>.<span class="ident">set_system</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">Heap::BOOLEAN_PROTO</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">the_boolean_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">the_boolean</span>);
-
-    <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::BOOLEAN_PROTO</span>)
-        .<span class="ident">set_hidden</span>(<span class="string">&quot;constructor&quot;</span>, <span class="ident">the_boolean_ref</span>)<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(<span class="ident">the_boolean_ref</span>)
-}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

@@ -791,25 +791,6 @@
 <span id="785">785</span>
 <span id="786">786</span>
 <span id="787">787</span>
-<span id="788">788</span>
-<span id="789">789</span>
-<span id="790">790</span>
-<span id="791">791</span>
-<span id="792">792</span>
-<span id="793">793</span>
-<span id="794">794</span>
-<span id="795">795</span>
-<span id="796">796</span>
-<span id="797">797</span>
-<span id="798">798</span>
-<span id="799">799</span>
-<span id="800">800</span>
-<span id="801">801</span>
-<span id="802">802</span>
-<span id="803">803</span>
-<span id="804">804</span>
-<span id="805">805</span>
-<span id="806">806</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ast</span>::<span class="kw-2">*</span>; <span class="comment">// yes, EVERYTHING</span>
@@ -827,15 +808,15 @@
 };
 
 <span class="comment">// ==============================================</span>
-
+<span class="doccomment">/// Describes things (i.e. AST nodes, [`Function`]) that can be interpreted on a [`Heap`]</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Interpretable</span> {
-    <span class="doccomment">/// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].</span>
-    <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span>;
-
-    <span class="doccomment">/// A wrapper over [`Interpretable::interpret`] that also resolves the result into [`JSValue`].</span>
+    <span class="doccomment">/// A wrapper for `.interpret` that also resolves the result to JSValue</span>
     <span class="kw">fn</span> <span class="ident">evaluate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">JSValue</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)
     }
+
+    <span class="doccomment">/// Interpret `self` on the `heap`, potentially to a settable [`Interpreted::Member`].</span>
+    <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span>;
 }
 
 <span class="comment">// ==============================================</span>
@@ -843,7 +824,6 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">Program</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="ident">heap</span>.<span class="ident">declare</span>(<span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">iter</span>(), <span class="self">self</span>.<span class="ident">functions</span>.<span class="ident">iter</span>())<span class="question-mark">?</span>;
-
         <span class="self">self</span>.<span class="ident">body</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)
     }
 }
@@ -893,8 +873,7 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">IfStatement</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">jbool</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">test</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">cond</span> <span class="op">=</span> <span class="ident">jbool</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">cond</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">test</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="ident">cond</span>.<span class="ident">boolify</span>(<span class="ident">heap</span>) {
             <span class="self">self</span>.<span class="ident">consequent</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)
         } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">else_stmt</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">alternate</span>.<span class="ident">as_ref</span>() {
@@ -907,8 +886,7 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">SwitchStatement</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">matchee</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">discriminant</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">switchval</span> <span class="op">=</span> <span class="ident">matchee</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">switchval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">discriminant</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">default</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>; <span class="comment">// the index of the default case, if any</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">found_case</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
@@ -920,7 +898,7 @@
                     <span class="ident">default</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
                     <span class="kw">continue</span>;
                 }
-                <span class="prelude-val">Some</span>(<span class="ident">test</span>) =&gt; <span class="ident">test</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">test</span>) =&gt; <span class="ident">test</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>,
             };
 
             <span class="kw">if</span> <span class="ident">JSValue::strict_eq</span>(<span class="kw-2">&amp;</span><span class="ident">switchval</span>, <span class="kw-2">&amp;</span><span class="ident">caseval</span>, <span class="ident">heap</span>) {
@@ -971,8 +949,8 @@
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">test</span>.<span class="ident">as_ref</span>() {
             <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
             <span class="prelude-val">Some</span>(<span class="ident">testexpr</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">testexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">result</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">boolify</span>(<span class="ident">heap</span>))
+                <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">testexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(<span class="ident">result</span>.<span class="ident">boolify</span>(<span class="ident">heap</span>))
             }
         }
     }
@@ -997,8 +975,7 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">ForInStatement</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">iteratee</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">right</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">iteratee</span> <span class="op">=</span> <span class="ident">iteratee</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">objectify</span>(<span class="ident">heap</span>);
+        <span class="kw">let</span> <span class="ident">iteratee</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">right</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">objectify</span>(<span class="ident">heap</span>);
 
         <span class="kw">let</span> <span class="ident">assignexpr</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">left</span> {
             <span class="ident">ForInTarget::Expr</span>(<span class="ident">expr</span>) =&gt; <span class="ident">expr</span>.<span class="ident">clone</span>(),
@@ -1019,14 +996,12 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">objref</span> <span class="op">=</span> <span class="ident">iteratee</span>;
         <span class="kw">while</span> <span class="ident">objref</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Heap::NULL</span> {
             <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">objref</span>);
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">keys</span> <span class="op">=</span> <span class="ident">object</span>
-                .<span class="ident">properties</span>
-                .<span class="ident">keys</span>()
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">keys</span> <span class="op">=</span> (<span class="ident">object</span>.<span class="ident">properties</span>.<span class="ident">keys</span>())
                 .<span class="ident">cloned</span>()
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">JSString</span><span class="op">&gt;</span><span class="op">&gt;</span>();
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">array</span>) <span class="op">=</span> <span class="ident">object</span>.<span class="ident">as_array</span>() {
                 <span class="kw">let</span> <span class="ident">indices</span> <span class="op">=</span> <span class="number">0</span>..<span class="ident">array</span>.<span class="ident">storage</span>.<span class="ident">len</span>();
-                <span class="ident">keys</span>.<span class="ident">extend</span>(<span class="ident">indices</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">i</span>.<span class="ident">to_string</span>()));
+                <span class="ident">keys</span>.<span class="ident">extend</span>(<span class="ident">indices</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">i</span>.<span class="ident">to_string</span>().<span class="ident">into</span>()));
             }
             <span class="comment">// TODO: strings iteration</span>
 
@@ -1122,8 +1097,7 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">ExpressionStatement</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">expression</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">expression</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::Value</span>(<span class="ident">value</span>))
     }
 }
@@ -1142,9 +1116,7 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">ThrowStatement</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">ThrowStatement</span>(<span class="ident">exc_expr</span>) <span class="op">=</span> <span class="self">self</span>;
-        <span class="kw">let</span> <span class="ident">exc_value</span> <span class="op">=</span> <span class="ident">exc_expr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">exc_value</span> <span class="op">=</span> <span class="ident">exc_value</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-
+        <span class="kw">let</span> <span class="ident">exc_value</span> <span class="op">=</span> <span class="ident">exc_expr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="ident">heap</span>.<span class="ident">throw</span>(<span class="ident">Exception::UserThrown</span>(<span class="ident">exc_value</span>))
     }
 }
@@ -1163,13 +1135,11 @@
                 <span class="comment">//Exception::ReferenceNotFound(ident) =&gt; { // TODO: ReferenceError</span>
                 <span class="kw">_</span> =&gt; {
                     <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">exc</span>);
+                    <span class="kw">let</span> <span class="ident">args</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Interpreted::from</span>(<span class="ident">message</span>)];
                     <span class="kw">let</span> <span class="ident">errval</span> <span class="op">=</span> <span class="ident">builtin::error::error_constructor</span>(
-                        <span class="ident">CallContext</span> {
-                            <span class="ident">this_ref</span>,
-                            <span class="ident">method_name</span>: <span class="string">&quot;Error&quot;</span>.<span class="ident">to_string</span>(),
-                            <span class="ident">arguments</span>: <span class="macro">vec!</span>[<span class="ident">Interpreted::from</span>(<span class="ident">message</span>)],
-                            <span class="ident">loc</span>: <span class="prelude-val">None</span>, <span class="comment">// TODO: get the location of the reference</span>
-                        },
+                        <span class="ident">CallContext::from</span>(<span class="ident">args</span>)
+                            .<span class="ident">with_this</span>(<span class="ident">this_ref</span>)
+                            .<span class="ident">with_name</span>(<span class="string">&quot;Error&quot;</span>.<span class="ident">into</span>()),
                         <span class="ident">heap</span>,
                     )<span class="question-mark">?</span>;
                     <span class="ident">errval</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>
@@ -1177,7 +1147,7 @@
             };
 
             <span class="ident">heap</span>.<span class="ident">scope_mut</span>()
-                .<span class="ident">set_nonconf</span>(<span class="self">self</span>.<span class="ident">param</span>.<span class="ident">as_str</span>(), <span class="ident">error_value</span>)<span class="question-mark">?</span>;
+                .<span class="ident">set_nonconf</span>(<span class="self">self</span>.<span class="ident">param</span>.<span class="number">0</span>.<span class="ident">clone</span>(), <span class="ident">error_value</span>)<span class="question-mark">?</span>;
             <span class="self">self</span>.<span class="ident">body</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)
         })
     }
@@ -1220,11 +1190,11 @@
         <span class="kw">for</span> <span class="ident">decl</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">declarations</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">initexpr</span>) <span class="op">=</span> <span class="ident">decl</span>.<span class="ident">init</span>.<span class="ident">as_ref</span>() {
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">decl</span>.<span class="ident">name</span>.<span class="number">0</span>;
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">initexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">initexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
                 <span class="kw">match</span> <span class="ident">heap</span>.<span class="ident">lookup_var</span>(<span class="ident">name</span>) {
                     <span class="prelude-val">Some</span>(<span class="ident">Interpreted::Member</span> { <span class="ident">of</span>, <span class="ident">name</span> }) =&gt; {
                         <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">of</span>)
-                            .<span class="ident">set_property</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="ident">value</span>)
+                            .<span class="ident">set_property</span>(<span class="ident">name</span>, <span class="ident">value</span>)
                             .<span class="ident">or_else</span>(<span class="ident"><span class="kw">crate</span>::error::ignore_set_readonly</span>)<span class="question-mark">?</span>;
                     }
                     <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;variable not declared: {}&quot;</span>, <span class="ident">name</span>),
@@ -1267,8 +1237,8 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">Literal</span> {
-    <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">object_from_json</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>);
+    <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_value</span>();
         <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::Value</span>(<span class="ident">value</span>))
     }
 }
@@ -1285,7 +1255,7 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">ConditionalExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">cond</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">condexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">cond</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">condexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="ident">cond</span>.<span class="ident">boolify</span>(<span class="ident">heap</span>) {
             <span class="self">self</span>.<span class="ident">thenexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)
         } <span class="kw">else</span> {
@@ -1297,9 +1267,9 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">LogicalExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">LogicalExpression</span>(<span class="ident">lexpr</span>, <span class="ident">op</span>, <span class="ident">rexpr</span>) <span class="op">=</span> <span class="self">self</span>;
-        <span class="kw">let</span> <span class="ident">lval</span> <span class="op">=</span> <span class="ident">lexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">lval</span> <span class="op">=</span> <span class="ident">lexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">lval</span>.<span class="ident">boolify</span>(<span class="ident">heap</span>), <span class="ident">op</span>) {
-            (<span class="bool-val">true</span>, <span class="ident">BoolOp::And</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="ident">BoolOp::Or</span>) =&gt; <span class="ident">rexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>,
+            (<span class="bool-val">true</span>, <span class="ident">BoolOp::And</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="ident">BoolOp::Or</span>) =&gt; <span class="ident">rexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>,
             <span class="kw">_</span> =&gt; <span class="ident">lval</span>,
         };
         <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::Value</span>(<span class="ident">value</span>))
@@ -1368,8 +1338,8 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">BinaryExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">BinaryExpression</span>(<span class="ident">lexpr</span>, <span class="ident">op</span>, <span class="ident">rexpr</span>) <span class="op">=</span> <span class="self">self</span>;
-        <span class="kw">let</span> <span class="ident">lval</span> <span class="op">=</span> <span class="ident">lexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">rval</span> <span class="op">=</span> <span class="ident">rexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">lval</span> <span class="op">=</span> <span class="ident">lexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">rval</span> <span class="op">=</span> <span class="ident">rexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">op</span>.<span class="ident">compute</span>(<span class="kw-2">&amp;</span><span class="ident">lval</span>, <span class="kw-2">&amp;</span><span class="ident">rval</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::Value</span>(<span class="ident">result</span>))
     }
@@ -1458,12 +1428,15 @@
         };
 
         <span class="comment">// TODO: __proto__ as (getPrototypeOf, setPrototypeOf) property</span>
-        <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">propname</span> <span class="op">==</span> <span class="string">&quot;__proto__&quot;</span> {
+        <span class="kw">if</span> <span class="ident">propname</span>.<span class="ident">as_str</span>() <span class="op">==</span> <span class="string">&quot;__proto__&quot;</span> {
             <span class="kw">let</span> <span class="ident">proto</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">objref</span>).<span class="ident">proto</span>;
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">proto</span>));
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::member</span>(<span class="ident">objref</span>, <span class="kw-2">&amp;</span><span class="ident">propname</span>))
+        <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::Member</span> {
+            <span class="ident">of</span>: <span class="ident">objref</span>,
+            <span class="ident">name</span>: <span class="ident">propname</span>,
+        })
     }
 }
 
@@ -1481,7 +1454,7 @@
             };
             <span class="kw">let</span> <span class="ident">valresult</span> <span class="op">=</span> <span class="ident">valexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">valresult</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-            <span class="ident">object</span>.<span class="ident">set_property</span>(<span class="kw-2">&amp;</span><span class="ident">keyname</span>, <span class="ident">value</span>)<span class="question-mark">?</span>;
+            <span class="ident">object</span>.<span class="ident">set_property</span>(<span class="ident">keyname</span>, <span class="ident">value</span>)<span class="question-mark">?</span>;
         }
 
         <span class="kw">let</span> <span class="ident">object_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">object</span>);
@@ -1504,9 +1477,9 @@
 
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">AssignmentExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">AssignmentExpression</span>(<span class="ident">leftexpr</span>, <span class="ident">AssignOp</span>(<span class="ident">modop</span>), <span class="ident">valexpr</span>) <span class="op">=</span> <span class="self">self</span>;
+        <span class="kw">let</span> <span class="ident">AssignmentExpression</span>(<span class="ident">leftexpr</span>, <span class="ident">modop</span>, <span class="ident">valexpr</span>) <span class="op">=</span> <span class="self">self</span>;
 
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">valexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">valexpr</span>.<span class="ident">evaluate</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// This can be:</span>
         <span class="comment">// - Interpreted::Member{ existing object, attribute }</span>
@@ -1516,10 +1489,9 @@
         <span class="kw">let</span> <span class="ident">assignee</span> <span class="op">=</span> <span class="ident">leftexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="ident">newvalue</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">modop</span> {
-            <span class="prelude-val">None</span> =&gt; <span class="ident">value</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>,
+            <span class="prelude-val">None</span> =&gt; <span class="ident">value</span>,
             <span class="prelude-val">Some</span>(<span class="ident">op</span>) =&gt; {
                 <span class="kw">let</span> <span class="ident">oldvalue</span> <span class="op">=</span> <span class="ident">assignee</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
                 <span class="ident">op</span>.<span class="ident">compute</span>(<span class="kw-2">&amp;</span><span class="ident">oldvalue</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>
             }
         };
@@ -1533,7 +1505,6 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">CallExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">CallExpression</span>(<span class="ident">callee_expr</span>, <span class="ident">argument_exprs</span>) <span class="op">=</span> <span class="self">self</span>;
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">loc</span>.<span class="ident">clone</span>();
 
         <span class="kw">let</span> <span class="ident">arguments</span> <span class="op">=</span> (<span class="ident">argument_exprs</span>.<span class="ident">iter</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">argexpr</span><span class="op">|</span> <span class="ident">argexpr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>))
@@ -1542,15 +1513,11 @@
         <span class="kw">let</span> <span class="ident">callee</span> <span class="op">=</span> <span class="ident">callee_expr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">func_ref</span>, <span class="ident">this_ref</span>, <span class="ident">name</span>) <span class="op">=</span> <span class="ident">callee</span>.<span class="ident">resolve_call</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">method_name</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">to_string</span>();
         <span class="ident">heap</span>.<span class="ident">execute</span>(
             <span class="ident">func_ref</span>,
-            <span class="ident">CallContext</span> {
-                <span class="ident">this_ref</span>,
-                <span class="ident">method_name</span>,
-                <span class="ident">arguments</span>,
-                <span class="ident">loc</span>,
-            },
+            <span class="ident">CallContext::from</span>(<span class="ident">arguments</span>)
+                .<span class="ident">with_this</span>(<span class="ident">this_ref</span>)
+                .<span class="ident">with_name</span>(<span class="ident">name</span>),
         )
     }
 }
@@ -1558,8 +1525,6 @@
 <span class="kw">impl</span> <span class="ident">Interpretable</span> <span class="kw">for</span> <span class="ident">NewExpression</span> {
     <span class="kw">fn</span> <span class="ident">interpret</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">NewExpression</span>(<span class="ident">callee_expr</span>, <span class="ident">argument_exprs</span>) <span class="op">=</span> <span class="self">self</span>;
-
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">loc</span>.<span class="ident">clone</span>();
 
         <span class="kw">let</span> <span class="ident">arguments</span> <span class="op">=</span> (<span class="ident">argument_exprs</span>.<span class="ident">iter</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">expr</span><span class="op">|</span> <span class="ident">expr</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>))
@@ -1569,7 +1534,7 @@
         <span class="kw">let</span> <span class="ident">funcref</span> <span class="op">=</span> <span class="ident">callee</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">prototype_ref</span> <span class="op">=</span> (<span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">funcref</span>))
             .<span class="ident">get_own_value</span>(<span class="string">&quot;prototype&quot;</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Exception::TypeErrorGetProperty</span>(<span class="ident">callee</span>, <span class="string">&quot;prototype&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Exception::TypeErrorGetProperty</span>(<span class="ident">callee</span>, <span class="string">&quot;prototype&quot;</span>.<span class="ident">into</span>()))<span class="question-mark">?</span>
             .<span class="ident">to_ref</span>()<span class="question-mark">?</span>;
 
         <span class="comment">// allocate the object</span>
@@ -1581,12 +1546,9 @@
         <span class="comment">// call its constructor</span>
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">execute</span>(
             <span class="ident">funcref</span>,
-            <span class="ident">CallContext</span> {
-                <span class="ident">this_ref</span>: <span class="ident">object_ref</span>,
-                <span class="ident">method_name</span>: <span class="string">&quot;&lt;constructor&gt;&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">arguments</span>,
-                <span class="ident">loc</span>,
-            },
+            <span class="ident">CallContext::from</span>(<span class="ident">arguments</span>)
+                .<span class="ident">with_this</span>(<span class="ident">object_ref</span>)
+                .<span class="ident">with_name</span>(<span class="string">&quot;&lt;constructor&gt;&quot;</span>.<span class="ident">into</span>()),
         )<span class="question-mark">?</span>;
         <span class="kw">match</span> <span class="ident">result</span> {
             <span class="ident">Interpreted::Value</span>(<span class="ident">JSValue::Ref</span>(<span class="ident">r</span>)) <span class="kw">if</span> <span class="ident">r</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Heap::NULL</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">result</span>),
@@ -1607,15 +1569,15 @@
 
         <span class="kw">let</span> <span class="ident">prototype_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">JSObject::new</span>());
         <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">function_ref</span>)
-            .<span class="ident">define_own_property</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">Access::WRITE</span>)<span class="question-mark">?</span>;
+            .<span class="ident">define_own_property</span>(<span class="string">&quot;prototype&quot;</span>.<span class="ident">into</span>(), <span class="ident">Access::WRITE</span>)<span class="question-mark">?</span>;
         <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">function_ref</span>)
-            .<span class="ident">set_property</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">prototype_ref</span>)<span class="question-mark">?</span>;
+            .<span class="ident">set_property</span>(<span class="string">&quot;prototype&quot;</span>.<span class="ident">into</span>(), <span class="ident">prototype_ref</span>)<span class="question-mark">?</span>;
         <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">prototype_ref</span>)
-            .<span class="ident">set_hidden</span>(<span class="string">&quot;constructor&quot;</span>, <span class="ident">function_ref</span>)<span class="question-mark">?</span>;
+            .<span class="ident">set_hidden</span>(<span class="string">&quot;constructor&quot;</span>.<span class="ident">into</span>(), <span class="ident">function_ref</span>)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">function_ref</span>))
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

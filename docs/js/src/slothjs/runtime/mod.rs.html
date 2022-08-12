@@ -190,22 +190,72 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
 </pre><pre class="rust"><code><span class="kw">mod</span> <span class="ident">esprima</span>;
 <span class="kw">mod</span> <span class="ident">nodejs</span>;
 
+<span class="kw">use</span> <span class="ident">core::str::Utf8Error</span>;
 <span class="kw">use</span> <span class="ident">std::io</span>;
-<span class="kw">use</span> <span class="ident">std::io::prelude</span>::<span class="kw-2">*</span>;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::function::HostFn</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">error</span>,
-    <span class="ident">source</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
-    <span class="ident">Interpretable</span>,
+    <span class="ident">JSString</span>,
     <span class="ident">JSValue</span>,
     <span class="ident">Program</span>,
     <span class="ident">JSON</span>,
+};
+<span class="kw">use</span> <span class="kw">crate</span>::{
+    <span class="ident">prelude</span>::<span class="kw-2">*</span>,
+    <span class="ident">CallContext</span>,
+    <span class="ident">Interpreted</span>,
+    <span class="ident">JSResult</span>,
 };
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::esprima::EsprimaParser</span>;
@@ -228,11 +278,11 @@
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">EvalError::Exception</span>(<span class="ident">exc</span>) =&gt; <span class="kw">match</span> <span class="ident">exc</span> {
                 <span class="ident">Exception::SyntaxTreeError</span>(<span class="ident">error::ParseError::InvalidJSON</span> { <span class="ident">err</span> }) =&gt; {
-                    <span class="macro">writeln!</span>(<span class="ident">f</span>, <span class="string">&quot;syntax error:\n{}&quot;</span>, <span class="ident">err</span>)
+                    <span class="macro">writeln!</span>(<span class="ident">f</span>, <span class="string">&quot;Syntax error:{}&quot;</span>, <span class="ident">err</span>.<span class="ident">as_str</span>())
                 }
-                <span class="kw">_</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;sljs error: {:?}&quot;</span>, <span class="ident">exc</span>),
+                <span class="kw">_</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Error: {:?}&quot;</span>, <span class="ident">exc</span>),
             },
-            <span class="ident">EvalError::Serialization</span>(<span class="ident">e</span>) =&gt; <span class="macro">writeln!</span>(<span class="ident">f</span>, <span class="string">&quot;serializaiton error:\n{}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">EvalError::Serialization</span>(<span class="ident">e</span>) =&gt; <span class="macro">writeln!</span>(<span class="ident">f</span>, <span class="string">&quot;Serialization error:\n{}&quot;</span>, <span class="ident">e</span>),
             <span class="ident">EvalError::Io</span>(<span class="ident">e</span>) =&gt; <span class="macro">writeln!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="ident">e</span>),
         }
     }
@@ -250,9 +300,22 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Utf8Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvalError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">Utf8Error</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::InvalidData</span>, <span class="ident">err</span>);
+        <span class="ident">EvalError::Io</span>(<span class="ident">err</span>)
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">io::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvalError</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">io::Error</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">EvalError::Io</span>(<span class="ident">err</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std::string::FromUtf8Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvalError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std::string::FromUtf8Error</span>) -&gt; <span class="ident">EvalError</span> {
+        <span class="ident">EvalError::Io</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::InvalidData</span>, <span class="ident">e</span>))
     }
 }
 
@@ -265,50 +328,106 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std::string::FromUtf8Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvalError</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std::string::FromUtf8Error</span>) -&gt; <span class="ident">EvalError</span> {
-        <span class="ident">EvalError::Io</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::InvalidData</span>, <span class="ident">e</span>))
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">EvalError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Exception</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">EvalError</span>) -&gt; <span class="ident">Exception</span> {
+        <span class="kw">match</span> <span class="ident">err</span> {
+            <span class="ident">EvalError::Exception</span>(<span class="ident">exc</span>) =&gt; <span class="ident">exc</span>,
+            <span class="ident">EvalError::Serialization</span>(<span class="ident">e</span>) =&gt; <span class="ident">Exception::UserThrown</span>(<span class="ident">JSValue::from</span>(<span class="ident">e</span>.<span class="ident">to_string</span>())),
+            <span class="ident">EvalError::Io</span>(<span class="ident">e</span>) =&gt; <span class="ident">Exception::UserThrown</span>(<span class="ident">JSValue::from</span>(<span class="ident">e</span>.<span class="ident">to_string</span>())),
+        }
     }
 }
 
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">EvalError</span><span class="op">&gt;</span>;
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Parser</span>: <span class="ident">Sized</span> {
-    <span class="kw">fn</span> <span class="ident">load</span>(<span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+<span class="doccomment">/// Describes anything that can parse JS code.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Parser</span>: <span class="ident">fmt::Debug</span> {
+    <span class="doccomment">/// Called by [`Runtime::load`] to initialize the parser.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If the parser does not need to touch [`Heap`], do nothing.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Parses an input into a `Program` (potentially using the `heap`)</span>
     <span class="kw">fn</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">Program</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Get the native callback for `eval()` in JavaScript provided by this parser</span>
+    <span class="kw">fn</span> <span class="ident">eval_func</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">HostFn</span>;
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runtime</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span> {
+<span class="doccomment">/// The sljs JavaScript runtime.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// It should be given a [`Parser`] implementation, e.g. [`NodejsParser`] or</span>
+<span class="doccomment">/// [`EsprimaParser`]:</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">/// use slothjs::JSON;</span>
+<span class="doccomment">/// use slothjs::runtime::{Runtime, NodejsParser};</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// let parser = NodejsParser::new();</span>
+<span class="doccomment">/// let mut sljs = Runtime::load(parser)</span>
+<span class="doccomment">///     .expect(&quot;Runtime::load&quot;);</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The [`Runtime`] evaluates JavaScript source code and creates/stores [`crate::JSObject`]s.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">/// # use slothjs::JSON;</span>
+<span class="doccomment">/// # use slothjs::runtime::{Runtime, NodejsParser};</span>
+<span class="doccomment">/// # let mut sljs = Runtime::load(NodejsParser::new()).expect(&quot;Runtime::load&quot;);</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// sljs.evaluate(&quot;var x = 12&quot;)</span>
+<span class="doccomment">///     .expect(&quot;eval: var x&quot;);</span>
+<span class="doccomment">/// let x = sljs.evaluate(&quot;x&quot;)</span>
+<span class="doccomment">///     .expect(&quot;eval: x&quot;);</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// assert_eq!(sljs.json_from(x), JSON::from(12.0));</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runtime</span> {
     <span class="kw">pub</span> <span class="ident">heap</span>: <span class="ident">Heap</span>,
-    <span class="ident">parser</span>: <span class="ident">P</span>,
+    <span class="ident">parser</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Parser</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Parser</span><span class="op">&gt;</span> <span class="ident">Runtime</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load</span>() -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+<span class="kw">impl</span> <span class="ident">Runtime</span> {
+    <span class="doccomment">/// Creates a sljs runtime.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">mut</span> <span class="ident">parser</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Parser</span><span class="op">&gt;</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">Heap::new</span>();
-        <span class="kw">let</span> <span class="ident">parser</span> <span class="op">=</span> <span class="ident">P::load</span>(<span class="kw-2">&amp;mut</span> <span class="ident">heap</span>)<span class="question-mark">?</span>;
+        <span class="ident">parser</span>.<span class="ident">load</span>(<span class="kw-2">&amp;mut</span> <span class="ident">heap</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="ident">eval_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">parser</span>.<span class="ident">eval_func</span>());
+        <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::GLOBAL</span>)
+            .<span class="ident">set_hidden</span>(<span class="ident">JSString::from</span>(<span class="string">&quot;eval&quot;</span>), <span class="ident">eval_ref</span>)<span class="question-mark">?</span>;
+
         <span class="prelude-val">Ok</span>(<span class="ident">Runtime</span> { <span class="ident">heap</span>, <span class="ident">parser</span> })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">evaluate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">JSValue</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">parser</span>.<span class="ident">parse</span>(<span class="ident">input</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">heap</span>)<span class="question-mark">?</span>;
-
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">program</span>.<span class="ident">interpret</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">heap</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">value</span>)
+    <span class="doccomment">/// Exposes the configured parser.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">Program</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">parser</span>.<span class="ident">parse</span>(<span class="ident">input</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">heap</span>)
     }
 
+    <span class="doccomment">/// Takes an `input` and evaluates it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">evaluate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">JSValue</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">parse</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">heap</span>.<span class="ident">evaluate</span>(<span class="kw-2">&amp;</span><span class="ident">program</span>).<span class="ident">map_err</span>(<span class="ident">EvalError::Exception</span>)
+    }
+
+    <span class="doccomment">/// Turn a [`JSValue`] into [`JSON`]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">json_from</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">JSValue</span>) -&gt; <span class="ident">JSON</span> {
         <span class="ident">value</span>.<span class="ident">to_json</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">heap</span>).<span class="ident">expect</span>(<span class="string">&quot;JSValue.to_json()&quot;</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">string_from</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">JSValue</span>) -&gt; <span class="ident">String</span> {
+    <span class="doccomment">/// Turn a [`JSValue`] into a human-readable string.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">string_from</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">JSValue</span>) -&gt; <span class="ident">JSString</span> {
         <span class="ident">value</span>
             .<span class="ident">to_string</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">heap</span>)
             .<span class="ident">expect</span>(<span class="string">&quot;JSValue.to_string()&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">dbg</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">refstr</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dbg</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">refstr</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">refnum</span>) <span class="op">=</span> <span class="ident">usize::from_str</span>(<span class="ident">refstr</span>) {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">heap</span>.<span class="ident">get_index</span>(<span class="ident">refnum</span>) {
                 <span class="prelude-val">Some</span>(<span class="ident">object</span>) =&gt; {
@@ -325,57 +444,28 @@
     }
 }
 
-<span class="doccomment">/// Reads stdin, parses and interprets it as one block.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">batch_main</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Parser</span><span class="op">&gt;</span>(<span class="ident">sljs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Runtime</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">String::new</span>();
-    <span class="ident">io::stdin</span>().<span class="ident">lock</span>().<span class="ident">read_to_string</span>(<span class="kw-2">&amp;mut</span> <span class="ident">input</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Not-really-a-[`Parser`] implementation that just deserializes a JSON ESTree.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JSONParser</span>;
 
-    <span class="kw">match</span> <span class="ident">sljs</span>.<span class="ident">evaluate</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>) {
-        <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">sljs</span>.<span class="ident">string_from</span>(<span class="ident">result</span>)),
-        <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; <span class="macro">eprintln!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>),
+<span class="kw">impl</span> <span class="ident">JSONParser</span> {
+    <span class="kw">fn</span> <span class="ident">json_eval</span>(<span class="kw">_</span>: <span class="ident">CallContext</span>, <span class="kw">_</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
+        <span class="macro">unimplemented!</span>(<span class="string">&quot;JSONParser does not support eval()&quot;</span>)
     }
-
-    <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// Provides a simple command line using stdin/stdout.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">repl_main</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Parser</span><span class="op">&gt;</span>(<span class="ident">sljs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Runtime</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">stdin</span> <span class="op">=</span> <span class="ident">io::stdin</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">input_iter</span> <span class="op">=</span> <span class="ident">stdin</span>.<span class="ident">lock</span>().<span class="ident">lines</span>();
-
-    <span class="kw">loop</span> {
-        <span class="comment">// prompt</span>
-        <span class="macro">eprint!</span>(<span class="string">&quot;sljs&gt; &quot;</span>);
-        <span class="ident">io::stderr</span>().<span class="ident">flush</span>()<span class="question-mark">?</span>;
-
-        <span class="comment">// get input</span>
-        <span class="kw">let</span> <span class="ident">maybe_input</span> <span class="op">=</span> <span class="ident">input_iter</span>.<span class="ident">next</span>();
-        <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">maybe_input</span> {
-            <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">input</span>) =&gt; <span class="ident">input</span><span class="question-mark">?</span>,
-        };
-        <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">continue</span>;
-        }
-
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">refstr</span>) <span class="op">=</span> <span class="ident">input</span>.<span class="ident">strip_prefix</span>(<span class="string">&quot;:dbg &quot;</span>) {
-            <span class="ident">sljs</span>.<span class="ident">dbg</span>(<span class="ident">refstr</span>);
-            <span class="kw">continue</span>;
-        }
-
-        <span class="kw">match</span> <span class="ident">sljs</span>.<span class="ident">evaluate</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">sljs</span>.<span class="ident">string_from</span>(<span class="ident">result</span>)),
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
-                <span class="macro">eprintln!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>);
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">source::print_callstack</span>(<span class="kw-2">&amp;</span><span class="ident">sljs</span>.<span class="ident">heap</span>) {
-                    <span class="macro">eprintln!</span>(<span class="string">&quot;   Exception thrown while getting stack trace: {:?}&quot;</span>, <span class="ident">e</span>);
-                }
-            }
-        }
+<span class="kw">impl</span> <span class="ident">Parser</span> <span class="kw">for</span> <span class="ident">JSONParser</span> {
+    <span class="kw">fn</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">Program</span><span class="op">&gt;</span> {
+        <span class="comment">// It&#39;s not much, but it&#39;s honest work.</span>
+        <span class="kw">let</span> <span class="ident">estree</span>: <span class="ident">JSON</span> <span class="op">=</span> <span class="ident">serde_json::from_str</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="ident">Program::parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">estree</span>).<span class="ident">map_err</span>(<span class="ident">Exception::from</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="ident">program</span>)
     }
 
-    <span class="prelude-val">Ok</span>(())
+    <span class="kw">fn</span> <span class="ident">eval_func</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">HostFn</span> {
+        <span class="ident"><span class="self">Self</span>::json_eval</span>
+    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

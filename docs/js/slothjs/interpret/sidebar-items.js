@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":[["Interpretable",""]]};
+window.SIDEBAR_ITEMS = {"trait":[["Interpretable","Describes things (i.e. AST nodes, [`Function`]) that can be interpreted on a [`Heap`]"]]};

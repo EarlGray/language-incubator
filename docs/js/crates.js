@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["sljs","sljs_node","sljson","slothjs"];
+window.ALL_CRATES = ["sljs_cli","sljs_test262","slothjs"];

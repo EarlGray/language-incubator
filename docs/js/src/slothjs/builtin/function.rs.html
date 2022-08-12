@@ -66,33 +66,29 @@
 <span id="60">60</span>
 <span id="61">61</span>
 <span id="62">62</span>
-<span id="63">63</span>
-<span id="64">64</span>
-<span id="65">65</span>
-<span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
-<span id="69">69</span>
-<span id="70">70</span>
-<span id="71">71</span>
-<span id="72">72</span>
-<span id="73">73</span>
-<span id="74">74</span>
-<span id="75">75</span>
-<span id="76">76</span>
-</pre><pre class="rust"><code><span class="doccomment">/// The implementation of the builtin Function object.</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::object::HostClass</span>;
+<span class="doccomment">/// The implementation of the builtin Function object.</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">function::CallContext</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
     <span class="ident">Interpreted</span>,
-    <span class="ident">JSObject</span>,
-    <span class="ident">JSRef</span>,
     <span class="ident">JSResult</span>,
 };
 
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CLASS</span>: <span class="ident">HostClass</span> <span class="op">=</span> <span class="ident">HostClass</span> {
+    <span class="ident">name</span>: <span class="string">&quot;Function&quot;</span>,
+    <span class="ident">constructor</span>: <span class="ident">function_constructor</span>,
+    <span class="ident">methods</span>: <span class="kw-2">&amp;</span>[
+        (<span class="string">&quot;call&quot;</span>, <span class="ident">function_proto_call</span>),
+        (<span class="string">&quot;apply&quot;</span>, <span class="ident">function_proto_apply</span>),
+    ],
+    <span class="ident">static_methods</span>: <span class="kw-2">&amp;</span>[],
+};
+
 <span class="kw">fn</span> <span class="ident">function_constructor</span>(<span class="ident">_call</span>: <span class="ident">CallContext</span>, <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
+    <span class="comment">// TODO: eval arguments</span>
     <span class="macro">todo!</span>()
 }
 
@@ -125,37 +121,13 @@
         <span class="prelude-val">None</span> =&gt; <span class="ident">Vec::new</span>(),
     };
 
-    <span class="kw">let</span> <span class="ident">funcref</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">this_ref</span>;
     <span class="ident">heap</span>.<span class="ident">execute</span>(
-        <span class="ident">funcref</span>,
-        <span class="ident">CallContext</span> {
-            <span class="ident">this_ref</span>: <span class="ident">bound_this</span>,
-            <span class="ident">method_name</span>: <span class="ident">call</span>.<span class="ident">method_name</span>,
-            <span class="ident">arguments</span>: <span class="ident">call_args</span>,
-            <span class="ident">loc</span>: <span class="ident">heap</span>.<span class="ident">loc</span>.<span class="ident">clone</span>(),
-        },
+        <span class="ident">call</span>.<span class="ident">this_ref</span>,
+        <span class="ident">CallContext::from</span>(<span class="ident">call_args</span>)
+            .<span class="ident">with_this</span>(<span class="ident">bound_this</span>)
+            .<span class="ident">with_name</span>(<span class="ident">call</span>.<span class="ident">method_name</span>),
     )
 }
-
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> {
-    <span class="comment">/* the Function.prototype */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">function_proto</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
-    <span class="ident">function_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;call&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">function_proto_call</span>))<span class="question-mark">?</span>;
-    <span class="ident">function_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;apply&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">function_proto_apply</span>))<span class="question-mark">?</span>;
-
-    <span class="kw-2">*</span><span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::FUNCTION_PROTO</span>) <span class="op">=</span> <span class="ident">function_proto</span>;
-
-    <span class="comment">/* the Function object */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">function_object</span> <span class="op">=</span> <span class="ident">JSObject::from_func</span>(<span class="ident">function_constructor</span>);
-
-    <span class="ident">function_object</span>.<span class="ident">set_system</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">Heap::FUNCTION_PROTO</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">the_function_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">function_object</span>);
-    <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::FUNCTION_PROTO</span>)
-        .<span class="ident">set_hidden</span>(<span class="string">&quot;constructor&quot;</span>, <span class="ident">the_function_ref</span>)<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(<span class="ident">the_function_ref</span>)
-}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

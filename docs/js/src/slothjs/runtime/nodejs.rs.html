@@ -102,6 +102,48 @@
 <span id="96">96</span>
 <span id="97">97</span>
 <span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::env</span>;
 <span class="kw">use</span> <span class="ident">std::fs</span>;
 <span class="kw">use</span> <span class="ident">std::io</span>;
@@ -116,13 +158,32 @@
 };
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">error::ParseError</span>,
+    <span class="ident">runtime::Parser</span>,
+    <span class="ident">CallContext</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
+    <span class="ident">Interpretable</span>,
+    <span class="ident">Interpreted</span>,
+    <span class="ident">JSResult</span>,
     <span class="ident">Program</span>,
     <span class="ident">JSON</span>,
 };
 
+<span class="kw">fn</span> <span class="ident">nodejs_eval</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">code</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">0</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">stringify</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let</span> <span class="ident">tmpdir</span> <span class="op">=</span> <span class="ident">env::temp_dir</span>().<span class="ident">join</span>(<span class="ident">NodejsParser::TMPDIRNAME</span>);
+    <span class="kw">let</span> <span class="ident">espath</span> <span class="op">=</span> <span class="ident">tmpdir</span>.<span class="ident">join</span>(<span class="string">&quot;esparse.js&quot;</span>);
+    <span class="kw">let</span> <span class="ident">parser</span> <span class="op">=</span> <span class="ident">NodejsParser</span> { <span class="ident">loc</span>: <span class="bool-val">true</span>, <span class="ident">espath</span> };
+
+    <span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="ident">parser</span>.<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">code</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
+    <span class="ident">program</span>.<span class="ident">interpret</span>(<span class="ident">heap</span>)
+}
+
+<span class="doccomment">/// [`NodejsParser`] runs Esprima in an external nodejs process, consumes JSON AST.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NodejsParser</span> {
+    <span class="ident">loc</span>: <span class="ident">bool</span>,
     <span class="ident">espath</span>: <span class="ident">PathBuf</span>,
 }
 
@@ -136,34 +197,52 @@
         <span class="string">&quot;node&quot;</span>
     };
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">works</span>() -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">proc::Command::new</span>(<span class="ident"><span class="self">Self</span>::NODE</span>).<span class="ident">arg</span>(<span class="string">&quot;-v&quot;</span>).<span class="ident">output</span>()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="ident">output</span>.<span class="ident">status</span>.<span class="ident">success</span>())
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+        <span class="ident">Box::new</span>(<span class="ident">NodejsParser</span> {
+            <span class="ident">loc</span>: <span class="bool-val">true</span>,
+            <span class="ident">espath</span>: <span class="ident">PathBuf::default</span>(),
+        })
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">without_location</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">loc</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="self">self</span>
+    }
+
     <span class="kw">fn</span> <span class="ident">run_esprima</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">tmpdir</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">espath</span>
-            .<span class="ident">parent</span>()
+        <span class="kw">let</span> <span class="ident">tmpdir</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">espath</span>.<span class="ident">parent</span>())
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::NotFound</span>, <span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>.<span class="ident">espath</span>)))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">esparse</span> <span class="op">=</span> <span class="ident">proc::Command::new</span>(<span class="ident"><span class="self">Self</span>::NODE</span>)
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">esparse</span> <span class="op">=</span> <span class="ident">proc::Command::new</span>(<span class="ident"><span class="self">Self</span>::NODE</span>);
+        <span class="ident">esparse</span>
             .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">espath</span>)
-            .<span class="ident">arg</span>(<span class="string">&quot;--loc&quot;</span>)
             .<span class="ident">env</span>(<span class="string">&quot;NODE_PATH&quot;</span>, <span class="ident">tmpdir</span>)
             .<span class="ident">stdin</span>(<span class="ident">proc::Stdio::piped</span>())
             .<span class="ident">stdout</span>(<span class="ident">proc::Stdio::piped</span>())
-            .<span class="ident">stderr</span>(<span class="ident">proc::Stdio::piped</span>())
-            .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+            .<span class="ident">stderr</span>(<span class="ident">proc::Stdio::piped</span>());
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">loc</span> {
+            <span class="ident">esparse</span>.<span class="ident">arg</span>(<span class="string">&quot;--loc&quot;</span>);
+        }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">esparse</span> <span class="op">=</span> <span class="ident">esparse</span>.<span class="ident">spawn</span>()<span class="question-mark">?</span>;
 
         {
-            <span class="kw">let</span> <span class="ident">stdin</span> <span class="op">=</span> <span class="ident">esparse</span>.<span class="ident">stdin</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;failed to open stdin&quot;</span>);
+            <span class="kw">let</span> <span class="ident">stdin</span> <span class="op">=</span> <span class="ident">esparse</span>.<span class="ident">stdin</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;stdin&quot;</span>);
             <span class="ident">stdin</span>.<span class="ident">write_all</span>(<span class="ident">input</span>.<span class="ident">as_bytes</span>())<span class="question-mark">?</span>;
         }
 
         <span class="kw">let</span> <span class="ident">esparse_output</span> <span class="op">=</span> <span class="ident">esparse</span>.<span class="ident">wait_with_output</span>()<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">stdout</span> <span class="op">=</span> <span class="ident">String::from_utf8</span>(<span class="ident">esparse_output</span>.<span class="ident">stdout</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">stderr</span> <span class="op">=</span> <span class="ident">String::from_utf8</span>(<span class="ident">esparse_output</span>.<span class="ident">stderr</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">esparse_output</span>.<span class="ident">status</span>;
+        <span class="kw">let</span> <span class="ident">stdout</span> <span class="op">=</span> <span class="ident">String::from_utf8</span>(<span class="ident">esparse_output</span>.<span class="ident">stdout</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">stderr</span> <span class="op">=</span> <span class="ident">core::str::from_utf8</span>(<span class="kw-2">&amp;</span><span class="ident">esparse_output</span>.<span class="ident">stderr</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="op">!</span><span class="ident">status</span>.<span class="ident">success</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">EvalError::from</span>(<span class="ident">Exception::from</span>(<span class="ident">ParseError::invalid_ast</span>(
-                <span class="ident">stderr</span>,
-            ))));
+            <span class="kw">let</span> <span class="ident">perr</span> <span class="op">=</span> <span class="ident">ParseError::from</span>(<span class="ident">stderr</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">EvalError::from</span>(<span class="ident">Exception::from</span>(<span class="ident">perr</span>)));
         }
         <span class="kw">if</span> <span class="op">!</span><span class="ident">stderr</span>.<span class="ident">is_empty</span>() {
             <span class="macro">eprintln!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">stderr</span>);
@@ -173,7 +252,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">runtime::Parser</span> <span class="kw">for</span> <span class="ident">NodejsParser</span> {
-    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw">_</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">tmpdir</span> <span class="op">=</span> <span class="ident">env::temp_dir</span>().<span class="ident">join</span>(<span class="ident"><span class="self">Self</span>::TMPDIRNAME</span>);
 
         <span class="kw">let</span> <span class="ident">tmpdir</span> <span class="op">=</span> <span class="ident">tmpdir</span>.<span class="ident">as_path</span>();
@@ -189,7 +268,8 @@
             <span class="ident">fs::File::create</span>(<span class="kw-2">&amp;</span><span class="ident">espath</span>)<span class="question-mark">?</span>.<span class="ident">write_all</span>(<span class="ident"><span class="self">Self</span>::ESPARSE</span>.<span class="ident">as_bytes</span>())<span class="question-mark">?</span>;
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">NodejsParser</span> { <span class="ident">espath</span> })
+        <span class="self">self</span>.<span class="ident">espath</span> <span class="op">=</span> <span class="ident">espath</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">EvalResult</span><span class="op">&lt;</span><span class="ident">Program</span><span class="op">&gt;</span> {
@@ -199,7 +279,11 @@
         <span class="kw">let</span> <span class="ident">program</span> <span class="op">=</span> <span class="ident">Program::parse_from</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">map_err</span>(<span class="ident">Exception::SyntaxTreeError</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">program</span>)
     }
+
+    <span class="kw">fn</span> <span class="ident">eval_func</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="kw">crate</span>::HostFn</span> {
+        <span class="ident">nodejs_eval</span>
+    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

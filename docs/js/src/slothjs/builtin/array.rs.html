@@ -81,26 +81,15 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
-<span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
-<span id="86">86</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::object::HostClass</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">object::ObjectValue</span>,
     <span class="ident">CallContext</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
     <span class="ident">Interpreted</span>,
-    <span class="ident">JSObject</span>,
-    <span class="ident">JSRef</span>,
     <span class="ident">JSResult</span>,
-    <span class="ident">JSValue</span>,
 };
 
 <span class="kw">fn</span> <span class="ident">array_object_constructor</span>(<span class="ident">_call</span>: <span class="ident">CallContext</span>, <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
@@ -111,15 +100,17 @@
 <span class="kw">fn</span> <span class="ident">array_toString</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">array_object</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>);
     <span class="kw">let</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">array_object</span>.<span class="ident">as_array</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-        <span class="ident">Exception::TypeErrorInstanceRequired</span>(<span class="ident">Interpreted::from</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>), <span class="string">&quot;Array&quot;</span>.<span class="ident">to_string</span>())
+        <span class="ident">Exception::TypeErrorInstanceRequired</span>(<span class="ident">Interpreted::from</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>), <span class="string">&quot;Array&quot;</span>.<span class="ident">into</span>())
     })<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">array</span>.<span class="ident">storage</span>.<span class="ident">clone</span>();
 
-    <span class="kw">let</span> <span class="ident">reprs</span> <span class="op">=</span> (<span class="ident">array</span>.<span class="ident">iter</span>())
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">val</span><span class="op">|</span> <span class="ident">val</span>.<span class="ident">stringify</span>(<span class="ident">heap</span>))
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">reprs</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">String::new</span>();
+    <span class="kw">for</span> <span class="ident">val</span> <span class="kw">in</span> <span class="ident">array</span>.<span class="ident">iter</span>() {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">s</span>.<span class="ident">is_empty</span>() {
+            <span class="ident">s</span> <span class="op">+</span><span class="op">=</span> <span class="string">&quot;,&quot;</span>;
+        }
+        <span class="ident">s</span> <span class="op">+</span><span class="op">=</span> <span class="ident">val</span>.<span class="ident">stringify</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">as_ref</span>();
+    }
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">s</span>))
 }
 
@@ -157,25 +148,16 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">array_proto</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
-    <span class="ident">array_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;toString&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">array_toString</span>))<span class="question-mark">?</span>;
-    <span class="ident">array_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;push&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">array_proto_push</span>))<span class="question-mark">?</span>;
-    <span class="ident">array_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;pop&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">array_proto_pop</span>))<span class="question-mark">?</span>;
-
-    <span class="kw-2">*</span><span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::ARRAY_PROTO</span>) <span class="op">=</span> <span class="ident">array_proto</span>;
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">array_object</span> <span class="op">=</span> <span class="ident">JSObject::from_func</span>(<span class="ident">array_object_constructor</span>);
-
-    <span class="comment">// Array.prototype</span>
-    <span class="ident">array_object</span>.<span class="ident">set_system</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">Heap::ARRAY_PROTO</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">array_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">array_object</span>);
-    <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::ARRAY_PROTO</span>)
-        .<span class="ident">set_system</span>(<span class="string">&quot;constructor&quot;</span>, <span class="ident">array_ref</span>)<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(<span class="ident">array_ref</span>)
-}
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CLASS</span>: <span class="ident">HostClass</span> <span class="op">=</span> <span class="ident">HostClass</span> {
+    <span class="ident">name</span>: <span class="string">&quot;Array&quot;</span>,
+    <span class="ident">constructor</span>: <span class="ident">array_object_constructor</span>,
+    <span class="ident">methods</span>: <span class="kw-2">&amp;</span>[
+        (<span class="string">&quot;pop&quot;</span>, <span class="ident">array_proto_pop</span>),
+        (<span class="string">&quot;push&quot;</span>, <span class="ident">array_proto_push</span>),
+        (<span class="string">&quot;toString&quot;</span>, <span class="ident">array_toString</span>),
+    ],
+    <span class="ident">static_methods</span>: <span class="kw-2">&amp;</span>[],
+};
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

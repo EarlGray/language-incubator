@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["CallContext",""],["Closure",""],["VMCall","A wrapper for NativeFunction to give it `fmt::Debug`."]],"type":[["NativeFunction",""]]};
+window.SIDEBAR_ITEMS = {"struct":[["CallContext","Call context information (e.g. arguments) for [`Heap::execute()`]."],["Closure",""],["HostFunc","A wrapper for [`HostFn`] to give it `fmt::Debug`."]],"type":[["HostFn","What a host function callable from JS looks like."]]};

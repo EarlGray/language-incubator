@@ -235,41 +235,10 @@
 <span id="229">229</span>
 <span id="230">230</span>
 <span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">object::Access</span>,
+    <span class="ident">object::HostClass</span>,
     <span class="ident">CallContext</span>,
     <span class="ident">Exception</span>,
     <span class="ident">Heap</span>,
@@ -277,7 +246,27 @@
     <span class="ident">JSObject</span>,
     <span class="ident">JSRef</span>,
     <span class="ident">JSResult</span>,
-    <span class="ident">JSValue</span>,
+};
+
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CLASS</span>: <span class="ident">HostClass</span> <span class="op">=</span> <span class="ident">HostClass</span> {
+    <span class="ident">name</span>: <span class="string">&quot;Object&quot;</span>,
+    <span class="ident">constructor</span>: <span class="ident">object_constructor</span>,
+    <span class="ident">methods</span>: <span class="kw-2">&amp;</span>[
+        (<span class="string">&quot;hasOwnProperty&quot;</span>, <span class="ident">object_proto_hasOwnProperty</span>),
+        (<span class="string">&quot;toString&quot;</span>, <span class="ident">object_proto_toString</span>),
+        (<span class="string">&quot;valueOf&quot;</span>, <span class="ident">object_proto_valueOf</span>),
+    ],
+    <span class="ident">static_methods</span>: <span class="kw-2">&amp;</span>[
+        (<span class="string">&quot;create&quot;</span>, <span class="ident">object_object_create</span>),
+        (<span class="string">&quot;defineProperties&quot;</span>, <span class="ident">object_object_defineProperties</span>),
+        (<span class="string">&quot;defineProperty&quot;</span>, <span class="ident">object_object_defineProperty</span>),
+        (
+            <span class="string">&quot;getOwnPropertyDescriptor&quot;</span>,
+            <span class="ident">object_object_getOwnPropertyDescriptor</span>,
+        ),
+        (<span class="string">&quot;is&quot;</span>, <span class="ident">object_object_is</span>),
+        (<span class="string">&quot;setPrototypeOf&quot;</span>, <span class="ident">object_object_setPrototypeOf</span>),
+    ],
 };
 
 <span class="kw">fn</span> <span class="ident">object_constructor</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
@@ -303,7 +292,7 @@
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;std&quot;</span>)]</span>
-<span class="kw">fn</span> <span class="ident">object_proto_dbg</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">object_proto_dbg</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
     <span class="macro">dbg!</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>);
     <span class="macro">dbg!</span>(<span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">call</span>.<span class="ident">this_ref</span>));
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::VOID</span>)
@@ -316,13 +305,12 @@
 }
 
 <span class="kw">fn</span> <span class="ident">object_object_create</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">proto</span> <span class="op">=</span>
-        (<span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">0</span>)).<span class="ident">ok_or</span>(<span class="ident">Exception::TypeErrorInvalidPrototype</span>(<span class="ident">Interpreted::VOID</span>))<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">protoref</span> <span class="op">=</span>
-        (<span class="ident">proto</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>)).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Exception::TypeErrorInvalidPrototype</span>(<span class="ident">proto</span>.<span class="ident">clone</span>()))<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">proto</span> <span class="op">=</span> (<span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">0</span>, <span class="ident">heap</span>))
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Exception::TypeErrorInvalidPrototype</span>(<span class="ident">Interpreted::VOID</span>))<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">protoref</span> <span class="op">=</span> (<span class="ident">proto</span>.<span class="ident">to_ref</span>())
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Exception::TypeErrorInvalidPrototype</span>(<span class="ident">Interpreted::from</span>(<span class="ident">proto</span>)))<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">properties</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> <span class="op">=</span>
-        (<span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">1</span>)).<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">props</span><span class="op">|</span> <span class="ident">props</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>).<span class="ident">ok</span>());
+    <span class="kw">let</span> <span class="ident">properties</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">1</span>, <span class="ident">heap</span>).<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">val</span><span class="op">|</span> <span class="ident">val</span>.<span class="ident">to_ref</span>()).<span class="ident">ok</span>();
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">object</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
     <span class="ident">object</span>.<span class="ident">proto</span> <span class="op">=</span> <span class="ident">protoref</span>;
@@ -339,24 +327,22 @@
 <span class="kw">fn</span> <span class="ident">object_object_is</span>(<span class="ident">call</span>: <span class="ident">CallContext</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
     <span class="kw">use</span> <span class="ident">JSValue</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">Interpreted::VOID</span>);
-    <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">1</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">Interpreted::VOID</span>);
+    <span class="kw">let</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">0</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">right</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">1</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">answer</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">left</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>), <span class="ident">right</span>.<span class="ident">to_value</span>(<span class="ident">heap</span>)) {
-        (<span class="prelude-val">Ok</span>(<span class="ident">Undefined</span>), <span class="prelude-val">Ok</span>(<span class="ident">Undefined</span>)) =&gt; <span class="bool-val">true</span>,
-        (<span class="prelude-val">Ok</span>(<span class="ident">String</span>(<span class="ident">lstr</span>)), <span class="prelude-val">Ok</span>(<span class="ident">String</span>(<span class="ident">rstr</span>))) <span class="kw">if</span> <span class="ident">lstr</span> <span class="op">==</span> <span class="ident">rstr</span> =&gt; <span class="bool-val">true</span>,
-        (<span class="prelude-val">Ok</span>(<span class="ident">Bool</span>(<span class="ident">lb</span>)), <span class="prelude-val">Ok</span>(<span class="ident">Bool</span>(<span class="ident">rb</span>))) <span class="kw">if</span> <span class="ident">lb</span> <span class="op">==</span> <span class="ident">rb</span> =&gt; <span class="bool-val">true</span>,
-        (<span class="prelude-val">Ok</span>(<span class="ident">Number</span>(<span class="ident">lnum</span>)), <span class="prelude-val">Ok</span>(<span class="ident">Number</span>(<span class="ident">rnum</span>))) =&gt; {
+    <span class="kw">let</span> <span class="ident">answer</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">left</span>, <span class="ident">right</span>) {
+        (<span class="ident">Undefined</span>, <span class="ident">Undefined</span>) =&gt; <span class="bool-val">true</span>,
+        (<span class="ident">String</span>(<span class="ident">lstr</span>), <span class="ident">String</span>(<span class="ident">rstr</span>)) <span class="kw">if</span> <span class="ident">lstr</span> <span class="op">==</span> <span class="ident">rstr</span> =&gt; <span class="bool-val">true</span>,
+        (<span class="ident">Bool</span>(<span class="ident">lb</span>), <span class="ident">Bool</span>(<span class="ident">rb</span>)) <span class="kw">if</span> <span class="ident">lb</span> <span class="op">==</span> <span class="ident">rb</span> =&gt; <span class="bool-val">true</span>,
+        (<span class="ident">Number</span>(<span class="ident">lnum</span>), <span class="ident">Number</span>(<span class="ident">rnum</span>)) =&gt; {
             <span class="kw">if</span> <span class="ident">f64::abs</span>(<span class="ident">lnum</span>) <span class="op">==</span> <span class="number">0.0</span> <span class="op">&amp;&amp;</span> <span class="ident">f64::abs</span>(<span class="ident">rnum</span>) <span class="op">==</span> <span class="number">0.0</span> {
                 <span class="ident">f64::is_sign_positive</span>(<span class="ident">lnum</span>) <span class="op">==</span> <span class="ident">f64::is_sign_positive</span>(<span class="ident">rnum</span>)
             } <span class="kw">else</span> {
                 (<span class="ident">f64::is_nan</span>(<span class="ident">lnum</span>) <span class="op">&amp;&amp;</span> <span class="ident">f64::is_nan</span>(<span class="ident">rnum</span>)) <span class="op">|</span><span class="op">|</span> <span class="ident">lnum</span> <span class="op">==</span> <span class="ident">rnum</span>
             }
         }
-        <span class="kw">_</span> =&gt; <span class="kw">match</span> (<span class="ident">left</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>), <span class="ident">right</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>)) {
-            (<span class="prelude-val">Ok</span>(<span class="ident">lref</span>), <span class="prelude-val">Ok</span>(<span class="ident">rref</span>)) =&gt; <span class="ident">lref</span> <span class="op">==</span> <span class="ident">rref</span>,
-            <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
-        },
+        (<span class="ident">Ref</span>(<span class="ident">lref</span>), <span class="ident">Ref</span>(<span class="ident">rref</span>)) =&gt; <span class="ident">lref</span> <span class="op">==</span> <span class="ident">rref</span>,
+        <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
     };
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">answer</span>))
 }
@@ -366,16 +352,14 @@
     <span class="ident">call</span>: <span class="ident">CallContext</span>,
     <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>,
 ) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">Interpreted</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">inspected</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">Interpreted::VOID</span>);
-    <span class="kw">let</span> <span class="ident">inspected_ref</span> <span class="op">=</span>
-        (<span class="ident">inspected</span>.<span class="ident">to_ref</span>(<span class="ident">heap</span>)).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Exception::ReferenceNotAnObject</span>(<span class="ident">inspected</span>.<span class="ident">clone</span>()))<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">inspected</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">0</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">inspected_ref</span> <span class="op">=</span> (<span class="ident">inspected</span>.<span class="ident">to_ref</span>())
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Exception::ReferenceNotAnObject</span>(<span class="ident">Interpreted::from</span>(<span class="ident">inspected</span>)))<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">propname</span> <span class="op">=</span> (<span class="ident">call</span>.<span class="ident">arguments</span>.<span class="ident">get</span>(<span class="number">1</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">Interpreted::VOID</span>))
-        .<span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">heap</span>)<span class="question-mark">?</span>
-        .<span class="ident">stringify</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">propname</span> <span class="op">=</span> <span class="ident">call</span>.<span class="ident">arg_value</span>(<span class="number">1</span>, <span class="ident">heap</span>)<span class="question-mark">?</span>.<span class="ident">stringify</span>(<span class="ident">heap</span>)<span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="ident">inspected_object</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">inspected_ref</span>);
-    <span class="kw">let</span> <span class="ident">prop</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">inspected_object</span>.<span class="ident">properties</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">propname</span>) {
+    <span class="kw">let</span> <span class="ident">prop</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">inspected_object</span>.<span class="ident">properties</span>.<span class="ident">get</span>(<span class="ident">propname</span>.<span class="ident">as_str</span>()) {
         <span class="prelude-val">Some</span>(<span class="ident">prop</span>) =&gt; <span class="ident">prop</span>.<span class="ident">clone</span>(),
         <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::VOID</span>),
     };
@@ -383,10 +367,10 @@
     <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">prop</span>.<span class="ident">content</span>.<span class="ident">to_value</span>()<span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">descriptor_object</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
-    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;value&quot;</span>, <span class="ident">value</span>)<span class="question-mark">?</span>;
-    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;configurable&quot;</span>, <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">configurable</span>())<span class="question-mark">?</span>;
-    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;enumerable&quot;</span>, <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">enumerable</span>())<span class="question-mark">?</span>;
-    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;writable&quot;</span>, <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">writable</span>())<span class="question-mark">?</span>;
+    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;value&quot;</span>.<span class="ident">into</span>(), <span class="ident">value</span>)<span class="question-mark">?</span>;
+    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;configurable&quot;</span>.<span class="ident">into</span>(), <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">configurable</span>())<span class="question-mark">?</span>;
+    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;enumerable&quot;</span>.<span class="ident">into</span>(), <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">enumerable</span>())<span class="question-mark">?</span>;
+    <span class="ident">descriptor_object</span>.<span class="ident">set_property</span>(<span class="string">&quot;writable&quot;</span>.<span class="ident">into</span>(), <span class="ident">prop</span>.<span class="ident">access</span>.<span class="ident">writable</span>())<span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="ident">descriptor_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">descriptor_object</span>);
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">descriptor_ref</span>))
@@ -394,7 +378,7 @@
 
 <span class="kw">fn</span> <span class="ident">define_property</span>(
     <span class="ident">objref</span>: <span class="ident">JSRef</span>,
-    <span class="ident">propname</span>: <span class="ident">String</span>,
+    <span class="ident">propname</span>: <span class="ident">JSString</span>,
     <span class="ident">descref</span>: <span class="ident">JSRef</span>,
     <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>,
 ) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -424,8 +408,8 @@
         <span class="kw">let</span> <span class="ident">access</span> <span class="op">=</span> <span class="ident">Access::new</span>(<span class="ident">configurable</span>, <span class="ident">enumerable</span>, <span class="ident">writable</span>);
 
         <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">objref</span>);
-        <span class="ident">object</span>.<span class="ident">define_own_property</span>(<span class="kw-2">&amp;</span><span class="ident">propname</span>, <span class="ident">access</span>)<span class="question-mark">?</span>;
-        <span class="ident">object</span>.<span class="ident">set_even_nonwritable</span>(<span class="kw-2">&amp;</span><span class="ident">propname</span>, <span class="ident">value</span>)<span class="question-mark">?</span>;
+        <span class="ident">object</span>.<span class="ident">define_own_property</span>(<span class="ident">propname</span>.<span class="ident">clone</span>(), <span class="ident">access</span>)<span class="question-mark">?</span>;
+        <span class="ident">object</span>.<span class="ident">set_even_nonwritable</span>(<span class="ident">propname</span>, <span class="ident">value</span>)<span class="question-mark">?</span>;
     }
     <span class="prelude-val">Ok</span>(())
 }
@@ -441,7 +425,7 @@
 }
 
 <span class="kw">fn</span> <span class="ident">define_properties</span>(<span class="ident">objref</span>: <span class="ident">JSRef</span>, <span class="ident">descs_ref</span>: <span class="ident">JSRef</span>, <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pairs</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">JSRef</span>)<span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">descs_ref</span>).<span class="ident">properties</span>.<span class="ident">iter</span>())
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pairs</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">JSString</span>, <span class="ident">JSRef</span>)<span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">heap</span>.<span class="ident">get</span>(<span class="ident">descs_ref</span>).<span class="ident">properties</span>.<span class="ident">iter</span>())
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">prop</span>, <span class="ident">desc</span>)<span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">descref</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">desc</span>.<span class="ident">to_ref</span>() {
                 <span class="prelude-val">Some</span>(<span class="ident">descref</span>) =&gt; <span class="ident">descref</span>,
@@ -482,54 +466,6 @@
 
     <span class="prelude-val">Ok</span>(<span class="ident">Interpreted::from</span>(<span class="ident">objref</span>))
 }
-
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Heap</span>) -&gt; <span class="ident">JSResult</span><span class="op">&lt;</span><span class="ident">JSRef</span><span class="op">&gt;</span> {
-    <span class="comment">/* Object.prototype */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">object_proto</span> <span class="op">=</span> <span class="ident">JSObject::new</span>();
-    <span class="ident">object_proto</span>.<span class="ident">proto</span> <span class="op">=</span> <span class="ident">Heap::NULL</span>;
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;std&quot;</span>)]</span>
-    <span class="ident">object_proto</span>.<span class="ident">set_system</span>(<span class="string">&quot;dbg&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_proto_dbg</span>))<span class="question-mark">?</span>;
-
-    <span class="ident">object_proto</span>.<span class="ident">set_hidden</span>(
-        <span class="string">&quot;hasOwnProperty&quot;</span>,
-        <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_proto_hasOwnProperty</span>),
-    )<span class="question-mark">?</span>;
-    <span class="ident">object_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;toString&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_proto_toString</span>))<span class="question-mark">?</span>;
-    <span class="ident">object_proto</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;valueOf&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_proto_valueOf</span>))<span class="question-mark">?</span>;
-
-    <span class="kw-2">*</span><span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::OBJECT_PROTO</span>) <span class="op">=</span> <span class="ident">object_proto</span>;
-
-    <span class="comment">/* the Object */</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">object_object</span> <span class="op">=</span> <span class="ident">JSObject::from_func</span>(<span class="ident">object_constructor</span>);
-
-    <span class="ident">object_object</span>.<span class="ident">set_system</span>(<span class="string">&quot;prototype&quot;</span>, <span class="ident">Heap::OBJECT_PROTO</span>)<span class="question-mark">?</span>;
-
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;create&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_create</span>))<span class="question-mark">?</span>;
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(<span class="string">&quot;is&quot;</span>, <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_is</span>))<span class="question-mark">?</span>;
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(
-        <span class="string">&quot;defineProperty&quot;</span>,
-        <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_defineProperty</span>),
-    )<span class="question-mark">?</span>;
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(
-        <span class="string">&quot;defineProperties&quot;</span>,
-        <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_defineProperties</span>),
-    )<span class="question-mark">?</span>;
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(
-        <span class="string">&quot;getOwnPropertyDescriptor&quot;</span>,
-        <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_getOwnPropertyDescriptor</span>),
-    )<span class="question-mark">?</span>;
-    <span class="ident">object_object</span>.<span class="ident">set_hidden</span>(
-        <span class="string">&quot;setPrototypeOf&quot;</span>,
-        <span class="ident">heap</span>.<span class="ident">alloc_func</span>(<span class="ident">object_object_setPrototypeOf</span>),
-    )<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">the_object_ref</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">alloc</span>(<span class="ident">object_object</span>);
-    <span class="ident">heap</span>.<span class="ident">get_mut</span>(<span class="ident">Heap::OBJECT_PROTO</span>)
-        .<span class="ident">set_hidden</span>(<span class="string">&quot;constructor&quot;</span>, <span class="ident">the_object_ref</span>)<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(<span class="ident">the_object_ref</span>)
-}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7425fb293 2022-06-30)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="slothjs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (3924dac7b 2022-07-29)" ></div>
 </body></html>

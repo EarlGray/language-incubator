@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["Exception",""],["ParseError",""]],"fn":[["ignore_set_readonly",""]],"type":[["JSResult",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["Exception",""],["ParseError",""]],"fn":[["ignore_set_readonly",""],["unescape",""]],"type":[["JSResult",""]]};
