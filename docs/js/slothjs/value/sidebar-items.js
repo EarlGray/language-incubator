@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["JSValue","A `JSValue` is either a primitive value or a reference to an object."]],"struct":[["JSString","A Javascript string value."]],"type":[["JSNumber",""],["JSON",""]]};

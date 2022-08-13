@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["main",""],["repl_main","Provides a simple command line using stdin/stdout."]],"struct":[["Args",""]]};
