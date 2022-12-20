@@ -71,7 +71,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
         ];
         let loc_ref = heap.alloc(JSObject::from_array(array));
         heap.scope_mut()
-            .set_system(CALLER_LOCATION.into(), loc_ref)?;
+            .set_system(CALLER_LOCATION, loc_ref)?;
     }
     Ok(())
 }

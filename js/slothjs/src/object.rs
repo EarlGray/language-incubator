@@ -135,6 +135,7 @@ impl JSObject {
         }
     }
 
+    #[allow(clippy::match_like_matches_macro)]
     pub fn is_callable(&self) -> bool {
         match self.value {
             ObjectValue::HostFn(_) | ObjectValue::Closure(_) => true,

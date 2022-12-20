@@ -334,11 +334,11 @@ impl JSValue {
                 heap.get(*lref).to_primitive(),
                 heap.get(*rref).to_primitive(),
             ) {
-                (Some(lval), Some(rval)) => (lval == rval),
+                (Some(lval), Some(rval)) => lval == rval,
                 _ => false,
             },
             _ => match (self.numberify(heap), other.numberify(heap)) {
-                (Some(lnum), Some(rnum)) => (lnum == rnum),
+                (Some(lnum), Some(rnum)) => lnum == rnum,
                 _ => false,
             },
         }

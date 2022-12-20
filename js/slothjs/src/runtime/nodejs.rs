@@ -89,6 +89,7 @@ impl NodejsParser {
 }
 
 impl NodejsParser {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         NodejsParser {
             espath: PathBuf::default(),
@@ -101,7 +102,7 @@ impl runtime::Parser for NodejsParser {
         let tmpdir = env::temp_dir().join(Self::TMPDIRNAME);
 
         let tmpdir = tmpdir.as_path();
-        fs::create_dir_all(&tmpdir)?;
+        fs::create_dir_all(tmpdir)?;
 
         let esprima_path = tmpdir.join("esprima.js");
         if !esprima_path.exists() {

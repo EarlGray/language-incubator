@@ -776,11 +776,11 @@ impl Interpretable for FunctionExpression {
 
         let prototype_ref = heap.alloc(JSObject::new());
         heap.get_mut(function_ref)
-            .define_own_property("prototype".into(), Access::WRITE)?;
+            .define_own_property("prototype", Access::WRITE)?;
         heap.get_mut(function_ref)
-            .set_property("prototype".into(), prototype_ref)?;
+            .set_property("prototype", prototype_ref)?;
         heap.get_mut(prototype_ref)
-            .set_hidden("constructor".into(), function_ref)?;
+            .set_hidden("constructor", function_ref)?;
 
         Ok(Interpreted::from(function_ref))
     }

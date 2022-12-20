@@ -149,7 +149,7 @@ impl From<JSON> for Literal {
     fn from(json: JSON) -> Literal {
         assert!(!json.is_array());
         assert!(!json.is_object());
-        Literal(json.clone())
+        Literal(json)
     }
 }
 

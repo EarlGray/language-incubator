@@ -123,7 +123,7 @@ impl Closure {
                 .collect::<JSResult<Vec<JSValue>>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
             heap.scope_mut()
-                .set_nonconf("arguments".into(), arguments_ref)?;
+                .set_nonconf("arguments", arguments_ref)?;
 
             // set each argument
             for (i, param) in self.function.params.iter().enumerate() {

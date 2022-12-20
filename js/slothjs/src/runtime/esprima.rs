@@ -52,6 +52,7 @@ fn esprima_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
 }
 
 impl EsprimaParser {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             object: Heap::NULL,

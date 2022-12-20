@@ -130,10 +130,10 @@ fn object_object_getOwnPropertyDescriptor(
     let value = prop.content.to_value()?;
 
     let mut descriptor_object = JSObject::new();
-    descriptor_object.set_property("value".into(), value)?;
-    descriptor_object.set_property("configurable".into(), prop.access.configurable())?;
-    descriptor_object.set_property("enumerable".into(), prop.access.enumerable())?;
-    descriptor_object.set_property("writable".into(), prop.access.writable())?;
+    descriptor_object.set_property("value", value)?;
+    descriptor_object.set_property("configurable", prop.access.configurable())?;
+    descriptor_object.set_property("enumerable", prop.access.enumerable())?;
+    descriptor_object.set_property("writable", prop.access.writable())?;
 
     let descriptor_ref = heap.alloc(descriptor_object);
     Ok(Interpreted::from(descriptor_ref))

@@ -223,6 +223,7 @@ impl ToSource for IfStatement {
         let mut s = String::from("if ");
         if cond.len() == 1 {
             let cond = cond[0].as_str();
+            #[allow(clippy::iter_nth_zero)]
             let cond_brackets = cond.chars().nth(0) == Some('(');
             if !cond_brackets {
                 s.push('(');

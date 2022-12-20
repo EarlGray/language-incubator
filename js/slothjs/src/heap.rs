@@ -331,12 +331,12 @@ impl Heap {
 
         let mut scope_object = JSObject::new();
 
-        scope_object.set_system(Self::SAVED_SCOPE.into(), old_scope_ref)?;
-        scope_object.set_system(Self::SCOPE_THIS.into(), this_ref)?;
+        scope_object.set_system(Self::SAVED_SCOPE, old_scope_ref)?;
+        scope_object.set_system(Self::SCOPE_THIS, this_ref)?;
 
         let new_scope_ref = self.alloc(scope_object);
         self.get_mut(Heap::GLOBAL)
-            .set_even_nonwritable(Self::LOCAL_SCOPE.into(), new_scope_ref)?;
+            .set_even_nonwritable(Self::LOCAL_SCOPE, new_scope_ref)?;
         Ok(new_scope_ref)
     }
 
@@ -352,7 +352,7 @@ impl Heap {
         if saved_scope_ref == Heap::GLOBAL {
             global.properties.remove(Self::LOCAL_SCOPE);
         } else {
-            global.set_even_nonwritable(Self::LOCAL_SCOPE.into(), saved_scope_ref)?;
+            global.set_even_nonwritable(Self::LOCAL_SCOPE, saved_scope_ref)?;
         }
 
         Ok(())
