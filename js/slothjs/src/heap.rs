@@ -1,24 +1,11 @@
-use crate::ast::{
-    FunctionDeclaration,
-    Identifier,
-};
-use crate::function::{
-    CallContext,
-    HostFn,
-};
+use crate::ast::{FunctionDeclaration, Identifier};
+use crate::error::TypeError;
+use crate::function::{CallContext, HostFn};
 use crate::object::HostClass;
 use crate::prelude::*;
 use crate::{
-    builtin,
-    object::ObjectValue,
-    source,
-    Exception,
-    Interpretable,
-    Interpreted,
-    JSObject,
-    JSResult,
-    JSValue,
-    JSON,
+    builtin, object::ObjectValue, source, Exception, Interpretable, Interpreted, JSObject,
+    JSResult, JSValue, JSON,
 };
 
 /// A heap reference: a Heap index.
@@ -32,10 +19,8 @@ impl JSRef {
 
     pub fn isinstance(&self, constructor: JSRef, heap: &Heap) -> JSResult<bool> {
         let protoval = heap.get(constructor).get_own_value("prototype");
-        let protoval = protoval.ok_or_else(|| {
-            let what = Interpreted::from(constructor);
-            Exception::TypeErrorNotCallable(what)
-        })?;
+        let protoval =
+            protoval.ok_or_else(|| Exception::type_error(TypeError::NOT_CALLABLE, constructor))?;
         let protoref = protoval.to_ref()?;
         Ok(self.has_proto(protoref, heap))
     }
@@ -52,14 +37,14 @@ impl JSRef {
             .lookup_var(constructor)
             .ok_or_else(|| Exception::no_reference(Identifier::from(constructor)))?;
         let ctrref = ctrval.to_ref(heap)?;
-        match self.isinstance(ctrref, heap)? {
-            true => Ok(()),
-            false => {
-                let what = Interpreted::from(*self);
-                let of = constructor.into();
-                Err(Exception::TypeErrorInstanceRequired(what, of))
-            }
+        if !self.isinstance(ctrref, heap)? {
+            return Err(Exception::attr_type_error(
+                TypeError::INSTANCE_REQUIRED,
+                *self,
+                constructor,
+            ))
         }
+        Ok(())
     }
 }
 
@@ -153,8 +138,7 @@ impl Heap {
         }
 
         let ctor_ref = self.alloc(ctor_object);
-        self.get_mut(proto)
-            .set_hidden("constructor", ctor_ref)?;
+        self.get_mut(proto).set_hidden("constructor", ctor_ref)?;
 
         self.get_mut(Heap::GLOBAL)
             .set_hidden(class.name, ctor_ref)?;
@@ -299,8 +283,7 @@ impl Heap {
         while let Some((&name, rest)) = names.split_first() {
             names = rest;
             let nameval = self.get(scoperef).get_own_value(name).ok_or_else(|| {
-                let what = Interpreted::from(scoperef);
-                Exception::TypeErrorGetProperty(what, name.into())
+                Exception::attr_type_error(TypeError::CANNOT_GET_PROPERTY, scoperef, name)
             })?;
             scoperef = nameval.to_ref()?;
         }
@@ -392,7 +375,7 @@ impl Heap {
                     of: call.this_ref,
                     name: call.method_name,
                 };
-                Err(Exception::TypeErrorNotCallable(callee))
+                Err(Exception::type_error(TypeError::NOT_CALLABLE, callee))
             }
         }
     }

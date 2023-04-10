@@ -1,3 +1,4 @@
+use crate::error::TypeError;
 use crate::prelude::*;
 use crate::{
     object::Access, object::HostClass, CallContext, Exception, Heap, Interpreted, JSObject, JSRef,
@@ -62,9 +63,9 @@ fn object_proto_valueOf(call: CallContext, _heap: &mut Heap) -> JSResult<Interpr
 
 fn object_object_create(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let proto = (call.arg_value(0, heap))
-        .map_err(|_| Exception::TypeErrorInvalidPrototype(Interpreted::VOID))?;
+        .map_err(|_| Exception::type_error(TypeError::INVALID_PROTO, Interpreted::VOID))?;
     let protoref = (proto.to_ref())
-        .map_err(|_| Exception::TypeErrorInvalidPrototype(Interpreted::from(proto)))?;
+        .map_err(|_| Exception::type_error(TypeError::INVALID_PROTO, Interpreted::from(proto)))?;
 
     let properties: Option<JSRef> = call.arg_value(1, heap).and_then(|val| val.to_ref()).ok();
 
@@ -156,7 +157,7 @@ fn define_property(
     if has_get || has_set {
         if has_value || has_writable {
             let what = Interpreted::from(descref);
-            return Err(Exception::TypeErrorInvalidDescriptor(what));
+            return Err(Exception::type_error(TypeError::INVALID_DESCRIPTOR, what));
         }
 
         todo!()
@@ -189,8 +190,7 @@ fn define_properties(objref: JSRef, descs_ref: JSRef, heap: &mut Heap) -> JSResu
                 Some(descref) => descref,
                 None => {
                     let value = desc.content.to_value()?;
-                    let value = Interpreted::Value(value);
-                    return Err(Exception::TypeErrorInvalidDescriptor(value));
+                    return Err(Exception::type_error(TypeError::INVALID_DESCRIPTOR, value));
                 }
             };
             Ok((prop.clone(), descref))

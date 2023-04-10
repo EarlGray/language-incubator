@@ -3,6 +3,7 @@ use serde::{
     Serialize,
 };
 
+use crate::error::TypeError;
 use crate::prelude::*;
 use crate::{
     error::ParseError,
@@ -51,7 +52,7 @@ impl Location {
 
             Ok(Location { start, end })
         } else {
-            Err(Exception::TypeErrorNotArraylike(Interpreted::VOID))
+            Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, Interpreted::VOID))
         }
     }
 }

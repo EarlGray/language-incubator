@@ -1,13 +1,8 @@
+use crate::error::TypeError;
 use crate::object::HostClass;
 /// The implementation of the builtin Function object.
 use crate::prelude::*;
-use crate::{
-    function::CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSResult,
-};
+use crate::{function::CallContext, Exception, Heap, Interpreted, JSResult};
 
 pub static CLASS: HostClass = HostClass {
     name: "Function",
@@ -45,7 +40,7 @@ fn function_proto_apply(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
             let objref = object.to_ref(heap)?;
             let array = (heap.get(objref))
                 .as_array()
-                .ok_or_else(|| Exception::TypeErrorNotArraylike(object.clone()))?;
+                .ok_or_else(|| Exception::type_error(TypeError::NOT_ARRAYLIKE, object.clone()))?;
             (array.storage.iter())
                 .map(|val| Interpreted::Value(val.clone()))
                 .collect()

@@ -1,3 +1,4 @@
+use crate::error::TypeError;
 use crate::object::HostClass;
 use crate::prelude::*;
 use crate::{
@@ -17,7 +18,7 @@ fn array_object_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<In
 fn array_toString(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let array_object = heap.get(call.this_ref);
     let array = array_object.as_array().ok_or_else(|| {
-        Exception::TypeErrorInstanceRequired(Interpreted::from(call.this_ref), "Array".into())
+        Exception::attr_type_error(TypeError::INSTANCE_REQUIRED, call.this_ref, "Array")
     })?;
     let array = array.storage.clone();
 
@@ -45,9 +46,7 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted>
             Ok(Interpreted::from(length))
         }
         // TODO: generic object path
-        _ => Err(Exception::TypeErrorNotArraylike(Interpreted::from(
-            call.this_ref,
-        ))),
+        _ => Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, call.this_ref)),
     }
 }
 
@@ -59,9 +58,7 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> 
             Ok(Interpreted::from(value))
         }
         // TODO: generic object path
-        _ => Err(Exception::TypeErrorNotArraylike(Interpreted::from(
-            call.this_ref,
-        ))),
+        _ => Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, call.this_ref)),
     }
 }
 

@@ -1,18 +1,12 @@
-use crate::Jump;
+use crate::error::TypeError;
 use crate::prelude::*;
+use crate::Jump;
 
 use crate::ast::*; // yes, EVERYTHING
 use crate::builtin;
 use crate::{
-    function::Closure,
-    object::Access,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSResult,
-    JSValue,
+    function::Closure, object::Access, CallContext, Exception, Heap, Interpreted, JSObject,
+    JSResult, JSValue,
 };
 
 // ==============================================
@@ -293,7 +287,9 @@ impl Interpretable for LabelStatement {
 
         let result = body.interpret(heap);
         match result {
-            Err(Exception::Jump(Jump::Break(Some(target)))) if &target == label => Ok(Interpreted::VOID),
+            Err(Exception::Jump(Jump::Break(Some(target)))) if &target == label => {
+                Ok(Interpreted::VOID)
+            }
             Err(Exception::Jump(Jump::Continue(Some(target)))) if &target == label => {
                 self.continue_loop(heap)
             }
@@ -373,8 +369,7 @@ impl Interpretable for TryStatement {
     fn interpret(&self, heap: &mut Heap) -> JSResult<Interpreted> {
         let result = self.block.interpret(heap);
         match &result {
-            Ok(_)
-            | Err(Exception::Jump(_)) => {
+            Ok(_) | Err(Exception::Jump(_)) => {
                 self.run_finalizer(heap)?;
                 result
             }
@@ -739,7 +734,9 @@ impl Interpretable for NewExpression {
         let funcref = callee.to_ref(heap)?;
         let prototype_ref = (heap.get_mut(funcref))
             .get_own_value("prototype")
-            .ok_or_else(|| Exception::TypeErrorGetProperty(callee, "prototype".into()))?
+            .ok_or_else(|| {
+                Exception::attr_type_error(TypeError::CANNOT_GET_PROPERTY, callee, "prototype")
+            })?
             .to_ref()?;
 
         // allocate the object

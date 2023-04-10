@@ -211,10 +211,10 @@ impl JSObject {
         match self.properties.get_mut(name) {
             Some(property) => {
                 if property.access != access && !property.access.configurable() {
-                    let what = Interpreted::from("???"); // TODO
-                    return Err(Exception::TypeErrorNotConfigurable(
-                        what,
-                        JSString::from(name),
+                    return Err(Exception::attr_type_error(
+                        TypeError::NONCONFIGURABLE_PROPERTY,
+                        "???",
+                        name,
                     ));
                 }
 
@@ -611,7 +611,11 @@ impl Interpreted {
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(JSValue::Ref(r)) => Ok(r),
                 None if heap.is_scope(*of) => Err(Exception::no_reference(name.clone())),
-                _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.clone())),
+                _ => Err(Exception::attr_type_error(
+                    TypeError::CANNOT_GET_PROPERTY,
+                    self.clone(),
+                    name.clone(),
+                )),
             },
             _ => Err(Exception::not_an_object(self.clone())),
         }
@@ -622,7 +626,7 @@ impl Interpreted {
             Interpreted::Member { of, name } => {
                 heap.get_mut(*of).set_property(name.as_str(), value)
             }
-            _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
+            _ => Err(Exception::type_error(TypeError::CANNOT_SET_PROPERTY, self.clone())),
         }
     }
 
@@ -633,20 +637,20 @@ impl Interpreted {
                 let of = match heap.lookup_protochain(*this_ref, name) {
                     Some(Interpreted::Member { of, .. }) => of,
                     Some(_) => unreachable!(),
-                    None => return Err(Exception::TypeErrorNotCallable(self.clone())),
+                    None => return Err(Exception::type_error(TypeError::NOT_CALLABLE, self.clone())),
                 };
                 let func_value = (heap.get(of).get_own_value(name)).ok_or_else(|| {
-                    Exception::TypeErrorNotCallable(Interpreted::member(of, name))
+                    Exception::type_error(TypeError::NOT_CALLABLE, Interpreted::member(of, name))
                 })?;
                 let func_ref = (func_value.to_ref())
-                    .map_err(|_| Exception::TypeErrorNotCallable(Interpreted::member(of, name)))?;
+                    .map_err(|_| Exception::type_error( TypeError::NOT_CALLABLE, Interpreted::member(of, name)))?;
                 Ok((func_ref, *this_ref, name.clone()))
             }
             Interpreted::Value(JSValue::Ref(func_ref)) => {
                 let this_ref = Heap::GLOBAL; // TODO: figure out what is this
                 Ok((*func_ref, this_ref, "<anonymous>".into()))
             }
-            _ => Err(Exception::TypeErrorNotCallable(self.clone())),
+            _ => Err(Exception::type_error(TypeError::NOT_CALLABLE, self.clone())),
         }
     }
 
@@ -665,8 +669,11 @@ impl Interpreted {
                     object.properties.remove(name);
                     Ok(())
                 } else {
-                    let what = Interpreted::from(*of);
-                    Err(Exception::TypeErrorNotConfigurable(what, name.clone()))
+                    Err(Exception::attr_type_error(
+                        TypeError::NONCONFIGURABLE_PROPERTY,
+                        *of,
+                        name.clone(),
+                    ))
                 }
             }
             _ => Ok(()),

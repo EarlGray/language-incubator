@@ -1,18 +1,7 @@
 use crate::{
-    runtime::{
-        self,
-        EvalResult,
-        Parser,
-    },
-    CallContext,
-    Exception,
-    Heap,
-    HeapNode,
-    HostFn,
-    Interpretable,
-    Interpreted,
-    JSRef,
-    JSResult,
+    error::TypeError,
+    runtime::{self, EvalResult, Parser},
+    CallContext, Exception, Heap, HeapNode, HostFn, Interpretable, Interpreted, JSRef, JSResult,
     Program,
 };
 use serde_json::json;
@@ -37,7 +26,7 @@ fn esprima_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
         .to_ref()?;
     let parse_ref = (heap.get(esprima_ref).get_own_value("parse"))
         .ok_or_else(|| {
-            Exception::TypeErrorGetProperty(Interpreted::from(esprima_ref), "parse".into())
+            Exception::attr_type_error(TypeError::CANNOT_GET_PROPERTY, esprima_ref, "parse")
         })?
         .to_ref()?;
 
@@ -97,8 +86,7 @@ impl runtime::Parser for EsprimaParser {
         )?;
         let node = estree.to_ref(heap)?;
 
-        let program =
-            HeapNode::with(heap, node, Program::parse_from).map_err(Exception::Syntax)?;
+        let program = HeapNode::with(heap, node, Program::parse_from).map_err(Exception::Syntax)?;
         Ok(program)
     }
 

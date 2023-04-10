@@ -11,6 +11,97 @@ use crate::{
 
 pub type JSResult<T> = Result<T, Exception>;
 
+#[derive(Debug, PartialEq)]
+pub enum Exception {
+    /// nonlocal transfers of control, "abrupt completions"
+    Jump(Jump),
+
+    /// exceptions thrown by the user and propagated up the call stack
+    UserThrown(JSValue),
+
+    /// SyntaxError
+    Syntax(ParseError),
+
+    /// ReferenceError
+    Reference(ReferenceError),
+
+    /// TypeError
+    Type(TypeError),
+}
+
+// TODO: impl Display for Exception
+// TODO: #[cfg(feature = "std"] impl Error for Exception
+// TODO: capture JavaScript stack trace in Exception
+
+impl Exception {
+    pub fn instance_required<V>(arg: V, of: &str) -> Exception
+    where
+        Interpreted: From<V>,
+    {
+        Exception::attr_type_error(TypeError::INSTANCE_REQUIRED, arg, of)
+    }
+
+    pub(crate) fn no_loop_for_continue_label(label: Identifier) -> Self {
+        Self::Syntax(ParseError::ContinueLabelNotALoop(label))
+    }
+
+    pub(crate) fn no_reference<Id>(id: Id) -> Self
+    where Identifier: From<Id>
+    {
+        Self::Reference(ReferenceError::not_found(id.into()))
+    }
+
+    pub(crate) fn not_an_object<V>(value: V) -> Self
+    where Interpreted: From<V>
+    {
+        let referr = ReferenceError {
+            tag: ReferenceError::NOT_OBJECT,
+            to: Identifier::from(""),
+            value: Interpreted::from(value),
+        };
+        Self::Reference(referr)
+    }
+
+    pub(crate) fn attr_type_error<V, S>(tag: &'static str, what: V, attr: S) -> Exception
+    where Interpreted: From<V>, JSString: From<S> {
+        Self::Type(TypeError{
+            tag,
+            value: Interpreted::from(what),
+            attr: JSString::from(attr),
+        })
+    }
+
+    pub(crate) fn type_error<V>(tag: &'static str, what: V) -> Exception
+    where Interpreted: From<V> {
+        Self::Type(TypeError{
+            tag,
+            value: Interpreted::from(what),
+            attr: JSString::from(""),
+        })
+    }
+}
+
+impl From<ParseError> for Exception {
+    fn from(err: ParseError) -> Self {
+        Self::Syntax(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<Exception> for io::Error {
+    fn from(exc: Exception) -> io::Error {
+        // TODO: impl Display for Exception
+        let msg = format!("{:?}", exc);
+        io::Error::new(io::ErrorKind::Other, msg)
+    }
+}
+
+pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
+    match e {
+        Exception::Type(TypeError{ tag: TypeError::SET_READONLY, ..}) => Ok(()),
+        _ => Err(e),
+    }
+}
 /// nonlocal transfers of control, "abrupt completions"
 #[derive(Debug, PartialEq)]
 pub enum Jump {
@@ -18,29 +109,6 @@ pub enum Jump {
     Break(Option<Identifier>),
     Continue(Option<Identifier>),
 }
-
-/*
-// TODO: switch Exception to this
-#[derive(Debug, PartialEq)]
-pub enum JSCompletion {
-    Jump(Jump),
-    Error(JSError),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum JSError {
-    UserThrown(JSValue),
-    Type(TypeError),
-    Reference(ReferenceError),
-    Syntax(SyntaxError),
-}
-
-impl From<Exception> for JSError {
-    fn from(value: Exception) -> Self {
-        Self::Deprecated(value)
-    }
-}
-*/
 
 #[derive(Debug, PartialEq)]
 pub struct TypeError {
@@ -51,17 +119,15 @@ pub struct TypeError {
 
 impl TypeError {
     pub const SET_READONLY: &str = "cannot set a readonly property";
-    /*
     pub const NONCONFIGURABLE_PROPERTY: &str = "the property is not configuratble";
-    pub const NO_PROPERTY: &str = "no such property";
-    pub const CANNOT_ASSIGN: &str = "property is not settable";
+    pub const CANNOT_GET_PROPERTY: &str = "property is not gettable";
+    pub const CANNOT_SET_PROPERTY: &str = "property is not settable";
     pub const CONST_ASSIGN: &str = "cannot assign to const";
     pub const NOT_CALLABLE: &str = "not callable";
     pub const NOT_ARRAYLIKE: &str = "not array-like";
     pub const INSTANCE_REQUIRED: &str = "an instance required";
     pub const INVALID_DESCRIPTOR: &str = "invalid descriptor";
     pub const INVALID_PROTO: &str = "invalid prototype";
-    */
 }
 
 #[derive(Debug, PartialEq)]
@@ -128,99 +194,6 @@ impl From<&str> for ParseError {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Exception {
-    TypeErrorNotConfigurable(Interpreted, JSString),
-    TypeErrorGetProperty(Interpreted, JSString),
-    TypeErrorCannotAssign(Interpreted),
-    TypeErrorConstAssign(Interpreted),
-    TypeErrorNotCallable(Interpreted),
-    TypeErrorNotArraylike(Interpreted),
-    TypeErrorInstanceRequired(Interpreted, JSString),
-    TypeErrorInvalidDescriptor(Interpreted),
-    TypeErrorInvalidPrototype(Interpreted),
-
-    /// nonlocal transfers of control, "abrupt completions"
-    Jump(Jump),
-
-    /// exceptions thrown by the user and propagated up the call stack
-    UserThrown(JSValue),
-
-    /// SyntaxError
-    Syntax(ParseError),
-
-    /// ReferenceError
-    Reference(ReferenceError),
-
-    /// TypeError
-    Type(TypeError),
-}
-
-// TODO: impl Display for Exception
-// TODO: #[cfg(feature = "std"] impl Error for Exception
-// TODO: capture JavaScript stack trace in Exception
-
-impl Exception {
-    pub fn instance_required<V>(arg: V, of: &str) -> Exception
-    where
-        Interpreted: From<V>,
-    {
-        let arg = Interpreted::from(arg);
-        Exception::TypeErrorInstanceRequired(arg, of.into())
-    }
-
-    pub(crate) fn no_loop_for_continue_label(label: Identifier) -> Self {
-        Self::Syntax(ParseError::ContinueLabelNotALoop(label))
-    }
-
-    pub(crate) fn no_reference<Id>(id: Id) -> Self
-    where Identifier: From<Id>
-    {
-        Self::Reference(ReferenceError::not_found(id.into()))
-    }
-
-    pub(crate) fn not_an_object<V>(value: V) -> Self 
-    where Interpreted: From<V>
-    {
-        let referr = ReferenceError {
-            tag: ReferenceError::NOT_OBJECT,
-            to: Identifier::from(""),
-            value: Interpreted::from(value),
-        };
-        Self::Reference(referr)
-    }
-
-    pub(crate) fn attr_type_error<V, S>(tag: &'static str, what: V, attr: S) -> Exception 
-    where Interpreted: From<V>, JSString: From<S> { 
-        Self::Type(TypeError{
-            tag,
-            value: Interpreted::from(what),
-            attr: JSString::from(attr),
-        })
-    }
-}
-
-impl From<ParseError> for Exception {
-    fn from(err: ParseError) -> Self {
-        Self::Syntax(err)
-    }
-}
-
-#[cfg(feature = "std")]
-impl From<Exception> for io::Error {
-    fn from(exc: Exception) -> io::Error {
-        // TODO: impl Display for Exception
-        let msg = format!("{:?}", exc);
-        io::Error::new(io::ErrorKind::Other, msg)
-    }
-}
-
-pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
-    match e {
-        Exception::Type(TypeError{ tag: TypeError::SET_READONLY, ..}) => Ok(()),
-        _ => Err(e),
-    }
-}
 
 pub fn unescape(input: &str) -> String {
     struct Unescape<C>(C);

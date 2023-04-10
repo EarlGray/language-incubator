@@ -348,9 +348,9 @@ fn test_assignment() {
 
     // const-bindings
     /*
-    assert_exception!( "const a = 1; a = 2; a",    Exception::TypeErrorConstAssign );
-    assert_exception!( "const a = 1; a += 1; a",   Exception::TypeErrorConstAssign );
-    assert_exception!( "const a = 1; a += 1",      Exception::TypeErrorConstAssign );
+    assert_exception!( "const a = 1; a = 2; a",    Exception::Type ); // "const assign"
+    assert_exception!( "const a = 1; a += 1; a",   Exception::Type ); // "const assign"
+    assert_exception!( "const a = 1; a += 1",      Exception::Type ); // "const assign"
     assert_eval!( "const a = 1; if (0) a = 2; a",  1.0 );  // not a syntax error
     */
 
@@ -967,16 +967,16 @@ fn test_builtin_object() {
     "#, 3.0);
     //assert_exception!(
     //  "Object.defineProperties({}, 'a')",
-    //  Exception::TypeErrorInstanceRequired
+    //  Exception::Type  // InstanceRequired
     //);
     //assert_exception!(
     //  "Object.defineProperties({}, ['a'])",
-    //  Exception::TypeErrorInvalidDescriptor
+    //  Exception::Type  // InvalidDescriptor
     //);
 
     // Object.defineProperty
-    //assert_exception!("Object.defineProperty(1)", Exception::TypeErrorInstanceRequired);
-    //assert_exception!("Object.defineProperty(null)", Exception::TypeErrorInstanceRequired);
+    //assert_exception!("Object.defineProperty(1)", Exception::Type);  // InstanceRequired
+    //assert_exception!("Object.defineProperty(null)", Exception::Type);  // InstanceRequired
     assert_eval!(r#"
         var obj = {};
         Object.defineProperty(obj, 'prop', {value: 42});
@@ -1028,7 +1028,7 @@ fn test_builtin_object() {
             get: function() { return this.val; },
             writable: true
         })
-    "#, Exception::TypeErrorInvalidDescriptor);
+    "#, Exception::Type); // InvalidDescriptor
 
     // Object.getOwnPropertyDescriptor
     assert_eval!(r#"
@@ -1067,7 +1067,7 @@ fn test_builtin_object() {
     assert_eval!("var p = {prop: true}; var o = Object.create(p); o.prop", true);
     assert_eval!("var p = {prop: false}; var o = Object.create(p); p.prop = true; o.prop", true);
     assert_eval!("'toString' in Object.create(null)", false);
-    assert_exception!("Object.create(true)", Exception::TypeErrorInvalidPrototype);
+    assert_exception!("Object.create(true)", Exception::Type);
     assert_eval!("var o = Object.create(null, {one: {value: 1}}); o.one", 1.0);
 
     // Object.entries()
@@ -1119,7 +1119,7 @@ fn test_builtin_object() {
     // Object.prototype.valueOf()
     assert_eval!("var obj = {}; obj.valueOf() == obj", true);
     assert_eval!("var obj = {}; obj.valueOf() == {}", false);
-    assert_exception!("null.valueOf()",  Exception::TypeErrorNotCallable);
+    assert_exception!("null.valueOf()",  Exception::Type); // not callable
 }
 
 #[test]
@@ -1214,7 +1214,7 @@ fn test_builtin_string() {
     // String.prototype.valueOf()
     assert_eval!("'str'.valueOf()", "str");
     assert_eval!("'str'.toString()", "str");
-    //assert_exception!("String.prototype.valueOf.call(1)", Exception::TypeErrorInstanceRequired);
+    //assert_exception!("String.prototype.valueOf.call(1)", Exception::Type);
 
     // String.prototype.charAt()
     assert_eval!("'abc'.charAt(1)", "b");
