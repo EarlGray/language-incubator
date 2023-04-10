@@ -88,10 +88,10 @@ impl Heap {
 
     const USERSTART: usize = 10;
 
-    pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
     const LOCAL_SCOPE: &'static str = "[[local_scope]]";
-    pub(crate) const SAVED_SCOPE: &'static str = "[[saved_scope]]";
     const CAPTURED_SCOPE: &'static str = "[[captured_scope]]";
+    pub(crate) const SCOPE_THIS: &'static str = "[[this]]";
+    pub(crate) const SAVED_SCOPE: &'static str = "[[saved_scope]]";
 
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {

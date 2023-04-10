@@ -11,6 +11,71 @@ use crate::{
 
 pub type JSResult<T> = Result<T, Exception>;
 
+/// nonlocal transfers of control, "abrupt completions"
+#[derive(Debug, PartialEq)]
+pub enum Jump {
+    Return(Interpreted),
+    Break(Option<Identifier>),
+    Continue(Option<Identifier>),
+}
+
+/*
+// TODO: switch Exception to this
+#[derive(Debug, PartialEq)]
+pub enum JSCompletion {
+    Jump(Jump),
+    Error(JSError),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum JSError {
+    UserThrown(JSValue),
+    Type(TypeError),
+    Reference(ReferenceError),
+    Syntax(SyntaxError),
+    Deprecated(Exception),
+}
+
+impl From<Exception> for JSError {
+    fn from(value: Exception) -> Self {
+        Self::Deprecated(value)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TypeError {
+    tag: &'static str,
+    value: Interpreted,
+    attr: JSString,
+}
+
+impl TypeError {
+    pub const SET_READONLY: &str = "";
+    pub const NONCONFIGURABLE_PROPERTY: &str = "";
+    pub const NO_PROPERTY: &str = "";
+    /*
+    SetReadonly(Interpreted, JSString),
+    NotConfigurable(Interpreted, JSString),
+    GetProperty(Interpreted, JSString),
+    CannotAssign(Interpreted),
+    ConstAssign(Interpreted),
+    NotCallable(Interpreted),
+    NotArraylike(Interpreted),
+    InstanceRequired(Interpreted, JSString),
+    InvalidDescriptor(Interpreted),
+    InvalidPrototype(Interpreted),
+    */
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ReferenceError {
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SyntaxError {
+}
+*/
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     InvalidJSON { err: String },
@@ -73,9 +138,7 @@ pub enum Exception {
     TypeErrorInvalidPrototype(Interpreted),
 
     // nonlocal transfers of control, "abrupt completions"
-    JumpReturn(Interpreted),
-    JumpBreak(Option<Identifier>),
-    JumpContinue(Option<Identifier>),
+    Jump(Jump),
 
     UserThrown(JSValue),
 }

@@ -11,6 +11,7 @@ use crate::{
     JSRef,
     JSResult,
     JSValue,
+    Jump,
 };
 
 /// Call context information (e.g. arguments) for [`Heap::execute()`].
@@ -144,7 +145,7 @@ impl Closure {
         });
         match result {
             Ok(_) => Ok(Interpreted::VOID), // BlockStatement result
-            Err(Exception::JumpReturn(returned)) => Ok(returned),
+            Err(Exception::Jump(Jump::Return(returned))) => Ok(returned),
             Err(e) => Err(e),
         }
     }

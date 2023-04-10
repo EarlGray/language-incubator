@@ -25,6 +25,7 @@ pub use ast::Program;
 pub use error::{
     Exception,
     JSResult,
+    Jump,
 };
 pub use function::{
     CallContext,

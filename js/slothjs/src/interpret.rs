@@ -1,3 +1,4 @@
+use crate::Jump;
 use crate::prelude::*;
 
 use crate::ast::*; // yes, EVERYTHING
@@ -122,7 +123,7 @@ impl Interpretable for SwitchStatement {
             for stmt in self.cases[i].consequent.iter() {
                 match stmt.interpret(heap) {
                     Ok(_) => (),
-                    Err(Exception::JumpBreak(None)) => {
+                    Err(Exception::Jump(Jump::Break(None))) => {
                         return Ok(Interpreted::VOID);
                     }
                     Err(e) => return Err(e),
@@ -142,8 +143,8 @@ impl ForStatement {
             let result = self.body.interpret(heap);
             match result {
                 Ok(_) => (),
-                Err(Exception::JumpContinue(None)) => (),
-                Err(Exception::JumpBreak(None)) => break,
+                Err(Exception::Jump(Jump::Continue(None))) => (),
+                Err(Exception::Jump(Jump::Break(None))) => break,
                 Err(e) => return Err(e),
             };
 
@@ -233,8 +234,8 @@ impl Interpretable for ForInStatement {
 
                 match self.body.interpret(heap) {
                     Ok(_) => (),
-                    Err(Exception::JumpContinue(None)) => continue,
-                    Err(Exception::JumpBreak(None)) => {
+                    Err(Exception::Jump(Jump::Continue(None))) => continue,
+                    Err(Exception::Jump(Jump::Break(None))) => {
                         return Ok(Interpreted::VOID);
                     }
                     Err(e) => {
@@ -252,14 +253,14 @@ impl Interpretable for ForInStatement {
 impl Interpretable for BreakStatement {
     fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
         let BreakStatement(maybe_label) = self;
-        Err(Exception::JumpBreak(maybe_label.clone()))
+        Err(Exception::Jump(Jump::Break(maybe_label.clone())))
     }
 }
 
 impl Interpretable for ContinueStatement {
     fn interpret(&self, _heap: &mut Heap) -> JSResult<Interpreted> {
         let ContinueStatement(maybe_label) = self;
-        Err(Exception::JumpContinue(maybe_label.clone()))
+        Err(Exception::Jump(Jump::Continue(maybe_label.clone())))
     }
 }
 
@@ -277,8 +278,8 @@ impl LabelStatement {
             loop_stmt.do_update(heap)?;
             let result = loop_stmt.do_loop(heap);
             match result {
-                Err(Exception::JumpContinue(Some(target))) if &target == label => continue,
-                Err(Exception::JumpBreak(Some(target))) if &target == label => break,
+                Err(Exception::Jump(Jump::Continue(Some(target)))) if &target == label => continue,
+                Err(Exception::Jump(Jump::Break(Some(target)))) if &target == label => break,
                 Err(e) => return Err(e),
                 Ok(()) => break,
             }
@@ -293,8 +294,8 @@ impl Interpretable for LabelStatement {
 
         let result = body.interpret(heap);
         match result {
-            Err(Exception::JumpBreak(Some(target))) if &target == label => Ok(Interpreted::VOID),
-            Err(Exception::JumpContinue(Some(target))) if &target == label => {
+            Err(Exception::Jump(Jump::Break(Some(target)))) if &target == label => Ok(Interpreted::VOID),
+            Err(Exception::Jump(Jump::Continue(Some(target)))) if &target == label => {
                 self.continue_loop(heap)
             }
             _ => result,
@@ -316,7 +317,7 @@ impl Interpretable for ReturnStatement {
             None => Interpreted::VOID,
             Some(argexpr) => argexpr.interpret(heap)?,
         };
-        Err(Exception::JumpReturn(returned))
+        Err(Exception::Jump(Jump::Return(returned)))
     }
 }
 
@@ -336,7 +337,7 @@ impl CatchClause {
         heap.enter_new_scope(this_ref, scope_ref, |heap| {
             let error_value: JSValue = match exc {
                 Exception::UserThrown(errval) => errval.clone(),
-                Exception::JumpBreak(_) | Exception::JumpContinue(_) | Exception::JumpReturn(_) => {
+                Exception::Jump(_) => {
                     panic!("Impossible to catch: {:?}", exc)
                 }
                 //Exception::ReferenceNotFound(ident) => { // TODO: ReferenceError
@@ -374,9 +375,7 @@ impl Interpretable for TryStatement {
         let result = self.block.interpret(heap);
         match &result {
             Ok(_)
-            | Err(Exception::JumpReturn(_))
-            | Err(Exception::JumpBreak(_))
-            | Err(Exception::JumpContinue(_)) => {
+            | Err(Exception::Jump(_)) => {
                 self.run_finalizer(heap)?;
                 result
             }
