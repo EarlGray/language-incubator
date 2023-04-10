@@ -1,23 +1,11 @@
 use bitflags::bitflags;
 use serde_json::json;
 
+use crate::error::TypeError;
 use crate::prelude::*;
 
-use crate::function::{
-    Closure,
-    HostFn,
-    HostFunc,
-};
-use crate::{
-    Exception,
-    Heap,
-    JSNumber,
-    JSRef,
-    JSResult,
-    JSString,
-    JSValue,
-    JSON,
-};
+use crate::function::{Closure, HostFn, HostFunc};
+use crate::{Exception, Heap, JSNumber, JSRef, JSResult, JSString, JSValue, JSON};
 
 /// Javascript objects.
 /// A `JSObject` always has a `proto`.
@@ -224,12 +212,19 @@ impl JSObject {
             Some(property) => {
                 if property.access != access && !property.access.configurable() {
                     let what = Interpreted::from("???"); // TODO
-                    return Err(Exception::TypeErrorNotConfigurable(what, JSString::from(name)));
+                    return Err(Exception::TypeErrorNotConfigurable(
+                        what,
+                        JSString::from(name),
+                    ));
                 }
 
                 if !(even_nonwritable || property.access.writable()) {
                     let what = Interpreted::from("???"); // TODO
-                    return Err(Exception::TypeErrorSetReadonly(what, JSString::from(name)));
+                    return Err(Exception::attr_type_error(
+                        TypeError::SET_READONLY,
+                        what,
+                        name,
+                    ));
                 }
 
                 property.access = access;
@@ -615,20 +610,18 @@ impl Interpreted {
             Interpreted::Value(JSValue::Ref(r)) => Ok(*r),
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(JSValue::Ref(r)) => Ok(r),
-                None if heap.is_scope(*of) => {
-                    Err(Exception::no_reference(name.clone()))
-                }
+                None if heap.is_scope(*of) => Err(Exception::no_reference(name.clone())),
                 _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.clone())),
             },
-            _ => {
-                Err(Exception::not_an_object(self.clone()))
-            }
+            _ => Err(Exception::not_an_object(self.clone())),
         }
     }
 
     pub fn put_value(&self, value: JSValue, heap: &mut Heap) -> JSResult<()> {
         match self {
-            Interpreted::Member { of, name } => heap.get_mut(*of).set_property(name.as_str(), value),
+            Interpreted::Member { of, name } => {
+                heap.get_mut(*of).set_property(name.as_str(), value)
+            }
             _ => Err(Exception::TypeErrorCannotAssign(self.clone())),
         }
     }

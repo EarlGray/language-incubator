@@ -33,7 +33,6 @@ pub enum JSError {
     Type(TypeError),
     Reference(ReferenceError),
     Syntax(SyntaxError),
-    Deprecated(Exception),
 }
 
 impl From<Exception> for JSError {
@@ -41,6 +40,7 @@ impl From<Exception> for JSError {
         Self::Deprecated(value)
     }
 }
+*/
 
 #[derive(Debug, PartialEq)]
 pub struct TypeError {
@@ -50,27 +50,19 @@ pub struct TypeError {
 }
 
 impl TypeError {
-    pub const SET_READONLY: &str = "";
-    pub const NONCONFIGURABLE_PROPERTY: &str = "";
-    pub const NO_PROPERTY: &str = "";
+    pub const SET_READONLY: &str = "cannot set a readonly property";
     /*
-    SetReadonly(Interpreted, JSString),
-    NotConfigurable(Interpreted, JSString),
-    GetProperty(Interpreted, JSString),
-    CannotAssign(Interpreted),
-    ConstAssign(Interpreted),
-    NotCallable(Interpreted),
-    NotArraylike(Interpreted),
-    InstanceRequired(Interpreted, JSString),
-    InvalidDescriptor(Interpreted),
-    InvalidPrototype(Interpreted),
+    pub const NONCONFIGURABLE_PROPERTY: &str = "the property is not configuratble";
+    pub const NO_PROPERTY: &str = "no such property";
+    pub const CANNOT_ASSIGN: &str = "property is not settable";
+    pub const CONST_ASSIGN: &str = "cannot assign to const";
+    pub const NOT_CALLABLE: &str = "not callable";
+    pub const NOT_ARRAYLIKE: &str = "not array-like";
+    pub const INSTANCE_REQUIRED: &str = "an instance required";
+    pub const INVALID_DESCRIPTOR: &str = "invalid descriptor";
+    pub const INVALID_PROTO: &str = "invalid prototype";
     */
 }
-
-#[derive(Debug, PartialEq)]
-pub enum SyntaxError {
-}
-*/
 
 #[derive(Debug, PartialEq)]
 pub struct ReferenceError {
@@ -138,7 +130,6 @@ impl From<&str> for ParseError {
 
 #[derive(Debug, PartialEq)]
 pub enum Exception {
-    TypeErrorSetReadonly(Interpreted, JSString),
     TypeErrorNotConfigurable(Interpreted, JSString),
     TypeErrorGetProperty(Interpreted, JSString),
     TypeErrorCannotAssign(Interpreted),
@@ -159,7 +150,10 @@ pub enum Exception {
     Syntax(ParseError),
 
     /// ReferenceError
-    Reference(ReferenceError)
+    Reference(ReferenceError),
+
+    /// TypeError
+    Type(TypeError),
 }
 
 // TODO: impl Display for Exception
@@ -195,6 +189,15 @@ impl Exception {
         };
         Self::Reference(referr)
     }
+
+    pub(crate) fn attr_type_error<V, S>(tag: &'static str, what: V, attr: S) -> Exception 
+    where Interpreted: From<V>, JSString: From<S> { 
+        Self::Type(TypeError{
+            tag,
+            value: Interpreted::from(what),
+            attr: JSString::from(attr),
+        })
+    }
 }
 
 impl From<ParseError> for Exception {
@@ -214,7 +217,7 @@ impl From<Exception> for io::Error {
 
 pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
     match e {
-        Exception::TypeErrorSetReadonly(_, _) => Ok(()),
+        Exception::Type(TypeError{ tag: TypeError::SET_READONLY, ..}) => Ok(()),
         _ => Err(e),
     }
 }
