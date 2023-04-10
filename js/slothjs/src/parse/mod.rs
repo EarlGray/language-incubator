@@ -337,6 +337,9 @@ impl ParseFrom for ForInStatement {
 
         let left = source.map_node("left", |jleft| {
             if let Ok(vardecl) = VariableDeclaration::parse_from(jleft, ctx) {
+                if vardecl.declarations.len() != 1 {
+                    return Err(ParseError::ForInMultipleVar());
+                }
                 Ok(ForInTarget::Var(vardecl))
             } else if let Ok(expr) = Expression::parse_from(jleft, ctx) {
                 Ok(ForInTarget::Expr(expr))

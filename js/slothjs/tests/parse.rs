@@ -328,7 +328,7 @@ fn test_assignment() {
     assert_eval!("undefined = 5; typeof undefined", "undefined");
     assert_eval!("undefined += 1; typeof undefined", "undefined");
 
-    assert_exception!("var var = 'var'",      Exception::SyntaxTreeError);
+    assert_exception!("var var = 'var'",      Exception::Syntax);
 
     // let-bindings
     assert_eval!( "let a = 1; a = 2; a",    2.0 );
@@ -460,10 +460,10 @@ fn test_block_scope() {
     */
 
     assert_eval!(       "var let = true; let",  true);
-    assert_exception!(  "let let = 'let'; let", Exception::SyntaxTreeError);
-    assert_exception!(  "let var = 'var'; var", Exception::SyntaxTreeError);
+    assert_exception!(  "let let = 'let'; let", Exception::Syntax);
+    assert_exception!(  "let var = 'var'; var", Exception::Syntax);
 
-    assert_exception!("if (true) let a = 1", Exception::SyntaxTreeError); //valid only in a block
+    assert_exception!("if (true) let a = 1", Exception::Syntax); //valid only in a block
 
     assert_eval!(r#"
         // let-bindings used from a function are evaluated on call site.
@@ -639,7 +639,7 @@ fn test_loops() {
     "#, 2.0);
     assert_exception!(
         "c = 0; label: { ++c; continue label; ++c; }",
-        Exception::SyntaxErrorContinueLabelNotALoop
+        Exception::Syntax
     );
 
     // ForInStatement

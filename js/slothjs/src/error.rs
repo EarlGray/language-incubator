@@ -82,8 +82,9 @@ pub enum ParseError {
     ObjectWithout { attr: String, value: JSON },
     UnexpectedValue { want: &'static str, value: JSON },
     UnknownNodeType { value: JSON },
-    ReferencedBeforeDeclaration {},
     BindingRedeclared {},
+    ForInMultipleVar(),
+    ContinueLabelNotALoop(Identifier),
 }
 
 impl ParseError {
@@ -120,9 +121,7 @@ impl From<&str> for ParseError {
 
 #[derive(Debug, PartialEq)]
 pub enum Exception {
-    SyntaxTreeError(ParseError),
-    SyntaxErrorForInMultipleVar(),
-    SyntaxErrorContinueLabelNotALoop(Identifier),
+    Syntax(ParseError),
 
     ReferenceNotAnObject(Interpreted),
     ReferenceNotFound(Identifier),
@@ -155,11 +154,15 @@ impl Exception {
         let arg = Interpreted::from(arg);
         Exception::TypeErrorInstanceRequired(arg, of.into())
     }
+
+    pub(crate) fn no_loop_for_continue_label(label: Identifier) -> Self {
+        Self::Syntax(ParseError::ContinueLabelNotALoop(label))
+    }
 }
 
 impl From<ParseError> for Exception {
     fn from(err: ParseError) -> Self {
-        Self::SyntaxTreeError(err)
+        Self::Syntax(err)
     }
 }
 

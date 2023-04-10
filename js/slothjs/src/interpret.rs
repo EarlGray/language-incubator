@@ -188,9 +188,7 @@ impl Interpretable for ForInStatement {
         let assignexpr = match &self.left {
             ForInTarget::Expr(expr) => expr.clone(),
             ForInTarget::Var(vardecl) => {
-                if vardecl.declarations.len() != 1 {
-                    return Err(Exception::SyntaxErrorForInMultipleVar());
-                }
+                debug_assert_eq!(vardecl.declarations.len(), 1);
                 let ident = &vardecl.declarations[0].name;
                 let idexpr = Expr::Identifier(Identifier::from(ident.as_str()));
                 Expression {
@@ -272,7 +270,8 @@ impl LabelStatement {
             let loop_stmt = match &body.stmt {
                 Stmt::For(stmt) => stmt,
                 Stmt::ForIn(_) => todo!(),
-                _ => return Err(Exception::SyntaxErrorContinueLabelNotALoop(label.clone())),
+                // TODO: move this check into the parser?
+                _ => return Err(Exception::no_loop_for_continue_label(label.clone())),
             };
 
             loop_stmt.do_update(heap)?;

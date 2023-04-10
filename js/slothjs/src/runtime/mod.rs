@@ -40,7 +40,7 @@ impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             EvalError::Exception(exc) => match exc {
-                Exception::SyntaxTreeError(error::ParseError::InvalidJSON { err }) => {
+                Exception::Syntax(error::ParseError::InvalidJSON { err }) => {
                     writeln!(f, "Syntax error:{}", err.as_str())
                 }
                 _ => write!(f, "Error: {:?}", exc),

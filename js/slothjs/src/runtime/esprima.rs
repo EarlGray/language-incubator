@@ -66,7 +66,7 @@ impl runtime::Parser for EsprimaParser {
     fn load(&mut self, heap: &mut Heap) -> EvalResult<()> {
         let esprima_json = serde_json::from_str::<serde_json::Value>(Self::ESPRIMA)?;
 
-        let esprima = Program::parse_from(&esprima_json).map_err(Exception::SyntaxTreeError)?;
+        let esprima = Program::parse_from(&esprima_json).map_err(Exception::Syntax)?;
 
         esprima.interpret(heap)?;
 
@@ -99,7 +99,7 @@ impl runtime::Parser for EsprimaParser {
         let node = estree.to_ref(heap)?;
 
         let program =
-            HeapNode::with(heap, node, Program::parse_from).map_err(Exception::SyntaxTreeError)?;
+            HeapNode::with(heap, node, Program::parse_from).map_err(Exception::Syntax)?;
         Ok(program)
     }
 

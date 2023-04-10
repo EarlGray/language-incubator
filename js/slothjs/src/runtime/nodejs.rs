@@ -122,7 +122,7 @@ impl runtime::Parser for NodejsParser {
         let stdout = self.run_esprima(input)?;
         let json: JSON = serde_json::from_str(&stdout)?;
 
-        let program = Program::parse_from(&json).map_err(Exception::SyntaxTreeError)?;
+        let program = Program::parse_from(&json).map_err(Exception::Syntax)?;
         Ok(program)
     }
 
