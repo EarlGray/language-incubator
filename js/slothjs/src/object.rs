@@ -3,7 +3,6 @@ use serde_json::json;
 
 use crate::prelude::*;
 
-use crate::ast;
 use crate::function::{
     Closure,
     HostFn,
@@ -603,8 +602,7 @@ impl Interpreted {
                 if let Some(value) = heap.get(*of).lookup_value(name, heap) {
                     Ok(value)
                 } else if heap.is_scope(*of) {
-                    let ident = ast::Identifier(name.clone());
-                    Err(Exception::ReferenceNotFound(ident))
+                    Err(Exception::no_reference(name.clone()))
                 } else {
                     Ok(JSValue::Undefined)
                 }
@@ -618,12 +616,13 @@ impl Interpreted {
             Interpreted::Member { of, name } => match heap.get(*of).lookup_value(name, heap) {
                 Some(JSValue::Ref(r)) => Ok(r),
                 None if heap.is_scope(*of) => {
-                    let ident = ast::Identifier(name.clone());
-                    Err(Exception::ReferenceNotFound(ident))
+                    Err(Exception::no_reference(name.clone()))
                 }
                 _ => Err(Exception::TypeErrorGetProperty(self.clone(), name.clone())),
             },
-            _ => Err(Exception::ReferenceNotAnObject(self.clone())),
+            _ => {
+                Err(Exception::not_an_object(self.clone()))
+            }
         }
     }
 

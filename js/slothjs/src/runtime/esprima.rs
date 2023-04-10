@@ -1,5 +1,4 @@
 use crate::{
-    ast::Identifier,
     runtime::{
         self,
         EvalResult,
@@ -34,7 +33,7 @@ fn esprima_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
     let code = call.arg_value(0, heap)?.stringify(heap)?;
 
     let esprima_ref = (heap.get(Heap::GLOBAL).get_own_value("esprima"))
-        .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima")))?
+        .ok_or_else(|| Exception::no_reference("esprima"))?
         .to_ref()?;
     let parse_ref = (heap.get(esprima_ref).get_own_value("parse"))
         .ok_or_else(|| {
@@ -73,7 +72,7 @@ impl runtime::Parser for EsprimaParser {
         let object: JSRef = heap.lookup_path(&["esprima"])?.to_ref(heap)?;
         let esparse = (heap.get(object))
             .get_own_value("parse")
-            .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from("esprima.parse")))?
+            .ok_or_else(|| Exception::no_reference("esprima.parse"))?
             .to_ref()?;
 
         let locjson = json!({ "loc": true });

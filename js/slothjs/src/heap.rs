@@ -50,7 +50,7 @@ impl JSRef {
     pub fn expect_instance(&self, constructor: &str, heap: &Heap) -> JSResult<()> {
         let ctrval = heap
             .lookup_var(constructor)
-            .ok_or_else(|| Exception::ReferenceNotFound(Identifier::from(constructor)))?;
+            .ok_or_else(|| Exception::no_reference(Identifier::from(constructor)))?;
         let ctrref = ctrval.to_ref(heap)?;
         match self.isinstance(ctrref, heap)? {
             true => Ok(()),

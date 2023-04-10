@@ -68,13 +68,30 @@ impl TypeError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ReferenceError {
-}
-
-#[derive(Debug, PartialEq)]
 pub enum SyntaxError {
 }
 */
+
+#[derive(Debug, PartialEq)]
+pub struct ReferenceError {
+    tag: &'static str,
+    to: Identifier,
+    value: Interpreted,
+}
+
+impl ReferenceError {
+    pub const NOT_FOUND: &str = "Reference not found";
+    pub const NOT_OBJECT: &str = "Reference is not an object";
+
+    pub fn not_found<Id>(id: Id) -> Self where Identifier: From<Id> {
+        Self {
+            tag: Self::NOT_FOUND,
+            to: Identifier::from(id),
+            value: Interpreted::VOID,
+        }
+    }
+}
+
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -121,10 +138,6 @@ impl From<&str> for ParseError {
 
 #[derive(Debug, PartialEq)]
 pub enum Exception {
-    Syntax(ParseError),
-
-    ReferenceNotAnObject(Interpreted),
-    ReferenceNotFound(Identifier),
     TypeErrorSetReadonly(Interpreted, JSString),
     TypeErrorNotConfigurable(Interpreted, JSString),
     TypeErrorGetProperty(Interpreted, JSString),
@@ -136,10 +149,17 @@ pub enum Exception {
     TypeErrorInvalidDescriptor(Interpreted),
     TypeErrorInvalidPrototype(Interpreted),
 
-    // nonlocal transfers of control, "abrupt completions"
+    /// nonlocal transfers of control, "abrupt completions"
     Jump(Jump),
 
+    /// exceptions thrown by the user and propagated up the call stack
     UserThrown(JSValue),
+
+    /// SyntaxError
+    Syntax(ParseError),
+
+    /// ReferenceError
+    Reference(ReferenceError)
 }
 
 // TODO: impl Display for Exception
@@ -157,6 +177,23 @@ impl Exception {
 
     pub(crate) fn no_loop_for_continue_label(label: Identifier) -> Self {
         Self::Syntax(ParseError::ContinueLabelNotALoop(label))
+    }
+
+    pub(crate) fn no_reference<Id>(id: Id) -> Self
+    where Identifier: From<Id>
+    {
+        Self::Reference(ReferenceError::not_found(id.into()))
+    }
+
+    pub(crate) fn not_an_object<V>(value: V) -> Self 
+    where Interpreted: From<V>
+    {
+        let referr = ReferenceError {
+            tag: ReferenceError::NOT_OBJECT,
+            to: Identifier::from(""),
+            value: Interpreted::from(value),
+        };
+        Self::Reference(referr)
     }
 }
 

@@ -628,7 +628,7 @@ impl Interpretable for MemberExpression {
         // get the object reference for member computation:
         let objresult = objexpr.interpret(heap)?;
         let objref = match objresult.to_value(heap)? {
-            JSValue::Undefined => return Err(Exception::ReferenceNotAnObject(objresult)),
+            JSValue::Undefined => return Err(Exception::not_an_object(objresult)),
             value => value.objectify(heap),
         };
 

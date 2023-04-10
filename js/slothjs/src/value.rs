@@ -147,7 +147,7 @@ impl JSValue {
             JSValue::Ref(objref) => Ok(*objref),
             _ => {
                 let what = Interpreted::Value(self.clone());
-                Err(Exception::ReferenceNotAnObject(what))
+                Err(Exception::not_an_object(what))
             }
         }
     }

@@ -176,6 +176,12 @@ impl From<&str> for Identifier {
     }
 }
 
+impl From<JSString> for Identifier {
+    fn from(value: JSString) -> Self {
+        Identifier(value)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BinaryExpression(pub Expression, pub BinOp, pub Expression);
 

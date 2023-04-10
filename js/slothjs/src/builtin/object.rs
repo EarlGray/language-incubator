@@ -1,13 +1,6 @@
 use crate::prelude::*;
 use crate::{
-    object::Access,
-    object::HostClass,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSRef,
+    object::Access, object::HostClass, CallContext, Exception, Heap, Interpreted, JSObject, JSRef,
     JSResult,
 };
 
@@ -116,8 +109,10 @@ fn object_object_getOwnPropertyDescriptor(
     heap: &mut Heap,
 ) -> JSResult<Interpreted> {
     let inspected = call.arg_value(0, heap)?;
-    let inspected_ref = (inspected.to_ref())
-        .map_err(|_| Exception::ReferenceNotAnObject(Interpreted::from(inspected)))?;
+    let inspected_ref = inspected.to_ref().map_err(|_| {
+        let inspected = Interpreted::from(inspected);
+        Exception::not_an_object(inspected)
+    })?;
 
     let propname = call.arg_value(1, heap)?.stringify(heap)?;
 

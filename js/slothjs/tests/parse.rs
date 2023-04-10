@@ -53,11 +53,11 @@ macro_rules! assert_eval {
 /// Run interpretation of the first argument (a string literal),
 /// then expects it to fail with a given variant of Exception:
 /// ```ignored
-/// assert_exception!( "bla", Exception::ReferenceNotFound );
+/// assert_exception!( "bla", Exception::Reference );
 /// ```
 // TODO: look if it's possible to match exception arguments as well:
 // ```
-// assert_exception!( "bla", Exception::ReferenceNotFound("bla") );
+// assert_exception!( "bla", Exception::Reference("bla") );
 // ```
 macro_rules! assert_exception {
     ($js:literal, $exc:path) => {
@@ -301,7 +301,7 @@ fn test_member_expression() {
     assert_eval!( "var x = 'one'; var o = {[x]: 1}; o", {"one": 1.0});
     assert_eval!( "var a = {}; a.sub = {}; a.sub.one = 1; a", {"sub": {"one": 1.0}});
     assert_exception!(
-        "var a = {}; a.sub.one = 1", Exception::ReferenceNotAnObject
+        "var a = {}; a.sub.one = 1", Exception::Reference
     );
 }
 
@@ -361,9 +361,9 @@ fn test_assignment() {
 #[test]
 fn test_global_scope() {
     assert_eval!( "a = 1; a",   1.0 );
-    assert_exception!( "b", Exception::ReferenceNotFound );
-    assert_exception!( "a = a + 1", Exception::ReferenceNotFound );
-    assert_exception!( "a += 1", Exception::ReferenceNotFound );
+    assert_exception!( "b", Exception::Reference );
+    assert_exception!( "a = a + 1", Exception::Reference );
+    assert_exception!( "a += 1", Exception::Reference );
 }
 
 #[test]
@@ -424,7 +424,7 @@ fn test_function_scope() {
     assert_exception!(r#"
         function adder(y) { return function(x) { return x + y + obj.z; } };
         adder(3)(4)
-    "#, Exception::ReferenceNotFound);
+    "#, Exception::Reference);
 
     // eval
     // TODO: eval can change function scope
@@ -439,18 +439,18 @@ fn test_block_scope() {
     assert_eval!( "let a = false; { a = true; } a",         true );
     assert_eval!( "let a = true; { let a = false; { let a = 'whut'; }}; a", true );
 
-    assert_exception!("{ let a = 'should not leak'; }; a", Exception::ReferenceNotFound );
+    assert_exception!("{ let a = 'should not leak'; }; a", Exception::Reference );
     /*
-    assert_exception!("typeof x; let x = 54; x", Exception::ReferenceNotFound);
-    assert_exception!("var a; { a = b; let b = 2; }; a", Exception::ReferenceNotFound);
+    assert_exception!("typeof x; let x = 54; x", Exception::Reference);
+    assert_exception!("var a; { a = b; let b = 2; }; a", Exception::Reference);
     assert_exception!(r#"{
         let a = 'a1';
         { a = b;   /* ReferenceError: b is not initialized yet */ };
         let b = 'b1';
-    }"#, Exception::ReferenceNotFound);
+    }"#, Exception::Reference);
     assert_exception!(  // "Cannot access 'a' before initialization"
         "var a = 'a', b; { b = a; let a = 'A'; }; b",
-        Exception::ReferenceNotFound);
+        Exception::Reference);
 
 
     assert_exception!("let foo; let foo;", Exception::SyntaxErrorAlreadyDeclared);
@@ -1328,7 +1328,7 @@ fn test_objects() {
     assert_eval!( "var a = {b: 2}; var b = a.b; b = 1; a.b", 2.0 );
     assert_eval!( "var a = {b: {}}; var b = a.b; b.one = 1; a.b.one", 1.0 );
 
-    assert_exception!( "a.one = 1", Exception::ReferenceNotFound );
+    assert_exception!( "a.one = 1", Exception::Reference );
 
     // NewExpression
     assert_eval!("new Object()",    {});
