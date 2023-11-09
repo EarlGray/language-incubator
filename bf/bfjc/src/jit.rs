@@ -1,5 +1,6 @@
 extern crate libc;
 
+use std::ffi;
 use std::mem;
 use std::ops::{Index, IndexMut};
 
@@ -31,44 +32,46 @@ impl Pages {
 pub struct Memory {
     contents: *mut u8,
     size: usize,
-    emit_pos: usize
+    emit_pos: usize,
 }
 
 impl Index<usize> for Memory {
     type Output = u8;
 
-    fn index(&self, _index: usize) -> &u8 {
-        unsafe { &*self.contents.offset(_index as isize) }
+    fn index(&self, index: usize) -> &u8 {
+        unsafe { &*self.contents.offset(index as isize) }
     }
 }
 
 impl IndexMut<usize> for Memory {
-    fn index_mut(&mut self, _index: usize) -> &mut u8 {
-        let size = self.size;
-        if _index >= size {
-            panic!("More than {} bytes to emit", size);
+    fn index_mut(&mut self, index: usize) -> &mut u8 {
+        if index >= self.size {
+            panic!("More than {} bytes to emit", self.size);
         }
 
-        unsafe { &mut *self.contents.offset(_index as isize) }
+        unsafe { &mut *self.contents.offset(index as isize) }
     }
 }
 
 impl Memory {
     pub fn new(pages: Pages) -> Memory {
-        let contents: *mut u8;
-        let size = pages.byte_size();
-        unsafe {
-            let mut memptr: *mut libc::c_void = mem::MaybeUninit::uninit().assume_init();
+        // SAFETY: just add a new rwx memory region.
+        let memptr: *mut ffi::c_void = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                pages.byte_size(),
+                libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+                libc::MAP_PRIVATE | libc::MAP_ANON,
+                -1,
+                0,
+            )
+        };
 
-            libc::posix_memalign(&mut memptr, Pages::SIZE, size);
-            let flags = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
-            libc::mprotect(memptr, size, flags);
-
-            // libc::memset(_contents, 0xc3, size);  // RET
-            contents = mem::transmute(memptr);
+        Memory {
+            contents: memptr as *mut u8,
+            size: pages.byte_size(),
+            emit_pos: 0,
         }
-
-        Memory { contents, size, emit_pos: 0 }
     }
 
     pub fn emit(&mut self, code: &[u8]) {
