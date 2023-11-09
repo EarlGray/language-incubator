@@ -1,10 +1,6 @@
-extern crate libc;
-
 use std::ffi;
 use std::mem;
 use std::ops::{Index, IndexMut};
-
-use libc::c_void;
 
 /*
  *  Pages
@@ -55,7 +51,7 @@ impl IndexMut<usize> for Memory {
 
 impl Memory {
     pub fn new(pages: Pages) -> Memory {
-        // SAFETY: just add a new rwx memory region.
+        // SAFETY: just adding a new rwx memory region.
         let memptr: *mut ffi::c_void = unsafe {
             libc::mmap(
                 std::ptr::null_mut(),
@@ -96,25 +92,28 @@ impl Memory {
     }
 
     pub fn at(&mut self, index: usize) -> Memory {
-        Memory { contents: self.contents, size: self.size, emit_pos: index }
+        if index >= self.size {
+            panic!("index {} is out of bounds", index);
+        }
+        Memory {
+            contents: self.contents,
+            size: self.size,
+            emit_pos: index,
+        }
     }
 
     pub fn get_entry(&self) -> fn() -> () {
-        unsafe { mem::transmute(self.contents) }
+        unsafe {
+            // SAFETY: if you don't execute the result, you'll be safe
+            mem::transmute(self.contents)
+        }
     }
     pub fn get_entry1(&self) -> fn(usize) -> () {
-        unsafe { mem::transmute(self.contents) }
+        unsafe {
+            // SAFETY: if you don't execute the result, you'll be safe
+            mem::transmute(self.contents)
+        }
     }
 }
 
 
-pub trait Compiler {
-    type IR;
-
-    fn parse(&self, source: &str) -> Self::IR;
-
-    fn set_putchar(&mut self, putchar: *mut c_void) -> &mut Self;
-    fn set_getchar(&mut self, getchar: *mut c_void, ctx: *mut c_void) -> &mut Self;
-
-    fn compile(&self, program: &Self::IR, exe: &mut Memory);
-}

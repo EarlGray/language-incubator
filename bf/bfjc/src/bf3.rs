@@ -3,7 +3,7 @@ extern crate libc;
 use std::ptr;
 use libc::c_void;
 
-use jit;
+use crate::{Compiler, Memory};
 
 /// The language
 #[derive(Clone, PartialEq, Debug)]
@@ -33,18 +33,11 @@ impl Impl {
     }
 }
 
-impl jit::Compiler for Impl {
+impl Compiler for Impl {
     type IR = Vec<Op>;
 
-    fn set_putchar(&mut self, putchar: *mut c_void) -> &mut Self {
-        self.putchar = putchar;
-        self
-    }
-
-    fn set_getchar(&mut self, getchar: *mut c_void, ctx: *mut c_void) -> &mut Self {
-        self.getchar = getchar;
-        self.getchar_ctx = ctx;
-        self
+    fn make(putchar: *mut c_void, getchar: *mut c_void, getchar_ctx: *mut c_void) -> Self {
+        Self { putchar, getchar, getchar_ctx }
     }
 
     fn parse(&self, prog: &str) -> Self::IR {
@@ -96,18 +89,17 @@ impl jit::Compiler for Impl {
           target_arch = "x86_64",
         ))
     ))]
-    pub fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
-        target_error!("This target_arch/target_family is not supported");
+    fn compile(&self, _ops: &Vec<Op>, exe: &mut Memory) {
+        compile_error!("This target_arch/target_family is not supported");
     }
 
     #[cfg(all(target_family = "unix", target_arch = "x86"))]
-    pub fn compile(_ops: &Vec<Op>, exe: &mut jit::Memory) {
-        target_error!("TODO: target_arch = x86");
-        use asm::x86;
+    fn compile(&self, _ops: &Vec<Op>, exe: &mut Memory) {
+        compile_error!("TODO: target_arch = x86");
     }
 
     #[cfg(all(target_family = "unix", target_arch = "x86_64"))]
-    fn compile(&self, ops: &Vec<Op>, exe: &mut jit::Memory) {
+    fn compile(&self, ops: &Vec<Op>, exe: &mut Memory) {
         use asm::x64;
 
         /* save registers */
@@ -125,61 +117,56 @@ impl jit::Compiler for Impl {
         for op in ops.iter() {
             match op {
                 Op::Add(n) => {
-                    // addb $n, (%rbp, %rbx)
-                    exe.emit(&[0x80, 0x44, 0x1d, 0x00, *n as u8]);
+                    exe.emit(&[0x80, 0x44, 0x1d, 0x00, *n as u8]);  // addb $n, (%rbp, %rbx)
                 }
                 Op::Move(n) => {
-                    // add $n, %rbx
-                    exe.emit(&[0x48, 0x81, 0xc3]);
-                    exe.emit_u32(*n as u32);
                     // TODO: check if %rbx is in bounds
+                    exe.emit(&[0x48, 0x81, 0xc3]);                  // add $n, %rbx
+                    exe.emit_u32(*n as u32);
                 }
                 Op::Print => {
-                    // movb (%rbp, %rbx), %al
-                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
-                    // movzx %al, %rdi
-                    exe.emit(&[0x48, 0x0f, 0xb6, 0xf8]);
-                    // movabs $putchar, %rax
-                    exe.emit(&[0x48, 0xb8]);
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);            // movb (%rbp, %rbx), %al
+                    exe.emit(&[0x48, 0x0f, 0xb6, 0xf8]);            // movzx %al, %rdi
+
+                    exe.emit(&[0x48, 0xb8]);                        // movabs $putchar, %rax
                     exe.emit_u64(self.putchar as u64);
-                    // call *%rax
-                    exe.emit(&[0xff, 0xd0]);
+
+                    exe.emit(&[0xff, 0xd0]);                        // call *%rax
                 }
                 Op::Read => {
-                    // movabs $ctx, %rdi
-                    exe.emit(&[0x48, 0xbf]);
+
+                    exe.emit(&[0x48, 0xbf]);                        // movabs $ctx, %rdi
                     exe.emit_u64(self.getchar_ctx as u64);
-                    // movabs $getchar, %rax
-                    exe.emit(&[0x48, 0xb8]);
+
+                    exe.emit(&[0x48, 0xb8]);                        // movabs $getchar, %rax
                     exe.emit_u64(self.getchar as u64);
-                    // call *%rax
-                    exe.emit(&[0xff, 0xd0]);
-                    // movb %al, (%rbp, %rbx)
-                    exe.emit(&[0x88, 0x44, 0x1d, 0x00]);
+
+                    exe.emit(&[0xff, 0xd0]);                        // call *%rax
+
+                    exe.emit(&[0x88, 0x44, 0x1d, 0x00]);            // movb %al, (%rbp, %rbx)
                 }
                 Op::Begin(_end) => {
-                    // movb (%rbp, %rbx), %al
-                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
-                    // test %al, %al
-                    exe.emit(&[0x84, 0xc0]);
-                    // jz <loop_end>
-                    exe.emit(&[0x0f, 0x84]);
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);            // movb (%rbp, %rbx), %al
+                    exe.emit(&[0x84, 0xc0]);                        // test %al, %al
+
+                    exe.emit(&[0x0f, 0x84]);                        // jz <loop_end>
                     exe.emit_u32(0);    // to be filled later.
-                    // remember the address just behind the intruction
+
+                    // remember the address just behind the intruction:
                     let addr = exe.current_position();
                     loop_addrs.push(addr);
                 }
                 Op::End(_begin) => {
-                    // movb (%rbp, %rbx), %al
-                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);
-                    // test %al, %al
-                    exe.emit(&[0x84, 0xc0]);
+                    exe.emit(&[0x8a, 0x44, 0x1d, 0x00]);            // movb (%rbp, %rbx), %al
+
+                    exe.emit(&[0x84, 0xc0]);                        // test %al, %al
                     // jnz <loop_begin>
                     let begin = loop_addrs.pop().expect("end without beginning");
                     let end = exe.current_position() + 6;
                     let offset = (end - begin) as u32;
                     exe.emit(&[0x0f, 0x85]);
                     exe.emit_u32((0 - offset as i32) as u32);
+
                     // backfill the begin jump:
                     exe.at(begin - 4).emit_u32(offset);
                 }
