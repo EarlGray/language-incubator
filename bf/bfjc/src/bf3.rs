@@ -87,6 +87,7 @@ impl Compiler for Impl {
         not(any(
           target_arch = "x86",
           target_arch = "x86_64",
+          target_arch = "aarch64",
         ))
     ))]
     fn compile(&self, _ops: &Vec<Op>, exe: &mut Memory) {
@@ -180,5 +181,47 @@ impl Compiler for Impl {
 
         /* exit */
         exe.emit(x64::ret);
+    }
+
+    // TODO: change `ops` to `&[Op]`
+    // TODO: signal that compilation failed, return Result
+    #[cfg(all(target_family = "unix", target_arch = "aarch64"))]
+    fn compile(&self, ops: &Vec<Op>, exe: &mut Memory) {
+        // the data pointer register - x20
+        // the function prolog
+        exe.emit(&[0xff, 0x43, 0x00, 0xd1]);      // sub sp, sp, #0x10
+
+        // the memory offset is passed in x0, let's save it in x19
+        exe.emit(&[0xf3, 0x03, 0x00, 0xaa]); // mov x19, x0
+
+        // initialize x20 to 0
+        exe.emit(&[0x94, 0x02, 0x14, 0xca]); // eor x20, x20, x20
+
+        for op in ops.iter() {
+            match op {
+                Op::Move(by) => {
+                    if !(-0x1000 < *by && *by < 0x1000) {
+                        panic!("shifts must fit in 12 bits, but by={}", by);
+                    }
+                    let by = *by as i32;
+                    if by < 0 {
+                        // sub x20, x20, #-by
+                        let n = -(by & 0xfff) as u32;
+                        exe.emit_u32(0xd1000294 | (n << 10));
+                    } else {
+                        // add x20, x20, #by
+                        let n = by as u32;
+                        exe.emit_u32(0x91000294 | (n << 10));
+                    }
+                }
+                _ => {
+                    panic!("TODO: {:?}", op);
+                }
+            }
+        }
+
+        // epilogue
+        exe.emit(&[0xff, 0x43, 0x00, 0x91]);      // add sp, sp, #0x10
+        exe.emit(&[0xc0, 0x03, 0x5f, 0xd6]);      // ret
     }
 }
