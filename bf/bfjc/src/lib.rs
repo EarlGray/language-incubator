@@ -42,6 +42,12 @@ pub extern "C" fn bf_input(ctx: *mut c_void) -> u8 {
     buf[0]
 }
 
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn pthread_jit_write_protect_supported_np() -> libc::c_int;
+    fn pthread_jit_write_protect_np(readonly: bool);
+}
+
 pub fn execute<L: Compiler>(contents: &str) {
     eprintln!("bf::run(): running!");
 
@@ -62,10 +68,16 @@ pub fn execute<L: Compiler>(contents: &str) {
     let mut exe = jit::Memory::new(pages);
     eprintln!("  code mem\t = *0x{:x}", &exe[0] as *const _ as usize);
 
-
     /* jit compilation */
     let ops = lang.parse(contents);
-    lang.compile(&ops, &mut exe);
+    if cfg!(target_os = "macos") && unsafe { pthread_jit_write_protect_supported_np() } != 0 {
+        eprintln!("  write_protect is on");
+        unsafe { pthread_jit_write_protect_np(false) };
+        lang.compile(&ops, &mut exe);
+        unsafe { pthread_jit_write_protect_np(true) };
+    } else {
+        lang.compile(&ops, &mut exe);
+    };
 
     /* data memory */
     const MEM_SIZE: usize = 30000;

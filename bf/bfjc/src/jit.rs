@@ -57,7 +57,7 @@ impl Memory {
                 std::ptr::null_mut(),
                 pages.byte_size(),
                 libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
-                libc::MAP_PRIVATE | libc::MAP_ANON,
+                libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_JIT,
                 -1,
                 0,
             )
