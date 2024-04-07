@@ -1,6 +1,7 @@
 pub mod estree;
 mod heapnode;
 mod jsonnode;
+mod serde;
 #[cfg(test)]
 mod test;
 

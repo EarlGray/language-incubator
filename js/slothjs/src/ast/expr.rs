@@ -177,7 +177,11 @@ impl From<JSString> for Literal {
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-pub struct Identifier(pub JSString);
+#[derive(serde::Serialize)]
+#[derive(serde::Deserialize)]
+pub struct Identifier(
+    pub JSString
+);
 
 impl Identifier {
     pub fn as_str(&self) -> &str {
