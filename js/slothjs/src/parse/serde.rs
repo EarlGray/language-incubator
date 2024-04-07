@@ -1,20 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ast::Identifier;
 use crate::ast::{BinOp, Literal};
+use crate::ast::{BoolOp, Identifier};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(from = "BinExprSerde", into = "BinExprSerde")]
-struct BinaryExpression(pub TExpression, pub BinOp, pub TExpression);
+struct BinaryExpression(TExpression, BinOp, TExpression);
 
 impl From<BinExprSerde> for BinaryExpression {
     fn from(value: BinExprSerde) -> Self {
-        let BinExprSerde {
-            operator,
-            left,
-            right,
-        } = value;
-        Self(left, operator, right)
+        Self(value.left, value.operator, value.right)
     }
 }
 
@@ -37,6 +32,35 @@ impl From<BinaryExpression> for BinExprSerde {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "LogicExprSerde")]
+#[serde(into = "LogicExprSerde")]
+pub struct LogicalExpression(TExpression, BoolOp, TExpression);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LogicExprSerde {
+    operator: BoolOp,
+    left: TExpression,
+    right: TExpression,
+}
+
+impl From<LogicalExpression> for LogicExprSerde {
+    fn from(value: LogicalExpression) -> Self {
+        let LogicalExpression(left, operator, right) = value;
+        Self {
+            operator,
+            left,
+            right,
+        }
+    }
+}
+
+impl From<LogicExprSerde> for LogicalExpression {
+    fn from(value: LogicExprSerde) -> Self {
+        Self(value.left, value.operator, value.right)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum TExpr {
     Identifier(Identifier),
@@ -45,6 +69,9 @@ enum TExpr {
 
     #[serde(rename = "BinaryExpression")]
     BinaryOp(Box<BinaryExpression>),
+
+    #[serde(rename = "LogicalExpression")]
+    LogicalOp(Box<LogicalExpression>),
 }
 
 impl From<TExpression> for TExpr {
@@ -56,10 +83,10 @@ impl From<TExpression> for TExpr {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct TExpression {
     #[serde(flatten)]
-    pub expr: TExpr,
+    expr: TExpr,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub loc: Option<Box<crate::source::Location>>,
+    loc: Option<Box<crate::source::Location>>,
 }
 
 impl TExpression {}
@@ -199,6 +226,22 @@ mod test {
                 TExpression::from(TExpr::Literal(Literal::from(2))),
                 BinOp::Plus,
                 TExpression::from(TExpr::Identifier(Identifier::from("x"))),
+            )))
+        );
+
+        let inp = json!({
+            "type": "LogicalExpression",
+            "operator": "&&",
+            "left": {"type": "Identifier", "name": "a"},
+            "right": {"type": "Identifier", "name": "b"},
+        });
+        let got: TExpr = serde_json::from_value(inp).unwrap();
+        assert_eq!(
+            got,
+            TExpr::LogicalOp(Box::new(LogicalExpression(
+                TExpression::from(TExpr::Identifier(Identifier::from("a"))),
+                BoolOp::And,
+                TExpression::from(TExpr::Identifier(Identifier::from("b"))),
             )))
         )
     }

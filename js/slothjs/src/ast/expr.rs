@@ -340,9 +340,12 @@ pub enum BinOp {
 }
 
 /// Lists all boolean operations (`&&`, `||`) for [`LogicalExpression`]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BoolOp {
+    #[serde(rename = "&&")]
     And,
+
+    #[serde(rename = "||")]
     Or,
 }
 
