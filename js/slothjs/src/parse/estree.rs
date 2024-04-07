@@ -107,3 +107,65 @@ impl ToESTree for BinOp {
         })
     }
 }
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use BinOp::*;
+        let s = match self {
+            Ampersand => "&",
+            EqEq => "==",
+            EqEqEq => "===",
+            Greater => ">",
+            GtEq => ">=",
+            GtGt => ">>",
+            GtGtGt => ">>>",
+            Hat => "^",
+            In => "in",
+            InstanceOf => "instanceof",
+            Less => "<",
+            LtEq => "<=",
+            LtLt => "<<",
+            Minus => "-",
+            NotEq => "!=",
+            NotEqEq => "!==",
+            Percent => "%",
+            Pipe => "|",
+            Plus => "+",
+            Slash => "/",
+            Star => "*",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl TryFrom<&str> for BinOp {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<BinOp, String> {
+        use BinOp::*;
+        Ok(match s {
+            "-" => Minus,
+            "!=" => NotEq,
+            "!==" => NotEqEq,
+            "*" => Star,
+            "/" => Slash,
+            "&" => Ampersand,
+            "%" => Percent,
+            "^" => Hat,
+            "+" => Plus,
+            "<" => Less,
+            "<<" => LtLt,
+            "<=" => LtEq,
+            "==" => EqEq,
+            "===" => EqEqEq,
+            ">" => Greater,
+            ">=" => GtEq,
+            ">>" => GtGt,
+            ">>>" => GtGtGt,
+            "|" => Pipe,
+            "in" => In,
+            "instanceof" => InstanceOf,
+            _ => return Err(format!("Not a BinOp: {s}")),
+        })
+    }
+}

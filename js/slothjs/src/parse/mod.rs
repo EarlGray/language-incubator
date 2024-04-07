@@ -5,6 +5,9 @@ mod serde;
 #[cfg(test)]
 mod test;
 
+use ::serde::Deserialize;
+use ::serde::Serialize;
+
 use crate::prelude::*;
 
 use crate::ast::*; // yes, EVERYTHING.
@@ -817,5 +820,43 @@ impl ParseFrom for FunctionExpression {
         Ok(FunctionExpression {
             func: Rc::new(func),
         })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentSerde {
+    name: String,
+}
+
+impl From<Identifier> for IdentSerde {
+    fn from(value: Identifier) -> Self {
+        Self {
+            name: String::from(value.0.as_str()),
+        }
+    }
+}
+
+impl From<IdentSerde> for Identifier {
+    fn from(value: IdentSerde) -> Self {
+        Identifier::from(JSString::from(value.name))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LitSerde {
+    value: JSON,
+}
+
+impl From<Literal> for LitSerde {
+    fn from(value: Literal) -> Self {
+        Self {
+            value: value.to_json(),
+        }
+    }
+}
+
+impl From<LitSerde> for JSON {
+    fn from(value: LitSerde) -> Self {
+        value.value
     }
 }

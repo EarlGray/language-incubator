@@ -14,7 +14,7 @@ pub type JSNumber = f64;
 ///   TODO: Indexing a Rust `String` over chars brings an unknown overhead of linear scanning.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct JSString(Rc<str>);
 
 impl JSString {

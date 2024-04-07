@@ -6,8 +6,7 @@ use crate::{error::ParseError, Exception, Heap, Interpreted, JSObject, JSValue, 
 
 const CALLER_LOCATION: &str = "[[caller_location]]";
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Position {
     line: u32,
     column: u32,
@@ -19,8 +18,7 @@ impl Position {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Location {
     start: Position,
     end: Position,

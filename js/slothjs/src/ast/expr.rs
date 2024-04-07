@@ -2,6 +2,9 @@
 //!
 //! The main struct here is [`Expression`], which wraps [`Expr`] enum.
 
+use serde::{Deserialize, Serialize};
+
+use crate::parse::LitSerde;
 use crate::prelude::*;
 
 use crate::{source, JSON};
@@ -113,8 +116,9 @@ impl From<CallExpression> for Expr {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "crate::parse::LitSerde")]
+#[serde(into = "crate::parse::LitSerde")]
 pub struct Literal(JSON); // TODO: change to JSValue
 
 impl Literal {
@@ -177,12 +181,16 @@ impl From<JSString> for Literal {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
-#[derive(serde::Serialize)]
-#[derive(serde::Deserialize)]
-pub struct Identifier(
-    pub JSString
-);
+impl From<LitSerde> for Literal {
+    fn from(value: LitSerde) -> Self {
+        Self(JSON::from(value))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize, Deserialize)]
+#[serde(from = "crate::parse::IdentSerde")]
+#[serde(into = "crate::parse::IdentSerde")]
+pub struct Identifier(pub JSString);
 
 impl Identifier {
     pub fn as_str(&self) -> &str {
@@ -285,28 +293,49 @@ pub type Pattern = Identifier;
 pub struct NewExpression(pub Expression, pub Vec<Expression>);
 
 /// Lists all possible binary operation for [`BinaryExpression`]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BinOp {
+    #[serde(rename = "+")]
     Plus,
+    #[serde(rename = "-")]
     Minus,
+    #[serde(rename = "*")]
     Star,
+    #[serde(rename = "/")]
     Slash,
+    #[serde(rename = "%")]
     Percent,
+    #[serde(rename = "==")]
     EqEq,
+    #[serde(rename = "!=")]
     NotEq,
+    #[serde(rename = "===")]
     EqEqEq,
+    #[serde(rename = "!==")]
     NotEqEq,
+    #[serde(rename = "<")]
     Less,
+    #[serde(rename = ">")]
     Greater,
+    #[serde(rename = "<=")]
     LtEq,
+    #[serde(rename = ">=")]
     GtEq,
+    #[serde(rename = "|")]
     Pipe,
+    #[serde(rename = "^")]
     Hat,
+    #[serde(rename = "&")]
     Ampersand,
+    #[serde(rename = "<<")]
     LtLt,
+    #[serde(rename = ">>")]
     GtGt,
+    #[serde(rename = ">>>")]
     GtGtGt,
+    #[serde(rename = "in")]
     In,
+    #[serde(rename = "instanceof")]
     InstanceOf,
 }
 
