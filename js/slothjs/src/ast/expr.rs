@@ -114,6 +114,7 @@ impl From<CallExpression> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Literal(JSON); // TODO: change to JSValue
 
 impl Literal {
