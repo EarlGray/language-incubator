@@ -1,20 +1,6 @@
-use core::{
-    borrow::Borrow,
-    convert::Infallible,
-    ops::Deref,
-    str::Chars,
-};
+use core::{borrow::Borrow, convert::Infallible, ops::Deref, str::Chars};
 
-use crate::{
-    prelude::*,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSRef,
-    JSResult,
-};
+use crate::{prelude::*, CallContext, Exception, Heap, Interpreted, JSObject, JSRef, JSResult};
 
 pub type JSON = serde_json::Value;
 
@@ -92,10 +78,7 @@ impl From<&str> for JSString {
 
 #[cfg(test)]
 mod test_strings {
-    use core::hash::{
-        Hash,
-        Hasher,
-    };
+    use core::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
 
     use super::JSString;

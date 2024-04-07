@@ -62,7 +62,7 @@ impl Interpretable for BlockStatement {
         let this_ref = heap.interpret_this();
         let outer_scope = heap.local_scope().unwrap_or(Heap::GLOBAL);
         heap.enter_new_scope(this_ref, outer_scope, |heap| {
-            heap.declare(self.bindings.iter(), vec![].iter())?;
+            heap.declare(self.bindings.iter(), [].into_iter())?;
 
             let mut result = Interpreted::VOID;
             for stmt in self.body.iter() {

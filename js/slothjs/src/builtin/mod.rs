@@ -6,10 +6,7 @@ pub mod global;
 pub mod object;
 pub mod string;
 
-use crate::{
-    Heap,
-    JSResult,
-};
+use crate::{Heap, JSResult};
 
 pub fn init(heap: &mut Heap) -> JSResult<()> {
     global::init(heap)?;

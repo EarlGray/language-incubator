@@ -1,10 +1,6 @@
 use serde_json::json;
 
-use crate::{
-    ast::*,
-    prelude::*,
-    JSON,
-};
+use crate::{ast::*, prelude::*, JSON};
 
 /// ToESTree de-parses an AST struct into its Esprima representation.
 pub trait ToESTree {

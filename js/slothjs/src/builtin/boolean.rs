@@ -1,13 +1,6 @@
 //use crate::prelude::*;
 use crate::{
-    object::HostClass,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSRef,
-    JSResult,
+    object::HostClass, CallContext, Exception, Heap, Interpreted, JSObject, JSRef, JSResult,
     JSValue,
 };
 

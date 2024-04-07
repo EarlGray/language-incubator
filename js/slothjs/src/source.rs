@@ -1,19 +1,8 @@
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
 use crate::error::TypeError;
 use crate::prelude::*;
-use crate::{
-    error::ParseError,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSValue,
-    JSON,
-};
+use crate::{error::ParseError, Exception, Heap, Interpreted, JSObject, JSValue, JSON};
 
 const CALLER_LOCATION: &str = "[[caller_location]]";
 
@@ -52,7 +41,10 @@ impl Location {
 
             Ok(Location { start, end })
         } else {
-            Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, Interpreted::VOID))
+            Err(Exception::type_error(
+                TypeError::NOT_ARRAYLIKE,
+                Interpreted::VOID,
+            ))
         }
     }
 }
@@ -71,8 +63,7 @@ pub fn save_caller(caller: Option<Box<Location>>, heap: &mut Heap) -> Result<(),
             JSValue::from(loc.end.column as f64),
         ];
         let loc_ref = heap.alloc(JSObject::from_array(array));
-        heap.scope_mut()
-            .set_system(CALLER_LOCATION, loc_ref)?;
+        heap.scope_mut().set_system(CALLER_LOCATION, loc_ref)?;
     }
     Ok(())
 }
@@ -94,9 +85,7 @@ impl<'heap> fmt::Display for Callstack<'heap> {
             let loc_ref = (self.heap.get(scoperef))
                 .get_own_value(CALLER_LOCATION)
                 .and_then(|v| v.to_ref().ok())
-                .ok_or_else(|| {
-                    Exception::Syntax(ParseError::no_attr(CALLER_LOCATION, JSON::Null))
-                })
+                .ok_or_else(|| Exception::Syntax(ParseError::no_attr(CALLER_LOCATION, JSON::Null)))
                 .map_err(|_| fmt::Error)?;
             if let Ok(loc) = Location::from_saved(self.heap.get(loc_ref), self.heap) {
                 writeln!(f, "   {:?}", loc)?;

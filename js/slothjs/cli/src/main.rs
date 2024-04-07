@@ -18,19 +18,10 @@ use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-use atty::{
-    self,
-    Stream,
-};
+use atty::{self, Stream};
 
 use clap::Parser;
-use slothjs::runtime::{
-    EsprimaParser,
-    JSONParser,
-    NodejsParser,
-    Parser as JSParser,
-    Runtime,
-};
+use slothjs::runtime::{EsprimaParser, JSONParser, NodejsParser, Parser as JSParser, Runtime};
 use slothjs::source;
 
 /// Reads stdin, parses and interprets it as one block.

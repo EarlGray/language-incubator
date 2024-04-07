@@ -1,14 +1,7 @@
 use crate::error::TypeError;
 use crate::object::HostClass;
 use crate::prelude::*;
-use crate::{
-    object::ObjectValue,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSResult,
-};
+use crate::{object::ObjectValue, CallContext, Exception, Heap, Interpreted, JSResult};
 
 fn array_object_constructor(_call: CallContext, _heap: &mut Heap) -> JSResult<Interpreted> {
     todo!()
@@ -39,14 +32,17 @@ fn array_proto_push(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted>
     let array_object = heap.get_mut(call.this_ref);
     match &mut array_object.value {
         ObjectValue::Array(array) => {
-            array.storage.extend(arguments.into_iter());
+            array.storage.extend(arguments);
             let length = array_object
                 .get_own_value("length")
                 .unwrap_or_else(|| JSValue::from(0));
             Ok(Interpreted::from(length))
         }
         // TODO: generic object path
-        _ => Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, call.this_ref)),
+        _ => Err(Exception::type_error(
+            TypeError::NOT_ARRAYLIKE,
+            call.this_ref,
+        )),
     }
 }
 
@@ -58,7 +54,10 @@ fn array_proto_pop(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> 
             Ok(Interpreted::from(value))
         }
         // TODO: generic object path
-        _ => Err(Exception::type_error(TypeError::NOT_ARRAYLIKE, call.this_ref)),
+        _ => Err(Exception::type_error(
+            TypeError::NOT_ARRAYLIKE,
+            call.this_ref,
+        )),
     }
 }
 

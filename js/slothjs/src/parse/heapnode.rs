@@ -1,12 +1,5 @@
 use crate::prelude::*;
-use crate::{
-    source,
-    Heap,
-    JSRef,
-    JSResult,
-    JSString,
-    JSValue,
-};
+use crate::{source, Heap, JSRef, JSResult, JSString, JSValue};
 
 use super::*;
 

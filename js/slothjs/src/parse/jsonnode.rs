@@ -1,13 +1,7 @@
 use crate::ast::*;
-use crate::parse::{
-    ParseResult,
-    SourceNode,
-};
+use crate::parse::{ParseResult, SourceNode};
 use crate::prelude::*;
-use crate::{
-    error::ParseError,
-    JSON,
-};
+use crate::{error::ParseError, JSON};
 
 use crate::source;
 
@@ -31,7 +25,7 @@ impl SourceNode for JSON {
                     }
                 }
             }
-            Err(ParseError::no_attr("", JSON::Null))    // empty String does not allocate
+            Err(ParseError::no_attr("", JSON::Null)) // empty String does not allocate
         })
         .unwrap_or(None)
     }

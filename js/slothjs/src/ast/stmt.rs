@@ -6,12 +6,7 @@ use crate::prelude::*;
 
 use crate::source;
 
-use super::expr::{
-    Expression,
-    FunctionExpression,
-    Identifier,
-    Pattern,
-};
+use super::expr::{Expression, FunctionExpression, Identifier, Pattern};
 
 /// `Statement` represents an [`Stmt`] together with its source span, if any.
 #[derive(Clone, Debug)]

@@ -1,19 +1,12 @@
 use crate::prelude::*;
-use crate::{
-    CallContext,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSResult,
-    JSValue,
-};
+use crate::{CallContext, Heap, Interpreted, JSObject, JSResult, JSValue};
 
 /*
  *  parseInt
  */
 #[allow(clippy::manual_range_contains)]
 fn parse_int(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let argument = call.arguments.first().unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?;
     if let JSValue::Number(_) = value {
         return Ok(Interpreted::Value(value));
@@ -48,7 +41,7 @@ fn parse_int(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
 
 #[allow(non_snake_case)]
 fn global_parseFloat(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let argument = call.arguments.get(0).unwrap_or(&Interpreted::VOID);
+    let argument = call.arguments.first().unwrap_or(&Interpreted::VOID);
     let value = argument.to_value(heap)?.stringify(heap)?;
 
     // TODO: proper implementation

@@ -5,22 +5,10 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process as proc;
 
-use crate::runtime::{
-    self,
-    EvalError,
-    EvalResult,
-};
+use crate::runtime::{self, EvalError, EvalResult};
 use crate::{
-    error::ParseError,
-    runtime::Parser,
-    CallContext,
-    Exception,
-    Heap,
-    Interpretable,
-    Interpreted,
-    JSResult,
-    Program,
-    JSON,
+    error::ParseError, runtime::Parser, CallContext, Exception, Heap, Interpretable, Interpreted,
+    JSResult, Program, JSON,
 };
 
 fn nodejs_eval(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {

@@ -1,16 +1,7 @@
 use crate::prelude::*;
 
 use crate::{
-    ast,
-    source,
-    Exception,
-    Heap,
-    Interpretable,
-    Interpreted,
-    JSObject,
-    JSRef,
-    JSResult,
-    JSValue,
+    ast, source, Exception, Heap, Interpretable, Interpreted, JSObject, JSRef, JSResult, JSValue,
     Jump,
 };
 
@@ -123,8 +114,7 @@ impl Closure {
                 .map(|v| v.to_value(heap))
                 .collect::<JSResult<Vec<JSValue>>>()?;
             let arguments_ref = heap.alloc(JSObject::from_array(argv));
-            heap.scope_mut()
-                .set_nonconf("arguments", arguments_ref)?;
+            heap.scope_mut().set_nonconf("arguments", arguments_ref)?;
 
             // set each argument
             for (i, param) in self.function.params.iter().enumerate() {

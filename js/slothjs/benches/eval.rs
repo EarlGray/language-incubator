@@ -1,13 +1,6 @@
-use criterion::{
-    criterion_group,
-    criterion_main,
-    Criterion,
-};
+use criterion::{criterion_group, criterion_main, Criterion};
 
-use slothjs::runtime::{
-    EsprimaParser,
-    Runtime,
-};
+use slothjs::runtime::{EsprimaParser, Runtime};
 
 fn esprima_eval() {
     let parser = EsprimaParser::new();

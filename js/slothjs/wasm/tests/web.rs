@@ -8,10 +8,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 use wasm_bindgen::JsValue;
 
-use slothjs::{
-    self as sljs,
-    ToESTree,
-};
+use slothjs::{self as sljs, ToESTree};
 
 #[wasm_bindgen_test]
 fn test_interpret_string() {

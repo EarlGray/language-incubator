@@ -626,7 +626,10 @@ impl Interpreted {
             Interpreted::Member { of, name } => {
                 heap.get_mut(*of).set_property(name.as_str(), value)
             }
-            _ => Err(Exception::type_error(TypeError::CANNOT_SET_PROPERTY, self.clone())),
+            _ => Err(Exception::type_error(
+                TypeError::CANNOT_SET_PROPERTY,
+                self.clone(),
+            )),
         }
     }
 
@@ -637,13 +640,16 @@ impl Interpreted {
                 let of = match heap.lookup_protochain(*this_ref, name) {
                     Some(Interpreted::Member { of, .. }) => of,
                     Some(_) => unreachable!(),
-                    None => return Err(Exception::type_error(TypeError::NOT_CALLABLE, self.clone())),
+                    None => {
+                        return Err(Exception::type_error(TypeError::NOT_CALLABLE, self.clone()))
+                    }
                 };
                 let func_value = (heap.get(of).get_own_value(name)).ok_or_else(|| {
                     Exception::type_error(TypeError::NOT_CALLABLE, Interpreted::member(of, name))
                 })?;
-                let func_ref = (func_value.to_ref())
-                    .map_err(|_| Exception::type_error( TypeError::NOT_CALLABLE, Interpreted::member(of, name)))?;
+                let func_ref = (func_value.to_ref()).map_err(|_| {
+                    Exception::type_error(TypeError::NOT_CALLABLE, Interpreted::member(of, name))
+                })?;
                 Ok((func_ref, *this_ref, name.clone()))
             }
             Interpreted::Value(JSValue::Ref(func_ref)) => {

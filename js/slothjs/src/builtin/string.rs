@@ -1,13 +1,6 @@
 use crate::prelude::*;
 use crate::{
-    object::HostClass,
-    CallContext,
-    Exception,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSRef,
-    JSResult,
+    object::HostClass, CallContext, Exception, Heap, Interpreted, JSObject, JSRef, JSResult,
 };
 
 pub static CLASS: HostClass = HostClass {
@@ -27,7 +20,7 @@ pub static CLASS: HostClass = HostClass {
 };
 
 fn string_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let arg = (call.arguments.get(0))
+    let arg = (call.arguments.first())
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?;
     let s = arg.stringify(heap)?;

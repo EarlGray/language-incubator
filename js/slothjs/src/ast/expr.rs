@@ -4,15 +4,9 @@
 
 use crate::prelude::*;
 
-use crate::{
-    source,
-    JSON,
-};
+use crate::{source, JSON};
 
-use super::stmt::{
-    BlockStatement,
-    FunctionDeclaration,
-};
+use super::stmt::{BlockStatement, FunctionDeclaration};
 
 /// `Expression` represents an [`Expr`] together with its source span, if any.
 #[derive(Debug, Clone)]
@@ -68,7 +62,10 @@ pub enum Expr {
     New(Box<NewExpression>),
 }
 
-impl<T> From<T> for Expr where Literal: From<T> {
+impl<T> From<T> for Expr
+where
+    Literal: From<T>,
+{
     fn from(lit: T) -> Expr {
         Expr::Literal(Literal::from(lit))
     }
@@ -153,12 +150,30 @@ impl From<JSON> for Literal {
     }
 }
 
-impl From<bool> for Literal { fn from(b: bool) -> Self { Literal(JSON::from(b)) }}
-impl From<f64> for Literal { fn from(n: f64) -> Self { Literal(JSON::from(n)) }}
-impl From<i64> for Literal { fn from(n: i64) -> Self { Literal(JSON::from(n)) }}
-impl From<&str> for Literal { fn from(s: &str) -> Self { Literal(JSON::from(s)) }}
+impl From<bool> for Literal {
+    fn from(b: bool) -> Self {
+        Literal(JSON::from(b))
+    }
+}
+impl From<f64> for Literal {
+    fn from(n: f64) -> Self {
+        Literal(JSON::from(n))
+    }
+}
+impl From<i64> for Literal {
+    fn from(n: i64) -> Self {
+        Literal(JSON::from(n))
+    }
+}
+impl From<&str> for Literal {
+    fn from(s: &str) -> Self {
+        Literal(JSON::from(s))
+    }
+}
 impl From<JSString> for Literal {
-    fn from(s: JSString) -> Self { Literal(JSON::String(s.to_string())) }
+    fn from(s: JSString) -> Self {
+        Literal(JSON::String(s.to_string()))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]

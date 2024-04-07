@@ -5,21 +5,8 @@ use core::str::Utf8Error;
 use std::io;
 
 use crate::function::HostFn;
-use crate::{
-    error,
-    Exception,
-    Heap,
-    JSString,
-    JSValue,
-    Program,
-    JSON,
-};
-use crate::{
-    prelude::*,
-    CallContext,
-    Interpreted,
-    JSResult,
-};
+use crate::{error, Exception, Heap, JSString, JSValue, Program, JSON};
+use crate::{prelude::*, CallContext, Interpreted, JSResult};
 
 pub use self::esprima::EsprimaParser;
 pub use self::nodejs::NodejsParser;
@@ -157,8 +144,7 @@ impl Runtime {
         parser.load(&mut heap)?;
 
         let eval_ref = heap.alloc_func(parser.eval_func());
-        heap.get_mut(Heap::GLOBAL)
-            .set_hidden("eval", eval_ref)?;
+        heap.get_mut(Heap::GLOBAL).set_hidden("eval", eval_ref)?;
 
         Ok(Runtime { heap, parser })
     }

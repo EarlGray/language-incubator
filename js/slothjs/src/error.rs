@@ -2,12 +2,7 @@
 use std::io;
 
 use crate::prelude::*;
-use crate::{
-    ast::Identifier,
-    Interpreted,
-    JSValue,
-    JSON,
-};
+use crate::{ast::Identifier, Interpreted, JSValue, JSON};
 
 pub type JSResult<T> = Result<T, Exception>;
 
@@ -46,13 +41,15 @@ impl Exception {
     }
 
     pub(crate) fn no_reference<Id>(id: Id) -> Self
-    where Identifier: From<Id>
+    where
+        Identifier: From<Id>,
     {
-        Self::Reference(ReferenceError::not_found(id.into()))
+        Self::Reference(ReferenceError::not_found(id))
     }
 
     pub(crate) fn not_an_object<V>(value: V) -> Self
-    where Interpreted: From<V>
+    where
+        Interpreted: From<V>,
     {
         let referr = ReferenceError {
             tag: ReferenceError::NOT_OBJECT,
@@ -63,8 +60,11 @@ impl Exception {
     }
 
     pub(crate) fn attr_type_error<V, S>(tag: &'static str, what: V, attr: S) -> Exception
-    where Interpreted: From<V>, JSString: From<S> {
-        Self::Type(TypeError{
+    where
+        Interpreted: From<V>,
+        JSString: From<S>,
+    {
+        Self::Type(TypeError {
             tag,
             value: Interpreted::from(what),
             attr: JSString::from(attr),
@@ -72,8 +72,10 @@ impl Exception {
     }
 
     pub(crate) fn type_error<V>(tag: &'static str, what: V) -> Exception
-    where Interpreted: From<V> {
-        Self::Type(TypeError{
+    where
+        Interpreted: From<V>,
+    {
+        Self::Type(TypeError {
             tag,
             value: Interpreted::from(what),
             attr: JSString::from(""),
@@ -98,7 +100,10 @@ impl From<Exception> for io::Error {
 
 pub fn ignore_set_readonly(e: Exception) -> JSResult<()> {
     match e {
-        Exception::Type(TypeError{ tag: TypeError::SET_READONLY, ..}) => Ok(()),
+        Exception::Type(TypeError {
+            tag: TypeError::SET_READONLY,
+            ..
+        }) => Ok(()),
         _ => Err(e),
     }
 }
@@ -118,16 +123,16 @@ pub struct TypeError {
 }
 
 impl TypeError {
-    pub const SET_READONLY: &str = "cannot set a readonly property";
-    pub const NONCONFIGURABLE_PROPERTY: &str = "the property is not configuratble";
-    pub const CANNOT_GET_PROPERTY: &str = "property is not gettable";
-    pub const CANNOT_SET_PROPERTY: &str = "property is not settable";
-    pub const CONST_ASSIGN: &str = "cannot assign to const";
-    pub const NOT_CALLABLE: &str = "not callable";
-    pub const NOT_ARRAYLIKE: &str = "not array-like";
-    pub const INSTANCE_REQUIRED: &str = "an instance required";
-    pub const INVALID_DESCRIPTOR: &str = "invalid descriptor";
-    pub const INVALID_PROTO: &str = "invalid prototype";
+    pub const SET_READONLY: &'static str = "cannot set a readonly property";
+    pub const NONCONFIGURABLE_PROPERTY: &'static str = "the property is not configuratble";
+    pub const CANNOT_GET_PROPERTY: &'static str = "property is not gettable";
+    pub const CANNOT_SET_PROPERTY: &'static str = "property is not settable";
+    pub const CONST_ASSIGN: &'static str = "cannot assign to const";
+    pub const NOT_CALLABLE: &'static str = "not callable";
+    pub const NOT_ARRAYLIKE: &'static str = "not array-like";
+    pub const INSTANCE_REQUIRED: &'static str = "an instance required";
+    pub const INVALID_DESCRIPTOR: &'static str = "invalid descriptor";
+    pub const INVALID_PROTO: &'static str = "invalid prototype";
 }
 
 #[derive(Debug, PartialEq)]
@@ -138,10 +143,13 @@ pub struct ReferenceError {
 }
 
 impl ReferenceError {
-    pub const NOT_FOUND: &str = "Reference not found";
-    pub const NOT_OBJECT: &str = "Reference is not an object";
+    pub const NOT_FOUND: &'static str = "Reference not found";
+    pub const NOT_OBJECT: &'static str = "Reference is not an object";
 
-    pub fn not_found<Id>(id: Id) -> Self where Identifier: From<Id> {
+    pub fn not_found<Id>(id: Id) -> Self
+    where
+        Identifier: From<Id>,
+    {
         Self {
             tag: Self::NOT_FOUND,
             to: Identifier::from(id),
@@ -149,7 +157,6 @@ impl ReferenceError {
         }
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -193,7 +200,6 @@ impl From<&str> for ParseError {
         Self::InvalidJSON { err }
     }
 }
-
 
 pub fn unescape(input: &str) -> String {
     struct Unescape<C>(C);

@@ -42,7 +42,7 @@ impl JSRef {
                 TypeError::INSTANCE_REQUIRED,
                 *self,
                 constructor,
-            ))
+            ));
         }
         Ok(())
     }

@@ -1,11 +1,5 @@
 use crate::{
-    function::CallContext,
-    object::HostClass,
-    prelude::*,
-    Heap,
-    Interpreted,
-    JSObject,
-    JSResult,
+    function::CallContext, object::HostClass, prelude::*, Heap, Interpreted, JSObject, JSResult,
 };
 
 pub static CLASS: HostClass = HostClass {
@@ -16,7 +10,7 @@ pub static CLASS: HostClass = HostClass {
 };
 
 pub fn error_constructor(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
-    let message = (call.arguments.get(0))
+    let message = (call.arguments.first())
         .unwrap_or(&Interpreted::from(""))
         .to_value(heap)?
         .stringify(heap)?;

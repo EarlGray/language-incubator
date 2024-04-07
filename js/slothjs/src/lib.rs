@@ -22,33 +22,10 @@ pub mod runtime;
 mod test;
 
 pub use ast::Program;
-pub use error::{
-    Exception,
-    JSResult,
-    Jump,
-};
-pub use function::{
-    CallContext,
-    HostFn,
-    HostFunc,
-};
-pub use heap::{
-    Heap,
-    JSRef,
-};
+pub use error::{Exception, JSResult, Jump};
+pub use function::{CallContext, HostFn, HostFunc};
+pub use heap::{Heap, JSRef};
 pub use interpret::Interpretable;
-pub use object::{
-    Interpreted,
-    JSObject,
-};
-pub use parse::{
-    estree::ToESTree,
-    HeapNode,
-    SourceNode,
-};
-pub use value::{
-    JSNumber,
-    JSString,
-    JSValue,
-    JSON,
-};
+pub use object::{Interpreted, JSObject};
+pub use parse::{estree::ToESTree, HeapNode, SourceNode};
+pub use value::{JSNumber, JSString, JSValue, JSON};
