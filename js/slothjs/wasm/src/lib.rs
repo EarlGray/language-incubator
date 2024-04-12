@@ -54,9 +54,8 @@ pub fn interpret(jsobject: &JsValue) -> Result<JsValue, JsValue> {
     let result = HEAP
         .with(|heapcell| {
             let mut heap = heapcell.borrow_mut();
-            heap.evaluate(&program)?.to_json(&heap)
+            heap.evaluate(&program)?.to_string(&mut heap)
         })
         .map_err(jserror)?;
-    // TODO: implement serde::Serializer directly for JSValue?
-    JsValue::from_serde(&result).map_err(jserror)
+    JsValue::from_serde(result.as_str()).map_err(jserror)
 }
