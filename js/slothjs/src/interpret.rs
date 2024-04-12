@@ -219,9 +219,13 @@ impl Interpretable for ForInStatement {
                     None => continue,    // the property has disappeared!
                 };
 
+                let propname = match propname.parse::<usize>() {
+                    Ok(p) => JSValue::from(p as f64),
+                    _ => JSValue::from(propname.as_str()),
+                };
                 assignexpr
                     .interpret(heap)?
-                    .put_value(JSValue::from(propname.as_str()), heap)
+                    .put_value(propname, heap)
                     .or_else(crate::error::ignore_set_readonly)?;
 
                 match self.body.interpret(heap) {

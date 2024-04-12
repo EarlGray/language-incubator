@@ -34,6 +34,7 @@ fn binary_addition() {
     );
     assert_eval!("undefined5", expr::add(expr::undefined(), "5"));
     assert_eval!("1[object Object]", expr::add(1, expr::empty_object()));
-    //assert_eval!((f64::NAN),   expr::add(expr::undefined(), expr::undefined()));
-    //assert_eval!((f64::NAN),  expr::add("5", expr::undefined())),  );
+    assert_eval!((f64::NAN),   expr::add(expr::undefined(), expr::undefined()));
+    assert_eval!("5undefined",  expr::add("5", expr::undefined()));
+    assert_eval!((f64::NAN),  expr::add(5, expr::undefined()));
 }

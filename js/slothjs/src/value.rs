@@ -364,10 +364,21 @@ impl JSValue {
     /// Addition operator:
     /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Addition>
     pub fn plus(&self, other: &JSValue, heap: &mut Heap) -> JSResult<JSValue> {
-        if let (JSValue::String(lstr), JSValue::String(rstr)) = (self, other) {
-            return Ok(JSValue::from(lstr.to_string() + rstr.as_str()));
+        if let JSValue::String(str_self) = self {
+            let str_other = other.stringify(heap)?;
+            let mut result = String::from(str_self.as_str());
+            result.push_str(str_other.as_str());
+            return Ok(JSValue::from(result));
         }
-        if let (Some(lnum), Some(rnum)) = (self.numberify(heap), other.numberify(heap)) {
+        if let JSValue::String(str_other) = other {
+            let str_self = self.stringify(heap)?;
+            let mut result = String::from(str_self.as_str());
+            result.push_str(str_other.as_str());
+            return Ok(JSValue::from(result));
+        }
+        let num_self = JSValue::Undefined.eq(self).then_some(f64::NAN).or_else(|| self.numberify(heap));
+        let num_other = JSValue::Undefined.eq(other).then_some(f64::NAN).or_else(|| other.numberify(heap));
+        if let (Some(lnum), Some(rnum)) = (num_self, num_other) {
             return Ok(JSValue::from(lnum + rnum));
         }
         let lvalstr = self.stringify(heap)?;
