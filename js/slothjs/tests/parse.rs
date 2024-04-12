@@ -1302,6 +1302,11 @@ fn test_builtin_string() {
     */
     //TODO: replace(RegExp, ...)
     //assert_eval!(r"'$1,$2'.replace(/(\$(\d))/g, '$$1-$1$2')", "$1-$11,$1-$22");
+
+
+    // String.toLowerCase()
+    assert_eval!(r#""AbCd".toLowerCase()"#, "abcd");
+    assert_eval!(r#""СЛАВА УКРАЇНІ".toLowerCase()"#, "слава україні");
 }
 
 #[test]
