@@ -15,6 +15,7 @@ pub static CLASS: HostClass = HostClass {
         ("substr", string_proto_substr),
         ("toString", string_proto_valueOf),
         ("valueOf", string_proto_valueOf),
+        ("toLowerCase", string_proto_toLowerCase),
     ],
     static_methods: &[],
 };
@@ -192,4 +193,10 @@ fn string_proto_replace(call: CallContext, heap: &mut Heap) -> JSResult<Interpre
     }
     result.push_str(after);
     Ok(Interpreted::from(result))
+}
+
+#[allow(non_snake_case)]
+fn string_proto_toLowerCase(call: CallContext, heap: &mut Heap) -> JSResult<Interpreted> {
+    let string = heap.ref_to_string(call.this_ref)?;
+    Ok(Interpreted::from(string.to_lowercase()))
 }
