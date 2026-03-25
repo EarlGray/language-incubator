@@ -7,10 +7,10 @@ Hacks that have grown into separate projects:
 
 - [x86/hasm](https://github.com/EarlGray/hasm): a simple x86 assembler written in Haskell, for now it's opcode set is very limited;
 - [fp/secd](https://github.com/EarlGray/SECD): implementation of SECD virtual machine in C with a Scheme-to-SECD compiler;
+- [js/slothjs](https://github.com/EarlGray/sljs): an effort at a naïve, primitive, savage Javascript interpreter (with parsing offloaded to [Esprima](https://esprima.org/));
 
 Some protoprojects that may be interesting:
 
-- js/slothjs: an effort at a naïve, primitive, savage Javascript interpreter (with parsing offloaded to [Esprima](https://esprima.org/));
 - bf/bfjc: a primitive but fully functional x86\_64 JIT compiler for BrainFuck, inspired by [_Adventures in JIT compilation_ by eliben](https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/) ;
 - fp/tapl: reimplementation of some typecheckers from [TAPL](https://www.cis.upenn.edu/~bcpierce/tapl/) (in Haskell/Prolog), e.g. [fullsimple](https://github.com/EarlGray/language-snippets/blob/master/fp/tapl/fullsimple.pl).
 - llvm/kldscp: LLVM tutorial, JIT compiler of a toy language Kaleidoscope;
